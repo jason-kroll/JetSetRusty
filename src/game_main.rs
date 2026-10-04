@@ -340,19 +340,26 @@ pub fn run() {
         remainder: 0,
         divisor: 0,
     };
-    // SDL reports refresh_rate == 0 when the rate is unspecified (headless,
-    // Xvfb, some virtual displays). Fall back to TICKRATE so Timer_Set doesn't
-    // divide by zero — this makes the frame gate run one tick per frame.
-    let refresh_rate = if mode.refresh_rate == 0 {
-        TICKRATE
-    } else {
-        mode.refresh_rate
-    };
-    Timer_Set(&raw mut timer_frame, TICKRATE, refresh_rate);
+    // One game tick per loop iteration; the loop itself is throttled to
+    // TICKRATE iterations/second by the wall-clock pacer below (a port of the
+    // original C System_StartFrame). The renderer still requests vsync for
+    // tear-free output, but vsync must not be relied on for pacing: several
+    // drivers and compositors silently ignore PRESENTVSYNC, which lets the
+    // loop spin unthrottled and the game run many times too fast.
+    Timer_Set(&raw mut timer_frame, TICKRATE, TICKRATE);
     Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
 
     // Main loop ---------------------------------------------------------------
+    // Wall-clock pacer: frame_time advances 1000 units per rendered frame,
+    // while SDL_GetTicks64() * TICKRATE puts the millisecond clock on the same
+    // scale, so the loop runs one iteration per 1000/TICKRATE ms (60 Hz).
+    let mut frame_time: u64 = 0;
     while GAME_RUNNING.load(Relaxed) {
+        while frame_time > unsafe { sdl::SDL_GetTicks64() } * TICKRATE as u64 {
+            unsafe { sdl::SDL_Delay(1) }
+        }
+        frame_time += 1000;
+
         let frame = Timer_Update(&raw mut timer_frame);
 
         let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();
