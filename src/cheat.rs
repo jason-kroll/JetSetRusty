@@ -14,10 +14,6 @@ static CHEAT_CODE: &[u8] = b"writetyper";
 
 #[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)]
-pub static mut cheatEnabled: i32 = 0;
-
-#[unsafe(no_mangle)]
-#[allow(non_upper_case_globals)]
 pub static mut Cheat_Responder: Event = Some(cheat_disabled);
 
 #[unsafe(no_mangle)]

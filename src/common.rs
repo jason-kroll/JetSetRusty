@@ -90,8 +90,8 @@ pub fn system_set_pixel(pos: i32, ink: i32) {
 // All globals have now been dissolved into GAME_STATE. This block is kept
 // empty as a placeholder and will be removed once the migration is complete.
 //
-// `cheatEnabled` is deliberately absent: it is Rust-owned (cheat.rs)
-// and already a single shared symbol.
+// `cheatEnabled` has likewise been dissolved into GAME_STATE
+// (as the `cheat_enabled` field) and no longer exists as a static.
 //
 // All globals have been dissolved into GAME_STATE (music/frame/inactivity_timer/
 // level_border/score_clock/score_items/timer, then clock_ticks/game_paused/

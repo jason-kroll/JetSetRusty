@@ -1,5 +1,4 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
-use crate::cheat::cheatEnabled;
 use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
 use crate::game::{GAME_STATE, Game_Action};
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
@@ -61,7 +60,7 @@ unsafe extern "C" fn game_start() {
 
         Miner_Init();
 
-        if cheatEnabled != 0 {
+        if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
             Robots_DrawCheat();
         }
 

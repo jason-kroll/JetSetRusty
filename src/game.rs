@@ -10,7 +10,6 @@ use crate::video::{
     Video_CycleColours, Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge,
 };
 
-use crate::cheat::cheatEnabled;
 use crate::common::{
     // All C-ABI globals have been dissolved into GAME_STATE.
     // Everything has been dissolved: gameMode, gameLevel, minerWilly, minerWillyRope,
@@ -942,21 +941,13 @@ pub extern "C" fn Game_DrawStatus() {
 }
 
 fn sync_rust_to_c() {
-    unsafe {
-        // Atomic fields -> C globals
-        cheatEnabled = GAME_STATE.cheat_enabled.load(Ordering::Relaxed) as i32;
-        // All other globals have been dissolved into GAME_STATE
-    }
+    // Atomic fields -> C globals
+    // All globals have been dissolved into GAME_STATE
 }
 
 fn sync_c_to_rust() {
-    unsafe {
-        // C globals -> Atomic fields
-        GAME_STATE
-            .cheat_enabled
-            .store(cheatEnabled != 0, Ordering::Relaxed);
-        // All other globals have been dissolved into GAME_STATE
-    }
+    // C globals -> Atomic fields
+    // All globals have been dissolved into GAME_STATE
 }
 
 #[allow(non_snake_case)]
