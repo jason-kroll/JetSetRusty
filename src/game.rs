@@ -460,7 +460,7 @@ pub fn do_draw_clock() {
 
     unsafe {
         Video_WriteLarge(
-            (WIDTH - 60) as i32,
+            (WIDTH - 60),
             STATUS as i32,
             text.as_ptr() as *const i8,
         );

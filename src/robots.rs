@@ -1298,7 +1298,14 @@ fn do_draw_arrow(robot: &Robot) {
 
 // --- C-ABI entry points (called from game.c / game.rs / title.rs) ------------
 
+// `&mut *(&raw mut ROBOT_THIS)` is the Rust-2024 workaround for taking
+// references to a `static mut`. clippy::deref_addrof wants to "simplify" it to
+// `&mut ROBOT_THIS`, which the deny-by-default `static_mut_refs` lint rejects —
+// and `cargo clippy --fix` will happily apply it and break the build. The
+// pattern is deliberate; do not let clippy touch it.
+
 #[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
 pub extern "C" fn Robots_Ticker() {
     unsafe {
         for robot in &mut *(&raw mut ROBOT_THIS) {
@@ -1309,6 +1316,7 @@ pub extern "C" fn Robots_Ticker() {
 }
 
 #[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
 pub extern "C" fn Robots_Drawer() {
     unsafe {
         for robot in &*(&raw const ROBOT_THIS) {
@@ -1318,6 +1326,7 @@ pub extern "C" fn Robots_Drawer() {
 }
 
 #[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
 pub extern "C" fn Robots_Init() {
     unsafe {
         let robots = &mut *(&raw mut ROBOT_THIS);
@@ -1336,6 +1345,7 @@ pub extern "C" fn Robots_Init() {
 }
 
 #[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
 pub extern "C" fn Robots_Flush() {
     // The Bathroom's toilet (slot 1) switches to its running frames (2 & 3).
     unsafe {
