@@ -1,5 +1,5 @@
 use crate::common::{Action, Event, Key};
-use crate::game::{game_init_room, game_pause, Game_CheatEnabled, GAME_STATE};
+use crate::game::{GAME_STATE, Game_CheatEnabled, game_init_room, game_pause};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // These will move to game.rs when we port that

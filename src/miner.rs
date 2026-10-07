@@ -11,7 +11,7 @@ use crate::audio::{Audio_WillySfx, audioPanX};
 use crate::common::Key;
 use crate::die::Die_Action;
 use crate::game::{
-    Direction, GAME_STATE, GameMode, Game_ChangeLevel, Game_GotItem, Miner, NIGHTMAREROOM,
+    Direction, GAME_STATE, Game_ChangeLevel, Game_GotItem, GameMode, Miner, NIGHTMAREROOM,
 };
 use crate::game_main::{Action, System_IsKey};
 use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
@@ -38,7 +38,13 @@ struct Jump {
 }
 
 const fn jmp(jump: i32, tile: i32, align: i32, length: i32, pitch: i32) -> Jump {
-    Jump { jump, tile, align, length, pitch }
+    Jump {
+        jump,
+        tile,
+        align,
+        length,
+        pitch,
+    }
 }
 
 #[rustfmt::skip]
@@ -100,7 +106,12 @@ const MINER_ZERO: Miner = Miner {
 // File-static miner state (private; no C ABI needed).
 static mut MINER_FRAME: usize = 0; // base row into MINER_SPRITE (0 or 8)
 static mut MINER_SEQ_INDEX: u8 = 0;
-static mut MINER_TIMER: Timer = Timer { rate: 0, acc: 0, remainder: 0, divisor: 0 };
+static mut MINER_TIMER: Timer = Timer {
+    rate: 0,
+    acc: 0,
+    remainder: 0,
+    divisor: 0,
+};
 
 // YALIGN macro from video.h.
 const fn yalign(y: i32) -> i32 {
@@ -118,7 +129,8 @@ pub extern "C" fn Miner_SetSeq(index: i32, speed: i32) {
 #[unsafe(no_mangle)]
 pub extern "C" fn Miner_IncSeq() {
     unsafe {
-        MINER_SEQ_INDEX = MINER_SEQ_INDEX.wrapping_add(Timer_Update(&raw mut MINER_TIMER) as u8) & 7;
+        MINER_SEQ_INDEX =
+            MINER_SEQ_INDEX.wrapping_add(Timer_Update(&raw mut MINER_TIMER) as u8) & 7;
     }
 }
 
@@ -166,7 +178,11 @@ pub extern "C" fn Miner_Save() {
     }
 
     unsafe {
-        MINER_FRAME = if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM { 8 } else { 0 };
+        MINER_FRAME = if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM {
+            8
+        } else {
+            0
+        };
     }
 }
 
@@ -207,7 +223,7 @@ fn move_left_right() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut y = 0;
     let mut offset = 0;
-    
+
     if miner.move_ == 0 {
         return;
     }
@@ -321,7 +337,9 @@ fn update_dir(convey_dir: i32) {
         }
     }
 
-    if System_IsKey(Key::Jump as i32) != 0 && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
+    if System_IsKey(Key::Jump as i32) != 0
+        && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
+    {
         miner.air = 1;
         miner.jump = 0;
         GAME_STATE.miner_air.store(1, Ordering::Relaxed);

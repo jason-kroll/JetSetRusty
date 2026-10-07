@@ -21,7 +21,7 @@ use crate::common::{
     WIDTH,
 };
 
-use crate::game_main::{Action, DoNothing, Drawer, Responder, Ticker, TICKRATE};
+use crate::game_main::{Action, DoNothing, Drawer, Responder, TICKRATE, Ticker};
 use crate::levels::level_init;
 use crate::misc::Timer_Set;
 use crate::rope::Rope_Init;
@@ -414,11 +414,7 @@ pub fn do_draw_clock() {
     }
 
     unsafe {
-        Video_WriteLarge(
-            (WIDTH - 60),
-            STATUS as i32,
-            text.as_ptr() as *const i8,
-        );
+        Video_WriteLarge((WIDTH - 60), STATUS as i32, text.as_ptr() as *const i8);
         DO_CLOCK_UPDATE = Some(DoNothing);
     }
 }

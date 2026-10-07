@@ -12,9 +12,9 @@
 // `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
 // them by that name.
 
-use crate::audio::{audioPanX, Audio_Sfx};
+use crate::audio::{Audio_Sfx, audioPanX};
 use crate::common::WIDTH;
-use crate::game::{GameMode, GAME_STATE, LIVES, MASTERBEDROOM};
+use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
 

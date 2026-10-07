@@ -64,7 +64,9 @@ unsafe extern "C" fn game_start() {
             Robots_DrawCheat();
         }
 
-        GAME_STATE.mode.store(GameMode::Normal as u8, Ordering::Relaxed);
+        GAME_STATE
+            .mode
+            .store(GameMode::Normal as u8, Ordering::Relaxed);
         GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
         Game_Action();

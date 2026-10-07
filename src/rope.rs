@@ -254,7 +254,9 @@ fn do_rope_drawer() {
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
-                GAME_STATE.miner_willy_rope.store(adjusted_seg, Ordering::Relaxed);
+                GAME_STATE
+                    .miner_willy_rope
+                    .store(adjusted_seg, Ordering::Relaxed);
                 return;
             }
 
