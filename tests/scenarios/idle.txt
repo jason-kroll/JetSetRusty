@@ -1,0 +1,3 @@
+# No input at all: the loader (with its flashing text and loading bar), then
+# the code-card screen waiting for an answer that never comes.
+frames 3600

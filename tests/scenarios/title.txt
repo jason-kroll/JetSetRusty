@@ -1,0 +1,5 @@
+# Skip the code card, then leave the title screen running: the title music
+# (polyphonic synth), the JSW logo flashing, the colour-cycling border, and
+# the scrolling ticker text.
+frames 4800
+100 space          # any key once the loader music ends (~frame 78) skips the code card

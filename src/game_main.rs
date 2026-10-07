@@ -94,10 +94,14 @@ pub static mut videoFlash: i32 = 0;
 thread_local! {
     static KEY_STATE:   Cell<*const u8>                              = const { Cell::new(std::ptr::null()) };
     static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
+    // In replay mode, the SDL keycodes the script is holding down this frame;
+    // System_IsKey reads this instead of SDL's keyboard state. None = live play.
+    static REPLAY_HELD: RefCell<Option<Vec<i32>>> = const { RefCell::new(None) };
 }
 
 static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
 static GAME_RUNNING: AtomicBool = AtomicBool::new(true);
+static REPLAY_MODE: AtomicBool = AtomicBool::new(false);
 
 // ---- Exported C-facing functions --------------------------------------------
 
@@ -121,9 +125,13 @@ pub extern "C" fn System_Rnd() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn System_IsKey(key: i32) -> i32 {
+    let sym = SDL_KEYS[key as usize];
+    if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
+        return held as i32;
+    }
     let key_state = KEY_STATE.with(Cell::get);
     unsafe {
-        let scancode = sdl::SDL_GetScancodeFromKey(SDL_KEYS[key as usize]);
+        let scancode = sdl::SDL_GetScancodeFromKey(sym);
         *key_state.add(scancode as usize) as i32
     }
 }
@@ -182,6 +190,68 @@ fn fire(event: Event) {
     }
 }
 
+// Run one game tick: the Action, then each pending input through the
+// Responder, then the Ticker and Drawer. `next_input` yields each input event
+// queued since the last tick (Key::None for events that aren't game input) and
+// None once the queue is empty. Shared by live play and replay so both run the
+// exact same frame logic.
+pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<i32>) {
+    unsafe {
+        fire(Action);
+        while let Some(input) = next_input() {
+            gameInput = input;
+            if gameInput != Key::None as i32 {
+                fire(Responder);
+            }
+        }
+        // As in live play, where the final (empty) poll leaves gameInput at None.
+        gameInput = Key::None as i32;
+        fire(Ticker);
+        fire(Drawer);
+        videoFlash ^= Timer_Update(timer_flash);
+    }
+}
+
+// Read-only view of the framebuffer (palette indices) and the border colour,
+// for replay hashing and frame dumps.
+pub(crate) fn with_framebuffer<R>(f: impl FnOnce(&[u8]) -> R) -> R {
+    FRAMEBUFFER.with(|fb| f(&fb.borrow()[..]))
+}
+
+pub(crate) fn border_index() -> usize {
+    BORDER_INDEX.load(Relaxed)
+}
+
+pub(crate) fn set_replay_mode() {
+    REPLAY_MODE.store(true, Relaxed);
+}
+
+// The version string shown on the loader screen. Replay mode pins it, because
+// the real one carries the build date and would change the frame hashes daily.
+pub(crate) fn build_version() -> &'static str {
+    if REPLAY_MODE.load(Relaxed) { "1.0.0 replay" } else { env!("BUILD") }
+}
+
+pub(crate) fn set_replay_held(keys: Option<Vec<i32>>) {
+    REPLAY_HELD.with(|h| *h.borrow_mut() = keys);
+}
+
+pub(crate) fn seed_rng(seed: u32) {
+    unsafe { srand(seed) };
+}
+
+pub(crate) fn game_running() -> bool {
+    GAME_RUNNING.load(Relaxed)
+}
+
+pub(crate) fn audio_init() {
+    unsafe { Audio_Init() };
+}
+
+pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
+    unsafe { Audio_Output(stereo_frame.as_mut_ptr()) };
+}
+
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
     unsafe {
@@ -205,38 +275,50 @@ fn system_get_event() -> bool {
             return true;
         }
 
-        let sym = event.key.keysym.sym;
-        let k1 = sdl::SDL_KeyCode::SDLK_1 as i32;
-        let ka = sdl::SDL_KeyCode::SDLK_a as i32;
-
-        gameInput = if sym == sdl::SDL_KeyCode::SDLK_RETURN as i32 {
-            Key::Enter as i32
-        } else if sym == sdl::SDL_KeyCode::SDLK_ESCAPE as i32 {
-            Key::Escape as i32
-        } else if sym == sdl::SDL_KeyCode::SDLK_PAUSE as i32
-            || sym == sdl::SDL_KeyCode::SDLK_TAB as i32
-        {
-            Key::Pause as i32
-        } else if sym == sdl::SDL_KeyCode::SDLK_LALT as i32
-            || sym == sdl::SDL_KeyCode::SDLK_RALT as i32
-        {
-            Key::Mute as i32
-        } else if sym >= k1 && sym <= sdl::SDL_KeyCode::SDLK_4 as i32 {
-            Key::K1 as i32 + (sym - k1)
-        } else if matches!(sym - ka, 4 | 8 | 15 | 17 | 19 | 22 | 24) {
-            // e i p r t w y
-            Key::A as i32 + (sym - ka)
-        } else {
-            Key::Else as i32
-        };
+        gameInput = map_keycode(event.key.keysym.sym);
 
         true
+    }
+}
+
+// Map an SDL keycode to the game's one-shot input (gameInput) for a keydown.
+// Shared by live play and replay, so scripted presses map exactly like real ones.
+pub(crate) fn map_keycode(sym: i32) -> i32 {
+    let k1 = sdl::SDL_KeyCode::SDLK_1 as i32;
+    let ka = sdl::SDL_KeyCode::SDLK_a as i32;
+
+    if sym == sdl::SDL_KeyCode::SDLK_RETURN as i32 {
+        Key::Enter as i32
+    } else if sym == sdl::SDL_KeyCode::SDLK_ESCAPE as i32 {
+        Key::Escape as i32
+    } else if sym == sdl::SDL_KeyCode::SDLK_PAUSE as i32
+        || sym == sdl::SDL_KeyCode::SDLK_TAB as i32
+    {
+        Key::Pause as i32
+    } else if sym == sdl::SDL_KeyCode::SDLK_LALT as i32
+        || sym == sdl::SDL_KeyCode::SDLK_RALT as i32
+    {
+        Key::Mute as i32
+    } else if sym >= k1 && sym <= sdl::SDL_KeyCode::SDLK_4 as i32 {
+        Key::K1 as i32 + (sym - k1)
+    } else if matches!(sym - ka, 4 | 8 | 15 | 17 | 19 | 22 | 24) {
+        // e i p r t w y
+        Key::A as i32 + (sym - ka)
+    } else {
+        Key::Else as i32
     }
 }
 
 // ---- Entry point ------------------------------------------------------------
 
 pub fn run() {
+    // `jetsetrusty --replay <script>`: headless, deterministic run for the
+    // regression tests (see replay.rs). No SDL is initialised.
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--replay") {
+        std::process::exit(crate::replay::main(&args[2..]));
+    }
+
     // SDL init ----------------------------------------------------------------
     unsafe { sdl::SDL_Init(sdl::SDL_INIT_VIDEO | sdl::SDL_INIT_AUDIO) };
     unsafe { sdl::SDL_SetHint(c"SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS".as_ptr(), c"0".as_ptr()) };
@@ -379,17 +461,13 @@ pub fn run() {
         let frame = Timer_Update(&raw mut timer_frame);
 
         for _ in 0..frame {
-            unsafe {
-                fire(Action);
-                while system_get_event() {
-                    if gameInput != Key::None as i32 {
-                        fire(Responder);
-                    }
+            game_frame(&mut timer_flash, || {
+                if system_get_event() {
+                    Some(unsafe { gameInput })
+                } else {
+                    None
                 }
-                fire(Ticker);
-                fire(Drawer);
-                videoFlash ^= Timer_Update(&raw mut timer_flash);
-            }
+            });
         }
 
         let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();

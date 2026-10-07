@@ -90,8 +90,9 @@ extern "C" fn do_loader_drawer1() {
 
         // BUILD string right-aligned on the same row
         // \x02\x00 = set ink to 0 (black); the embedded null is the ink arg, not a terminator
-        let build = concat!(env!("BUILD"), "\0").as_bytes();
-        let build_with_ink = concat!("\x02\x00", env!("BUILD"), "\0").as_bytes();
+        let version = crate::game_main::build_version();
+        let build = format!("{version}\0").into_bytes();
+        let build_with_ink = format!("\x02\x00{version}\0").into_bytes();
         Video_Write(
             23 * 8 * WIDTH + WIDTH - video_text_width(build.as_ptr() as *const i8),
             build_with_ink.as_ptr() as *const i8,

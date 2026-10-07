@@ -1,0 +1,17 @@
+# Start a game and move around: walking, jumping, the stairs in The Bathroom,
+# a room change into Top Landing, pause (colour cycling) and music mute.
+frames 2400
+100 space          # skip the code card
+300 enter          # start the game from the title screen
+360 right 40       # walk right toward the bath
+420 space 1        # jump on the spot
+480 left 60        # back left
+560 left 20        # walk left and jump while moving
+565 space 1
+640 lalt           # mute the in-game music
+700 lalt           # and unmute it
+760 tab            # pause: the playfield colours cycle
+1000 tab           # unpause
+1060 left 900      # walk left out of The Bathroom into Top Landing
+2000 space 1       # a jump in Top Landing
+2100 escape        # quit to the title screen

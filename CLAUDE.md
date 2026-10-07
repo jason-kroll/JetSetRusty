@@ -12,6 +12,7 @@ A Rust port of the 1984 ZX Spectrum game "Jet Set Willy" (originally by Matthew 
 cargo build           # debug build
 cargo build --release # optimized
 cargo run             # run the game
+cargo test            # golden-frame regression tests (see *Regression tests*)
 ```
 
 **Required system libraries:** `libsdl2-dev build-essential`
@@ -36,7 +37,8 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 | Module | Role |
 |--------|------|
 | `main.rs` | Entry point — calls `game_main::run()` |
-| `game_main.rs` | SDL2 init, main loop (wall-clock 60 Hz pacer — see *Frame pacing*), SDL audio callback (`sdl_audio_callback` → `Audio_Output`), keyboard polling, the four function-pointer globals |
+| `game_main.rs` | SDL2 init, main loop (wall-clock 60 Hz pacer — see *Frame pacing*), SDL audio callback (`sdl_audio_callback` → `Audio_Output`), keyboard polling, the four function-pointer globals. Owns `FRAMEBUFFER` (see *Graphics Model*) and `game_frame()`, the per-tick body shared by live play and replay. |
+| `replay.rs` | Headless deterministic replay (`jetsetrusty --replay <script>`) for the regression tests: scripted input, fixed RNG seed, lockstep audio, per-frame FNV-1a hashes of video and audio. No SDL. |
 | `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum (`#[repr(i32)]`), `Event` type alias, re-exports of `game_main` globals, extern decls for any unported C `*_Action` |
 | `video.rs` | Full rendering engine — `videoPixel` buffer, sprite drawing, two character sets (8px/128-char and 16px/96-char) |
 | `misc.rs` | 16-color `videoColour` palette (`#[no_mangle]`), `Timer` struct, `Video_Viewport` |
@@ -91,6 +93,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 - Per-pixel bit flags in `ink`: `B_LEVEL=1`, `B_ROBOT=2`, `B_WILLY=4`
 - Text uses embedded control bytes: `\x01` = set paper (next byte = index), `\x02` = set ink
 - `TILE2PIXEL(t)` macro converts tile coordinates to pixel buffer offsets
+- Output path: `video.rs` → `System_SetPixel(pos, palette_index)` → `FRAMEBUFFER` (a 256×192 thread-local `[u8]` of palette indices in `game_main.rs`). Once per frame `present_frame()` converts the whole buffer to RGB on the SDL texture. The buffer persists across frames because the game only redraws pixels that change. The palette (`videoColour`) is an immutable `static`, and the border is a separate palette index (`System_Border`).
 
 ### Audio Model
 
@@ -109,6 +112,16 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 `CONVENTIONS.md` asks for code to pass `cargo clippy -- -D warnings`; the crate does not yet (about 40 pre-existing errors, mostly `manual_c_str_literals` and `needless_range_loop`), so compare against a baseline rather than expecting a clean run. Beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build. The affected `robots.rs` functions carry `#[allow(clippy::deref_addrof)]` for this reason (`4e36bf1`); keep that pattern for any new `static mut` accessor.
 
 **Do not run `cargo fmt` yet.** The crate is not rustfmt-clean, and `cargo fmt -- <file>` still formats the *whole crate* (it rewrites `robots.rs`'s hand-aligned guardian data tables into thousands of lines). Formatting is planned as its own separate pass, with the data tables excluded (e.g. `#[rustfmt::skip]` or moving them to a data file).
+
+## Regression tests
+
+`cargo test` runs `tests/replay.rs`: each `tests/scenarios/<name>.txt` is replayed headlessly with `jetsetrusty --replay` (`src/replay.rs`), and its per-frame video+audio hashes must match `tests/golden/<name>.hashes` exactly. The test reports the **first divergent frame** and whether the video, the audio, or both changed. Use this to prove a refactor is behaviour-preserving.
+
+- **Inspect a frame:** `cargo run -- --replay tests/scenarios/play.txt --dump 301 /tmp/f.ppm` (any number of `--dump <frame> <file>`).
+- **Intentional output change:** `UPDATE_GOLDEN=1 cargo test --test replay`, and say in the commit why the frames changed. The goldens record current behaviour, bugs included: they detect *change*, not correctness.
+- **Script format** (documented at the top of `replay.rs`): `frames N`, optional `seed N`, then `<frame> <key> [<held frames>]` lines. A press sends the keydown through the same `map_keycode()` as live play *and* holds the key for `System_IsKey`.
+- **Why audio is in lockstep:** the loader and title screens advance on `audioMusicPlaying`, which the audio sequencer updates. Replay therefore generates exactly `SAMPLERATE / TICKRATE` samples per frame instead of using the audio thread. Live play still depends on audio-thread timing there.
+- **Replay-mode differences from live play:** no SDL at all, a fixed RNG seed, and the loader's version string pinned to `1.0.0 replay` (`build_version()`), since the real one carries the build date. Scenarios: `idle` (loader + code card), `title` (title screen + music), `play` (start a game, walk/jump/pick up an item, mute, pause, Top Landing, escape).
 
 ## Debugging
 
