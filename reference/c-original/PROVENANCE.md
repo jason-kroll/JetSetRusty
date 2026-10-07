@@ -50,6 +50,16 @@ make clean      # remove linux/ and the binary
 The Makefile defines `-DNOCODES` (skips the copy-protection code entry on
 startup) and stamps `-DBUILD="v1.0.<year>"`. Build output is git-ignored.
 
+## `README.md` — upstream's README
+
+`README.md` is upstream's README as of fawtytoo's last commit to it,
+`5ce25a6` ("Add Linux/VS compiling", 2026-01-19). It was the repo's root README
+until JetSetRusty got its own. The **one change** from upstream is the four
+screenshot links, rewritten from `images/…` to `../../images/…` so they
+resolve from this directory. Its build instructions (`make install`, Visual
+Studio 2015) describe upstream's C build, not this snapshot's `Makefile` or the
+Rust port.
+
 ## `Win32/` — upstream's Visual Studio project (stale, does not build)
 
 `Win32/` is upstream's Windows build: a Visual Studio solution/project

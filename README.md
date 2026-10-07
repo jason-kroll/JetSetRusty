@@ -1,66 +1,85 @@
-# JET SET WILLY
+<!--
+TODO(Jason): This README is a placeholder that was LLM-generated (Claude Code,
+Claude Opus 5.5). It will be rewritten by hand. Don't polish it; replace it.
+-->
 
-**NOTE: Some rando on the internet is porting this to Rust as a fun-time project**
+> **⚠️ LLM-generated placeholder.** An AI model (Claude) wrote this README as a
+> stand-in. **TODO:** Jason is going to rewrite it. Until then, trust the code
+> over this file.
 
-*(this is that fun-time project; the original is [here](https://github.com/fawtytoo/JetSetWilly))*
+# JetSetRusty
 
-## About
+A Rust port of **Jet Set Willy**, the 1984 ZX Spectrum game by Matthew Smith
+(Software Projects). It is ported from
+[fawtytoo/JetSetWilly](https://github.com/fawtytoo/JetSetWilly), Steve Clark's
+C/SDL2 reimplementation. The game is now 100% Rust, with no C compiled, and
+gameplay is meant to be identical to the C version.
 
-Originally written in 1984 by Matthew Smith. This port is based on the original
-ZX Spectrum version, written in C and using the SDL2 library.
+It's a for-fun project: some rando on the internet porting it to Rust.
 
 ![JetSet Willy loading screen](images/JetSetWilly.gif)
 
-## Game play
+## What carries over from the C version
 
-Game play is 100% identical. The original game had bugs which have been fixed, such as landing at the end
-of a jump into a solid wall.
+These are all features of fawtytoo's version, preserved in the port:
+
+- **Gameplay identical to the original**, minus a few original bugs that were
+  fixed, such as landing at the end of a jump into a solid wall.
+- **Per-pixel colouring**, so there is no colour clash, with a 16-colour palette.
+- Two replacement character-set fonts, one small and one large.
+- **Polyphonic** title and in-game music, plus approximate original sound
+  effects with **stereo panning**. All sound comes from a square-wave synth
+  for that retro "beepy" sound.
 
 ![JetSet Willy title screen](images/JetSetWilly-Title.gif)
 
-## Video & Audio
+## Controls
 
-Some subtle improvements have been made to make the game more enjoyable:
+| Key | Action |
+|-----|--------|
+| ← / → | Walk |
+| Space | Jump |
+| Tab or Pause | Pause |
+| Alt | Music on/off |
+| Esc | Quit to title |
 
-- Per pixel colouring. This eliminates colour clashing.
-- 16 colour palette.
-- 2 replacement character set fonts; one small, one large.
-- The title and in-game music scores have been reproduced and are polyphonic.
-- The sound effects are approximately the same as in the original game and
-include stereo panning effects.
-- To give the music and sound effects a retro feel, a square wave generator is
-used to give it a "beepy" sound.
+### Cheat mode
 
-![JetSet Willy level 1](images/JetSetWilly-Level1.png)
+Type the cheat code just like in the original. Once it's active, hold a level
+key and press Enter: `1`–`0` select levels 1–10, `A`–`T` select levels 11–30,
+and holding Shift moves those to 31–60. See [`ROOMS.md`](ROOMS.md) for the
+full room list.
 
-## Cheat mode
+### Copy protection
 
-Cheat mode is activated just like in the original game by typing the code. Once
-activated, switching levels is as simple.
-
-The keyboard numbers 1 to 0 are levels 1 to 10, letters A to T are levels
-11 to 30 and the Shift key changes that to levels 31 to 60. Then press Enter
-to change level. These key combinations need to be pressed simultaneously.
-
-## Copy protection
-
-The original game needed a "code card" to start the game after loading. This was
-an early attempt at copy protection. If you don't want to experience entering
-those codes, press any key during the "JetSet Willy Loading" sequence.
+The original shipped with a "code card" you had to consult after loading. To
+skip entering codes, press any key during the "JetSet Willy Loading" sequence.
 
 ![JetSet Willy codes](images/JetSetWilly-Codes.gif)
 
-# Download
-- Linux users require installing the SDL2 library for your distro.
-- For Windows 7 and newer.
+## Building
 
-# Compiling
+You need a Rust toolchain (edition 2024) and the SDL2 development library:
 
-## Linux/Debian
+```sh
+sudo apt install libsdl2-dev build-essential   # Debian/Ubuntu
+cargo run --release
+```
 
-- Install the packages `libsdl2-dev build-essential`
-- Then type `make install` at a command prompt.
+Only Linux is tested at the moment.
 
-## Windows
+![JetSet Willy level 1](images/JetSetWilly-Level1.png)
 
-Project files are include for Visual Studio 2015.
+## The original C
+
+The C implementation this was ported from is kept, buildable, in
+[`reference/c-original/`](reference/c-original/). It includes upstream's
+original [README](reference/c-original/README.md), and
+[`PROVENANCE.md`](reference/c-original/PROVENANCE.md) explains where it came
+from. Cargo does not compile it.
+
+## Licence
+
+zlib licence; see [`LICENCE`](LICENCE). Copyright © 2021–2026 Steve Clark and
+© 1984 Matthew Smith (Software Projects). In keeping with the licence, this is
+an **altered version**: a Rust port, not the original software.

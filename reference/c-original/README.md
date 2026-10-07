@@ -1,0 +1,62 @@
+# JET SET WILLY
+
+## About
+
+Originally written in 1984 by Matthew Smith. This port is based on the original
+ZX Spectrum version, written in C and using the SDL2 library.
+
+![JetSet Willy loading screen](../../images/JetSetWilly.gif)
+
+## Game play
+
+Game play is 100% identical. The original game had bugs which have been fixed, such as landing at the end
+of a jump into a solid wall.
+
+![JetSet Willy title screen](../../images/JetSetWilly-Title.gif)
+
+## Video & Audio
+
+Some subtle improvements have been made to make the game more enjoyable:
+
+- Per pixel colouring. This eliminates colour clashing.
+- 16 colour palette.
+- 2 replacement character set fonts; one small, one large.
+- The title and in-game music scores have been reproduced and are polyphonic.
+- The sound effects are approximately the same as in the original game and
+include stereo panning effects.
+- To give the music and sound effects a retro feel, a square wave generator is
+used to give it a "beepy" sound.
+
+![JetSet Willy level 1](../../images/JetSetWilly-Level1.png)
+
+## Cheat mode
+
+Cheat mode is activated just like in the original game by typing the code. Once
+activated, switching levels is as simple.
+
+The keyboard numbers 1 to 0 are levels 1 to 10, letters A to T are levels
+11 to 30 and the Shift key changes that to levels 31 to 60. Then press Enter
+to change level. These key combinations need to be pressed simultaneously.
+
+## Copy protection
+
+The original game needed a "code card" to start the game after loading. This was
+an early attempt at copy protection. If you don't want to experience entering
+those codes, press any key during the "JetSet Willy Loading" sequence.
+
+![JetSet Willy codes](../../images/JetSetWilly-Codes.gif)
+
+# Download
+- Linux users require installing the SDL2 library for your distro.
+- For Windows 7 and newer.
+
+# Compiling
+
+## Linux/Debian
+
+- Install the packages `libsdl2-dev build-essential`
+- Then type `make install` at a command prompt.
+
+## Windows
+
+Project files are include for Visual Studio 2015.
