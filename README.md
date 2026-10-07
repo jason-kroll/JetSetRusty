@@ -1,11 +1,21 @@
 <!--
 TODO(Jason): This README is a placeholder that was LLM-generated (Claude Code,
 Claude Opus 5.5). It will be rewritten by hand. Don't polish it; replace it.
+
+KEEP IN THE REWRITE: the zlib LICENCE (clause 2) requires that "Altered source
+versions must be plainly marked as such, and must not be misrepresented as
+being the original software." The rewrite must still say plainly that this is
+an altered version (a Rust port), not the original Jet Set Willy or fawtytoo's
+C version.
 -->
 
 > **⚠️ LLM-generated placeholder.** An AI model (Claude) wrote this README as a
 > stand-in. **TODO:** Jason is going to rewrite it. Until then, trust the code
 > over this file.
+>
+> **Note for the rewrite:** the zlib [`LICENCE`](LICENCE) (clause 2) requires
+> altered versions to be *plainly marked as such*. Keep a clear statement that
+> this is a modified port, not the original software (see *Licence* below).
 
 # JetSetRusty
 
