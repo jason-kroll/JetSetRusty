@@ -37,7 +37,8 @@ git log --oneline -- src/robots.c # every revision of a since-deleted file
 ## Building it
 
 Needs `gcc` and `libSDL2-dev` only — **no SDL2_mixer** (the original used raw
-SDL2 audio; the mixer came in with the Rust rewrite).
+SDL2 audio; the Rust port's build briefly linked the mixer but never called it,
+and `3fe7f1a` dropped it).
 
 ```bash
 cd reference/c-original
@@ -48,6 +49,21 @@ make clean      # remove linux/ and the binary
 
 The Makefile defines `-DNOCODES` (skips the copy-protection code entry on
 startup) and stamps `-DBUILD="v1.0.<year>"`. Build output is git-ignored.
+
+## `Win32/` — upstream's Visual Studio project (stale, does not build)
+
+`Win32/` is upstream's Windows build: a Visual Studio solution/project
+(`JetSetWilly.sln`, `.vcxproj`, toolsets v142 / v140_xp), the icon resource
+(`JetSetWilly.rc`, `resource.h`, `jetsetwilly.ico`), and `SDL/`, where you were
+meant to drop the SDL2 headers and libs by hand. It sat at the repo root until
+the Rust port no longer needed it, then moved here, where its `..\src\`
+paths resolve to this snapshot's C sources again.
+
+It was **already stale upstream**: the `.vcxproj` omits `system.c` (so it won't
+link) and lists ten headers that don't exist (`cheat.h`, `die.h`, `robots.h`,
+…). Keep it as a historical artifact, not as a working build. The `.ico` is the
+one asset worth reusing (e.g. embedding it in a future Windows build of the
+Rust port).
 
 ## Diffing against current upstream
 
