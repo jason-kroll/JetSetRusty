@@ -11,10 +11,6 @@ use crate::video::{
 };
 
 use crate::common::{
-    // All C-ABI globals have been dissolved into GAME_STATE.
-    // Everything has been dissolved: gameMode, gameLevel, minerWilly, minerWillyRope,
-    // miner_attr_split, clock_ticks (robots), game_paused & item_count (title),
-    // and lives (die).
     // Types
     Event,
     Key,
@@ -246,35 +242,21 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // room, then swaps `Ticker` to DoGameTicker and `Action` to DoNothing — that
 // DoNothing handoff is what stops the title's `game_start` from re-firing (and
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
-//
-// sync_c_to_rust() pulls the latest raw globals (title/game_start wrote gameLevel,
-// gameMode directly) into GAME_STATE before we read them; sync_rust_to_c()
-// pushes our writes (gameLevel, minerAttrSplit, …) back out so the modules that
-// still read the raw globals (miner/robots/title/…) see them.
 #[unsafe(no_mangle)]
 pub extern "C" fn game_init_room() {
-    sync_c_to_rust();
-
-    // Calls to C functions (while still unported)
     level_init();
     unsafe {
         Robots_Init();
     }
     Rope_Init();
 
-    // Read from GAME_STATE (Rust shadow of C state)
     let game = &*GAME_STATE;
     let current_level = game.level.load(Ordering::Relaxed);
 
-    // System_border is a C function into which we send data from Rust
-    // levelBorder[gameLevel] -> game.level_border[level]
-    // Use scope to drop level_border guard before sync_rust_to_c()
-    {
-        let border_value = game.level_border.lock().unwrap()[current_level as usize];
-        unsafe {
-            System_Border(border_value);
-        }
-        // border guard dropped here at end of scope
+    // System_Border(levelBorder[gameLevel])
+    let border_value = game.level_border.lock().unwrap()[current_level as usize];
+    unsafe {
+        System_Border(border_value);
     }
 
     unsafe {
@@ -288,17 +270,12 @@ pub extern "C" fn game_init_room() {
     }
 
     // Timer
-    // Use scope to drop timer guard before sync_rust_to_c()
-    {
-        Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE);
-        // timer guard dropped here at end of scope
-    }
+    Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE);
     game.frame.store(1, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
-    // C Globals
-    // Ticker, Drawer, Action: still C
+    // Ticker, Drawer, Action: the Event function-pointer globals
     unsafe {
         if game.game_paused.load(Ordering::Relaxed) != 0 {
             Ticker = Some(DoNothing);
@@ -308,8 +285,6 @@ pub extern "C" fn game_init_room() {
         }
         Action = Some(DoNothing);
     }
-
-    sync_rust_to_c();
 }
 
 pub fn game_pause(state: bool) {
@@ -347,13 +322,10 @@ pub fn game_pause(state: bool) {
         // colour. (The condition was inverted, so it never fired in normal play.)
         if !game.cheat_enabled.load(Ordering::Relaxed) {
             game_draw_status();
-            // Use scope to drop level_border guard before function returns
-            {
-                let border = game.level_border.lock().unwrap();
-                unsafe {
-                    System_Border(border[game.level.load(Ordering::Relaxed) as usize]);
-                }
-                // border guard dropped here
+            let level = game.level.load(Ordering::Relaxed);
+            let border_value = game.level_border.lock().unwrap()[level as usize];
+            unsafe {
+                System_Border(border_value);
             }
         }
     }
@@ -361,10 +333,6 @@ pub fn game_pause(state: bool) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn do_game_responder() {
-    // Pull current C state in, act on GAME_STATE (incl. game_pause), push back out
-    // so the C code (miner/robots) sees pause/music/mode changes.
-    sync_c_to_rust();
-
     let game = &*GAME_STATE;
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -388,22 +356,13 @@ pub extern "C" fn do_game_responder() {
         _ => {
             if let Some(handler) = unsafe { Cheat_Responder } {
                 unsafe { handler() };
-                // Cheat_Responder writes C state directly (gameLevel on a
-                // level-select, cheatEnabled, Action = Game_InitRoom, &c).
-                // Re-pull so the round-trip below doesn't clobber it with our
-                // stale shadow, then re-apply this frame's inactivity reset.
-                sync_c_to_rust();
-                game.inactivity_timer.store(0, Ordering::Relaxed);
             }
         }
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn do_game_drawer() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
@@ -421,7 +380,6 @@ pub extern "C" fn do_game_drawer() {
     }
 
     unsafe {
-        sync_rust_to_c();
         Level_Drawer();
         Robots_Drawer();
         Miner_Drawer();
@@ -434,13 +392,10 @@ pub extern "C" fn do_game_drawer() {
         if let Some(func) = DO_CLOCK_UPDATE {
             func();
         }
-
-        sync_c_to_rust();
     }
 }
 
 pub fn do_draw_clock() {
-    // NOTE: Caller must have synced state
     let game = &*GAME_STATE;
 
     let mut text: Vec<u8> = vec![
@@ -470,27 +425,21 @@ pub fn do_draw_clock() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn DoDrawClock() {
-    sync_c_to_rust();
     do_draw_clock();
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn DoPauseTicker() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
     if old_paused == 16 * 5 {
         game.game_paused.store(1, Ordering::Relaxed);
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn DoPauseDrawer() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
@@ -499,27 +448,17 @@ pub extern "C" fn DoPauseDrawer() {
             Video_CycleColours();
         }
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_GameReset() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     // gameScoreItems = 0
     *game.score_items.lock().unwrap() = 0;
 
     // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
-    // Use scope to drop clock guard before sync_rust_to_c()
-    {
-        let mut clock = game.score_clock.lock().unwrap();
-        clock[0] = 0;
-        clock[1] = 7;
-        clock[2] = 0;
-        // clock guard dropped here at end of scope
-    }
+    *game.score_clock.lock().unwrap() = [0, 7, 0];
 
     // DoClockUpdate = DoDrawClock
     unsafe {
@@ -545,13 +484,10 @@ pub extern "C" fn Game_GameReset() {
     unsafe {
         Audio_Music(MUS_GAME, music as i32);
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_CheatEnabled() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
@@ -579,13 +515,10 @@ pub extern "C" fn Game_CheatEnabled() {
     unsafe {
         Robots_DrawCheat();
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_ChangeLevel(dir: i32) {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     // int level = Level_Dir(dir)
@@ -593,18 +526,12 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
     if dir == Direction::Above as i32 {
-        let miner = game.miner.lock().unwrap();
+        let mut miner = game.miner.lock().unwrap();
         if (level == THEDRIVE && miner.x > 22 && miner.x < 32)
             || (level == FIRSTLANDING && miner.x > 182)
         {
             // minerWilly.air = 2; return
-            drop(miner); // release the lock before we mutate
-            {
-                let mut miner = game.miner.lock().unwrap();
-                miner.air = 2;
-                // miner guard dropped here at end of scope
-            }
-            sync_rust_to_c();
+            miner.air = 2;
             return;
         }
     }
@@ -613,7 +540,8 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
     game.level.store(level, Ordering::Relaxed);
 
     // Update minerWilly based on direction
-    // Use a scope to drop the lock before calling game_init_room()
+    // Scoped so the miner guard drops before game_init_room() (Miner_Save
+    // locks GAME_STATE.miner itself).
     {
         let mut miner = game.miner.lock().unwrap();
         match dir {
@@ -653,32 +581,22 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
             }
             _ => {}
         }
-        // miner guard dropped here at end of scope
     }
 
-    // game_init_room() reads GAME_STATE directly now — level_init / Robots_Init /
-    // Miner_Save all use GAME_STATE. No sync needed since everything is now
-    // in GAME_STATE. The old "can't leave the room" bug (nested sync-bracket trap)
-    // is resolved.
     game_init_room();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn DoDrawOnce() {
-    sync_c_to_rust();
-
     do_game_drawer();
 
     unsafe {
         Drawer = Some(DoNothing);
     }
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn DoGameTicker() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     // Inactivity check: pause after 5 minutes when music stopped
@@ -686,7 +604,6 @@ pub extern "C" fn DoGameTicker() {
         let old = game.inactivity_timer.fetch_add(1, Ordering::Relaxed);
         if old == 256 * 5 && game.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
             game_pause(true);
-            sync_rust_to_c();
             return;
         }
     }
@@ -699,14 +616,12 @@ pub extern "C" fn DoGameTicker() {
     }
 
     // Update game frame
-    // Use scope to drop timer guard before sync_rust_to_c()
     let frame = unsafe {
         let mut timer = game.timer.lock().unwrap();
         Timer_Update(&mut *timer)
     };
     game.frame.store(frame, Ordering::Relaxed);
     if frame == 0 {
-        sync_rust_to_c();
         return;
     }
 
@@ -724,36 +639,27 @@ pub extern "C" fn DoGameTicker() {
                 Action = Some(Title_Action);
             }
         }
-        sync_rust_to_c();
         return;
     }
 
     // Tick miner
     unsafe {
         Miner_Ticker();
-        // Miner_Ticker now writes directly to GAME_STATE.miner, so no sync
-        // copy is needed here.
     }
 
     // GM_RUNNING mode
     if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
-        // Use scope to ensure miner guard is dropped before sync_rust_to_c()
-        {
-            let mut miner = game.miner.lock().unwrap();
-            miner.frame |= 1;
+        let mut miner = game.miner.lock().unwrap();
+        miner.frame |= 1;
 
-            if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
-                drop(miner);
-                game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
-                unsafe {
-                    Robots_Flush();
-                }
-                game.clock_ticks.store(0, Ordering::Relaxed);
+        if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
+            drop(miner);
+            game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
+            unsafe {
+                Robots_Flush();
             }
-            // miner guard dropped here at end of scope
+            game.clock_ticks.store(0, Ordering::Relaxed);
         }
-
-        sync_rust_to_c();
         return;
     }
 
@@ -761,14 +667,10 @@ pub extern "C" fn DoGameTicker() {
     if game.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
         && game.level.load(Ordering::Relaxed) == MASTERBEDROOM
     {
-        // Use scope to ensure miner guard is dropped before sync_rust_to_c()
-        {
-            let miner = game.miner.lock().unwrap();
-            if miner.air == 0 && miner.x == 40 {
-                drop(miner);
-                game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
-            }
-            // miner guard dropped here at end of scope
+        // Guard drops at the end of this if-block, before Rope_Ticker.
+        let miner = game.miner.lock().unwrap();
+        if miner.air == 0 && miner.x == 40 {
+            game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
         }
     }
 
@@ -779,15 +681,12 @@ pub extern "C" fn DoGameTicker() {
         }
     }
 
-    // Tick clock - use Rust version now
+    // Tick clock
     clock_ticker();
-
-    sync_rust_to_c();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_GotItem() {
-    sync_c_to_rust();
     let game = &*GAME_STATE;
 
     // gameScoreItems++
@@ -813,23 +712,11 @@ pub extern "C" fn Game_GotItem() {
     unsafe {
         crate::audio::Audio_Sfx(0);
     }
-
-    sync_rust_to_c();
 }
 
-// Ported from C's ClockTicker, but NOT yet wired in: the live game loop is still
-// C's DoGameTicker, which calls C's ClockTicker (game.c). Hook this up when
-// DoGameTicker itself is ported — and note it reads/writes GAME_STATE, so it'll
-// need the sync bookends (or to run inside an already-synced Rust ticker).
+// Port of C's ClockTicker; called once per game frame from DoGameTicker.
 #[unsafe(no_mangle)]
 pub extern "C" fn clock_ticker() {
-    // NOTE: no sync bookends here. clock_ticker is only ever called from inside
-    // DoGameTicker, which already syncs on entry and exit. A nested sync_c_to_rust
-    // here reloaded GAME_STATE.timer from the not-yet-synced C gameTimer, discarding
-    // this frame's Timer_Update result and wedging the frame gate (physics every
-    // frame). clock_ticker only touches clock_ticks/score_clock, which the C physics
-    // never write, so operating on the already-synced GAME_STATE is correct.
-
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -844,25 +731,21 @@ pub extern "C" fn clock_ticker() {
 
     game.clock_ticks.store(0, Ordering::Relaxed);
 
-    // Use scope to drop clock guard before sync_rust_to_c()
-    {
-        let mut clock = game.score_clock.lock().unwrap();
-        clock[0] += 1;
-        if (clock[0] == 60) {
-            clock[0] = 0;
-            clock[1] += 1;
-            if (clock[1] == 12) {
-                clock[2] = 1 - clock[2];
-                if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
-                    unsafe {
-                        Action = Some(Gameover_Action);
-                    }
+    let mut clock = game.score_clock.lock().unwrap();
+    clock[0] += 1;
+    if (clock[0] == 60) {
+        clock[0] = 0;
+        clock[1] += 1;
+        if (clock[1] == 12) {
+            clock[2] = 1 - clock[2];
+            if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
+                unsafe {
+                    Action = Some(Gameover_Action);
                 }
-            } else if (clock[1] == 13) {
-                clock[1] = 1;
             }
+        } else if (clock[1] == 13) {
+            clock[1] = 1;
         }
-        // clock guard dropped here
     }
 
     unsafe {
@@ -871,7 +754,6 @@ pub extern "C" fn clock_ticker() {
 }
 
 pub fn game_draw_lives() {
-    // NOTE: Caller must have synced state
     let game = &*GAME_STATE;
     let lives = game.lives.load(Ordering::Relaxed) as usize;
 
@@ -885,13 +767,10 @@ pub fn game_draw_lives() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn GameDrawLives() {
-    sync_c_to_rust();
     game_draw_lives();
-    sync_rust_to_c();
 }
 
 pub fn game_draw_status() {
-    // NOTE: Caller must have synced state (Game_DrawStatus or Game_GotItem)
     let game = &*GAME_STATE;
 
     // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
@@ -935,19 +814,7 @@ pub fn game_draw_status() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_DrawStatus() {
-    sync_c_to_rust();
     game_draw_status();
-    sync_rust_to_c();
-}
-
-fn sync_rust_to_c() {
-    // Atomic fields -> C globals
-    // All globals have been dissolved into GAME_STATE
-}
-
-fn sync_c_to_rust() {
-    // C globals -> Atomic fields
-    // All globals have been dissolved into GAME_STATE
 }
 
 #[allow(non_snake_case)]

@@ -85,15 +85,3 @@ pub unsafe extern "C" fn Level_SetBorder() {
 pub fn system_set_pixel(pos: i32, ink: i32) {
     System_SetPixel(pos, ink)
 }
-
-// These `c_*` bindings previously aliased the shared C-ABI globals.
-// All globals have now been dissolved into GAME_STATE. This block is kept
-// empty as a placeholder and will be removed once the migration is complete.
-//
-// `cheatEnabled` has likewise been dissolved into GAME_STATE
-// (as the `cheat_enabled` field) and no longer exists as a static.
-//
-// All globals have been dissolved into GAME_STATE (music/frame/inactivity_timer/
-// level_border/score_clock/score_items/timer, then clock_ticks/game_paused/
-// item_count/lives, then miner_attr_split, then gameLevel, then gameMode,
-// then minerWilly and minerWillyRope).

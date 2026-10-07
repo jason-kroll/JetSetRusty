@@ -2,19 +2,15 @@
 // Maria, and the two screen-crossing arrows.
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
-// mid-frame inside DoGameTicker/do_game_drawer. For the shared C-ABI globals it
-// still needs (`minerWilly.{y,air}`) it reads the raw
-// storage straight through the `c_*` link_name aliases in common.rs, rather
-// than locking GAME_STATE's mutex fields mid-frame and nesting sync brackets
-// inside the already-synced game.rs callers (the documented anti-pattern).
-// `clock_ticks`, `gameLevel`, and `gameMode`, now dissolved into GAME_STATE, are
-// read via plain atomic loads — no mutex, no sync, so no nesting risk.
+// mid-frame inside DoGameTicker/do_game_drawer, reading shared state straight
+// from GAME_STATE: Willy's position via the `miner` mutex, and `clock_ticks`,
+// `level`, and `mode` via plain atomic loads.
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is
 // Rust-private: no `#[repr(C)]`, no `#[no_mangle]` globals. Only the five
-// `Robots_*` entry points keep their C ABI, because game.c/game.rs/title.rs
-// still call them by that name.
+// `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
+// them by that name.
 
 use crate::audio::{Audio_Sfx, audioPanX};
 use crate::common::WIDTH;
