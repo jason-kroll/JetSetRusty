@@ -3,7 +3,7 @@
 use crate::common::{Event, HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, Timer_Set, Timer_Update, Video_Viewport, videoColour};
 use sdl2::sys as sdl;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 
 pub const SAMPLERATE: i32 = 22050;
@@ -83,11 +83,17 @@ pub static mut videoFlash: i32 = 0;
 
 // ---- Module-private state ---------------------------------------------------
 
-// SDL surface and key state are raw pointers needed by exported functions, but
-// only ever accessed on the main thread — thread_local Cell avoids static mut.
+// The key state is a raw pointer needed by exported functions, but only ever
+// accessed on the main thread — thread_local Cell avoids static mut.
+//
+// FRAMEBUFFER is everything the game has drawn: one palette index (0-15) per
+// pixel, written by System_SetPixel. It persists across frames, because the
+// game only redraws pixels that change, and present_frame() copies all of it
+// to the SDL texture once per frame. Keeping it in our own buffer, not a
+// locked SDL surface, makes the game's output independent of SDL.
 thread_local! {
-    static SDL_SURFACE: Cell<*mut sdl::SDL_Surface> = const { Cell::new(std::ptr::null_mut()) };
-    static KEY_STATE:   Cell<*const u8>              = const { Cell::new(std::ptr::null()) };
+    static KEY_STATE:   Cell<*const u8>                              = const { Cell::new(std::ptr::null()) };
+    static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
 }
 
 static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
@@ -124,18 +130,7 @@ pub extern "C" fn System_IsKey(key: i32) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn System_SetPixel(pos: i32, index: i32) {
-    let surface_ptr = SDL_SURFACE.with(Cell::get);
-    unsafe {
-        let surface = &*surface_ptr;
-        let pixels = surface.pixels as *mut u8;
-        let bpp = (*surface.format).BytesPerPixel as i32;
-        let offset = (pos / WIDTH) * surface.pitch + (pos & 255) * bpp;
-        let pixel = pixels.add(offset as usize);
-        let c = &videoColour[index as usize];
-        *pixel = c.b;
-        *pixel.add(1) = c.g;
-        *pixel.add(2) = c.r;
-    }
+    FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos as usize] = index as u8);
 }
 
 #[unsafe(no_mangle)]
@@ -157,6 +152,27 @@ unsafe extern "C" fn sdl_audio_callback(
         unsafe { output = output.add(2) };
         length -= 4;
     }
+}
+
+// Copy the palette-index framebuffer to the (locked) SDL surface as RGB. Only
+// the B, G, R bytes are written; the alpha byte is left untouched, as the
+// original per-pixel writes did.
+fn present_frame(surface: &sdl::SDL_Surface) {
+    let pixels = surface.pixels as *mut u8;
+    let bpp = unsafe { (*surface.format).BytesPerPixel } as i32;
+    FRAMEBUFFER.with(|fb| {
+        for (pos, &index) in fb.borrow().iter().enumerate() {
+            let pos = pos as i32;
+            let offset = (pos / WIDTH) * surface.pitch + (pos & 255) * bpp;
+            let c = &videoColour[index as usize];
+            unsafe {
+                let pixel = pixels.add(offset as usize);
+                *pixel = c.b;
+                *pixel.add(1) = c.g;
+                *pixel.add(2) = c.r;
+            }
+        }
+    });
 }
 
 // Call an Event's function pointer if it is set.
@@ -362,10 +378,6 @@ pub fn run() {
 
         let frame = Timer_Update(&raw mut timer_frame);
 
-        let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();
-        unsafe { sdl::SDL_LockTextureToSurface(texture, std::ptr::null(), &raw mut sdl_surface) };
-        SDL_SURFACE.with(|c| c.set(sdl_surface));
-
         for _ in 0..frame {
             unsafe {
                 fire(Action);
@@ -380,6 +392,11 @@ pub fn run() {
             }
         }
 
+        let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();
+        unsafe { sdl::SDL_LockTextureToSurface(texture, std::ptr::null(), &raw mut sdl_surface) };
+        if let Some(surface) = unsafe { sdl_surface.as_ref() } {
+            present_frame(surface);
+        }
         unsafe { sdl::SDL_UnlockTexture(texture) };
 
         let border = &videoColour[BORDER_INDEX.load(Relaxed)];
