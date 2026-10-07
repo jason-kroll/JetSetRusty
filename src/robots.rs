@@ -12,9 +12,9 @@
 // `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
 // them by that name.
 
-use crate::audio::{Audio_Sfx, audioPanX};
+use crate::audio::{audioPanX, Audio_Sfx};
 use crate::common::WIDTH;
-use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
+use crate::game::{GameMode, GAME_STATE, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
 
@@ -78,6 +78,8 @@ const NOROBOT: Robot = Robot {
 // per frame. Sets with fewer frames are zero-padded to 8, exactly as the
 // partially-initialized C array is. Index 43/44 are Maria's two colour layers
 // (used by Robots_DrawCheat), index 0 is the toilet.
+
+#[rustfmt::skip]
 static ROBOT_GFX: [[[u16; 16]; 8]; 45] = [
     [
         [15, 63, 15, 12303, 3087, 783, 207, 47, 8, 16376, 16368, 16366, 8159, 8155, 4091, 4091],
@@ -543,6 +545,7 @@ static ROBOT_GFX: [[[u16; 16]; 8]; 45] = [
 //           f_update: 2, f_index: 0, f_mask: 0b011 },
 // Arrow entries ({POS(0, 82), 208 * 8, 208, DoMoveArrowRight, DoDrawArrow,
 // 0, 0, ...}) get `gfx: None`.
+#[rustfmt::skip]
 static ROBOT_START: [[Robot; 8]; 60] = [
     [
         Robot { pos: pos(10, 48), min: pos(10, 8), max: pos(10, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[36]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
@@ -1330,8 +1333,9 @@ pub extern "C" fn Robots_Init() {
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
         // colour layers) are gone.
-        if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM 
-            && GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Maria as u8 {
+        if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM
+            && GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
+        {
             for robot in &mut robots[..2] {
                 robot.do_move = do_move_nothing;
                 robot.do_draw = do_draw_nothing;
