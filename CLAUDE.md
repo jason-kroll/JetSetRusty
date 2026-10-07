@@ -14,9 +14,9 @@ cargo build --release # optimized
 cargo run             # run the game
 ```
 
-**Required system libraries:** `libsdl2-dev libsdl2-mixer-dev build-essential`
+**Required system libraries:** `libsdl2-dev build-essential`
 
-`build.rs` links SDL2 and SDL2_mixer via pkg-config and sets `env!("BUILD")` to a datestamped version string used in the loader screen. **No C is compiled** — the game is 100% Rust.
+`build.rs` links SDL2 via pkg-config (SDL2_mixer was never used and is no longer linked; all sound comes from the `audio.rs` synth) and sets `env!("BUILD")` to a datestamped version string used in the loader screen. **No C is compiled** — the game is 100% Rust.
 
 ## Architecture
 
