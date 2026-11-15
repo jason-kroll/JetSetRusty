@@ -168,8 +168,7 @@ impl CodesState {
                     return;
                 }
 
-                // TODO: After porting we can drop the C string terminator
-                // assuming nothing is trickily depending on it.
+                // Null terminator required: video_write_large takes a C string (*const i8).
                 video_write_large(
                     0,
                     8 * 8,

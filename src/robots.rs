@@ -73,12 +73,6 @@ const NOROBOT: Robot = Robot {
     f_mask: 0b000,
 };
 
-// TODO: port data table — robotGfx[45][8][16] from robots.c.
-// 45 guardian sprite sets, up to 8 animation frames each, 16 u16 raster lines
-// per frame. Sets with fewer frames are zero-padded to 8, exactly as the
-// partially-initialized C array is. Index 43/44 are Maria's two colour layers
-// (used by Robots_DrawCheat), index 0 is the toilet.
-
 #[rustfmt::skip]
 static ROBOT_GFX: [[[u16; 16]; 8]; 45] = [
     [
@@ -533,18 +527,6 @@ static ROBOT_GFX: [[[u16; 16]; 8]; 45] = [
     ], // set 44
 ];
 
-// TODO: port data table — robotStart[][8] from robots.c.
-// One row of 8 slots per room (60 rooms, ROOMS.md order); unused slots are
-// NOROBOT. Each entry transcribes a C initializer, e.g. room 0 slot 0:
-//   {POS(10, 48), POS(10, 8), POS(10, 104), DoMoveDown, DoDrawRobot, 4,
-//    robotGfx[36], 0x5, 2, 0, 0b011}
-// becomes:
-//   Robot { pos: pos(10, 48), min: pos(10, 8), max: pos(10, 104),
-//           do_move: do_move_down, do_draw: do_draw_robot, speed: 4,
-//           gfx: Some(&ROBOT_GFX[36]), ink: 0x5,
-//           f_update: 2, f_index: 0, f_mask: 0b011 },
-// Arrow entries ({POS(0, 82), 208 * 8, 208, DoMoveArrowRight, DoDrawArrow,
-// 0, 0, ...}) get `gfx: None`.
 #[rustfmt::skip]
 static ROBOT_START: [[Robot; 8]; 60] = [
     [

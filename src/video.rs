@@ -397,7 +397,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 // miner.c still needs this
 #[unsafe(no_mangle)]
 pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after miner.c
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
 
     let attr = [0x8i32, 0x8, 0x8, 0x1];
     let mut die = 0i32;
@@ -433,7 +433,7 @@ pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32
 // robots.c needs this
 #[unsafe(no_mangle)]
 pub extern "C" fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after robots.c
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
     let mut pos = pos + 15;
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
@@ -459,7 +459,7 @@ pub fn video_draw_robot(pos: i32, line: [i32; 16], ink: u8) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8) {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // TODO: fix after robots.c
+    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
     let colour = [paper, ink];
     let mut pos = pos + 15;
 
