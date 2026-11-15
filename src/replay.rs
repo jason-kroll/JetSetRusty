@@ -31,8 +31,8 @@
 
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    TICKRATE, audio_init, audio_output, border_index, game_frame, game_running, map_keycode,
-    seed_rng, set_replay_held, set_replay_mode, with_framebuffer, SAMPLERATE,
+    SAMPLERATE, TICKRATE, audio_init, audio_output, border_index, game_frame, game_running,
+    map_keycode, seed_rng, set_replay_held, set_replay_mode, with_framebuffer,
 };
 use crate::misc::{Timer, Timer_Set, videoColour};
 use sdl2::sys::SDL_KeyCode as K;

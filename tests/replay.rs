@@ -121,7 +121,10 @@ fn check(name: &str) {
                 scenario.display()
             );
         }
-        Some(d) => panic!("{name}: {d:?} (golden has {} frames)", expected.lines().count()),
+        Some(d) => panic!(
+            "{name}: {d:?} (golden has {} frames)",
+            expected.lines().count()
+        ),
     }
 }
 
@@ -156,7 +159,10 @@ fn compare_video_only() {
     let b = A.replace("bbbb", "BBBB");
     assert_eq!(
         first_divergence(A, &b),
-        Some(Divergence::Frame { frame: 1, change: Change::Video })
+        Some(Divergence::Frame {
+            frame: 1,
+            change: Change::Video
+        })
     );
 }
 
@@ -165,7 +171,10 @@ fn compare_audio_only() {
     let b = A.replace("3333", "0000");
     assert_eq!(
         first_divergence(A, &b),
-        Some(Divergence::Frame { frame: 2, change: Change::Audio })
+        Some(Divergence::Frame {
+            frame: 2,
+            change: Change::Audio
+        })
     );
 }
 
@@ -174,7 +183,10 @@ fn compare_both() {
     let b = A.replace("aaaa 1111", "AAAA 0000");
     assert_eq!(
         first_divergence(A, &b),
-        Some(Divergence::Frame { frame: 0, change: Change::Both })
+        Some(Divergence::Frame {
+            frame: 0,
+            change: Change::Both
+        })
     );
 }
 
@@ -183,20 +195,29 @@ fn compare_reports_first_of_several() {
     let b = A.replace("bbbb", "BBBB").replace("cccc", "CCCC");
     assert_eq!(
         first_divergence(A, &b),
-        Some(Divergence::Frame { frame: 1, change: Change::Video })
+        Some(Divergence::Frame {
+            frame: 1,
+            change: Change::Video
+        })
     );
 }
 
 #[test]
 fn compare_ended_early() {
     let b: String = A.lines().take(2).map(|l| format!("{l}\n")).collect();
-    assert_eq!(first_divergence(A, &b), Some(Divergence::EndedEarly { frame: 2 }));
+    assert_eq!(
+        first_divergence(A, &b),
+        Some(Divergence::EndedEarly { frame: 2 })
+    );
 }
 
 #[test]
 fn compare_too_long() {
     let b = format!("{A}000003 dddd 4444\n");
-    assert_eq!(first_divergence(A, &b), Some(Divergence::TooLong { frame: 3 }));
+    assert_eq!(
+        first_divergence(A, &b),
+        Some(Divergence::TooLong { frame: 3 })
+    );
 }
 
 // ---- Tests of the harness: the hashes respond to input -----------------------
@@ -207,9 +228,15 @@ fn compare_too_long() {
 #[test]
 fn hashes_see_a_delayed_keypress() {
     let original = scenario_text("play");
-    assert!(original.contains("420 space 1"), "play.txt changed; update this test");
+    assert!(
+        original.contains("420 space 1"),
+        "play.txt changed; update this test"
+    );
     let delayed = original.replace("420 space 1", "421 space 1");
-    let (a, b) = (replay_text("play-original", &original), replay_text("play-delayed", &delayed));
+    let (a, b) = (
+        replay_text("play-original", &original),
+        replay_text("play-delayed", &delayed),
+    );
     match first_divergence(&a, &b) {
         Some(Divergence::Frame { frame, .. }) => assert!(
             (420..430).contains(&frame),
@@ -226,7 +253,10 @@ fn hashes_see_the_rng_seed() {
     let a = replay_text("seed-1", "frames 600\nseed 1\n");
     let b = replay_text("seed-2", "frames 600\nseed 2\n");
     match first_divergence(&a, &b) {
-        Some(Divergence::Frame { frame, change: Change::Video }) => assert!(
+        Some(Divergence::Frame {
+            frame,
+            change: Change::Video,
+        }) => assert!(
             frame > 300,
             "seed changed the output at frame {frame}, before the code card"
         ),

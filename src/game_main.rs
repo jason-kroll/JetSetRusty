@@ -92,7 +92,7 @@ pub static mut videoFlash: i32 = 0;
 // to the SDL texture once per frame. Keeping it in our own buffer, not a
 // locked SDL surface, makes the game's output independent of SDL.
 thread_local! {
-    static KEY_STATE:   Cell<*const u8>                              = const { Cell::new(std::ptr::null()) };
+    static KEY_STATE:   Cell<*const u8>                          = const { Cell::new(std::ptr::null()) };
     static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
     // In replay mode, the SDL keycodes the script is holding down this frame;
     // System_IsKey reads this instead of SDL's keyboard state. None = live play.
@@ -229,7 +229,11 @@ pub(crate) fn set_replay_mode() {
 // The version string shown on the loader screen. Replay mode pins it, because
 // the real one carries the build date and would change the frame hashes daily.
 pub(crate) fn build_version() -> &'static str {
-    if REPLAY_MODE.load(Relaxed) { "1.0.0 replay" } else { env!("BUILD") }
+    if REPLAY_MODE.load(Relaxed) {
+        "1.0.0 replay"
+    } else {
+        env!("BUILD")
+    }
 }
 
 pub(crate) fn set_replay_held(keys: Option<Vec<i32>>) {
@@ -291,12 +295,10 @@ pub(crate) fn map_keycode(sym: i32) -> i32 {
         Key::Enter as i32
     } else if sym == sdl::SDL_KeyCode::SDLK_ESCAPE as i32 {
         Key::Escape as i32
-    } else if sym == sdl::SDL_KeyCode::SDLK_PAUSE as i32
-        || sym == sdl::SDL_KeyCode::SDLK_TAB as i32
+    } else if sym == sdl::SDL_KeyCode::SDLK_PAUSE as i32 || sym == sdl::SDL_KeyCode::SDLK_TAB as i32
     {
         Key::Pause as i32
-    } else if sym == sdl::SDL_KeyCode::SDLK_LALT as i32
-        || sym == sdl::SDL_KeyCode::SDLK_RALT as i32
+    } else if sym == sdl::SDL_KeyCode::SDLK_LALT as i32 || sym == sdl::SDL_KeyCode::SDLK_RALT as i32
     {
         Key::Mute as i32
     } else if sym >= k1 && sym <= sdl::SDL_KeyCode::SDLK_4 as i32 {
