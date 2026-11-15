@@ -1,7 +1,8 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
+use crate::audio::{Audio_ReduceMusicSpeed, Audio_Sfx, SFX_DIE};
 use crate::common::WIDTH;
-use crate::game::{GAME_STATE, Game_Action};
+use crate::game::{GAME_STATE, Game_Action, LIVES};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 use std::sync::atomic::Ordering;
 
@@ -14,23 +15,7 @@ unsafe extern "C" {
     fn Gameover_Action();
     fn DoNothing();
     fn Miner_Restore();
-    fn Audio_ReduceMusicSpeed();
-    fn Audio_Sfx(sfx: i32);
     fn System_Border(colour: i32);
-}
-
-// TODO: move to audio when ported
-const LIVES: i32 = (18 * 8 + 4) * WIDTH + 4; // Defined in game.h
-
-// from audio.h
-#[repr(C)]
-enum Sfx {
-    Item = 0,
-    Die,
-    Gameover,
-    Arrow,
-    Willy,
-    None,
 }
 
 static dieBlank: [u16; 16] = [0; 16];
@@ -55,7 +40,7 @@ extern "C" fn Die_Ticker() {
         }
 
         Video_DrawSprite(
-            LIVES + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
+            LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
             dieBlank.as_ptr(),
             0x0,
             0x0,
@@ -76,7 +61,7 @@ extern "C" fn Die_Init() {
         let miner = GAME_STATE.miner.lock().unwrap();
         audioPanX = miner.x;
         drop(miner);
-        Audio_Sfx(Sfx::Die as i32);
+        Audio_Sfx(SFX_DIE as i32);
         Ticker = Some(Die_Ticker);
     }
 }

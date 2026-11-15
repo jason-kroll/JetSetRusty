@@ -22,12 +22,12 @@ pub const MUS_STOP: i32 = 0;
 pub const MUS_PLAY: i32 = 1;
 
 // Matches audio.h SFX enum order
-const SFX_ITEM: usize = 0;
-const SFX_DIE: usize = 1;
-const SFX_GAMEOVER: usize = 2;
-const SFX_ARROW: usize = 3;
-const SFX_WILLY: usize = 4;
-const SFX_NONE: usize = 5;
+pub const SFX_ITEM: usize = 0;
+pub const SFX_DIE: usize = 1;
+pub const SFX_GAMEOVER: usize = 2;
+pub const SFX_ARROW: usize = 3;
+pub const SFX_WILLY: usize = 4;
+pub const SFX_NONE: usize = 5;
 
 // musicChannel[i] maps to audioChannel index
 const MUSIC_CH: [usize; NMUSIC] = [3, 4, 5, 6, 7];
