@@ -23,6 +23,9 @@ use crate::common::{
 
 use crate::game_main::{DoNothing, TICKRATE, set_action, set_drawer, set_responder, set_ticker};
 use crate::levels::level_init;
+use crate::miner::{
+    Miner_DrawSeqSprite, Miner_Drawer, Miner_IncSeq, Miner_Save, Miner_SetSeq, Miner_Ticker,
+};
 use crate::misc::{Timer_Set, Timer_Update};
 use crate::rope::Rope_Init;
 use crate::title::Title_Action;
@@ -60,12 +63,7 @@ pub static mut DO_CLOCK_UPDATE: Event = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
-    fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
-    fn Miner_Drawer();
-    fn Miner_IncSeq();
-    fn Miner_Save();
-    fn Miner_SetSeq(index: i32, speed: i32);
-    fn Miner_Ticker();
+
     fn Robots_DrawCheat();
     fn Robots_Flush();
     fn Robots_Init();

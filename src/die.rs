@@ -9,10 +9,10 @@ use std::sync::atomic::Ordering;
 
 use crate::game_main::DoNothing;
 use crate::gameover::Gameover_Action;
+use crate::miner::Miner_Restore;
 
 unsafe extern "C" {
     static mut audioPanX: i32;
-    fn Miner_Restore();
     fn System_Border(colour: i32);
 }
 

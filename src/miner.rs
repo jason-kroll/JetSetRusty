@@ -118,24 +118,21 @@ const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_SetSeq(index: i32, speed: i32) {
+pub fn Miner_SetSeq(index: i32, speed: i32) {
     unsafe {
         Timer_Set(&raw mut MINER_TIMER, 1, speed);
         MINER_SEQ_INDEX = index as u8;
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_IncSeq() {
+pub fn Miner_IncSeq() {
     unsafe {
         MINER_SEQ_INDEX =
             MINER_SEQ_INDEX.wrapping_add(Timer_Update(&raw mut MINER_TIMER) as u8) & 7;
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
+pub fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
     unsafe {
         let row = MINER_SEQUENCE[MINER_SEQ_INDEX as usize];
         Video_DrawSprite(pos, MINER_SPRITE[row].as_ptr(), paper, ink);
@@ -146,8 +143,7 @@ pub extern "C" fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
 // It's file-static and doesn't need C ABI.
 static mut MINER_STORE: Miner = MINER_ZERO;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_Restore() {
+pub fn Miner_Restore() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     miner.x = unsafe { MINER_STORE.x };
     miner.y = unsafe { MINER_STORE.y };
@@ -162,8 +158,7 @@ pub extern "C" fn Miner_Restore() {
     GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_Save() {
+pub fn Miner_Save() {
     let miner = GAME_STATE.miner.lock().unwrap();
     unsafe {
         MINER_STORE.x = miner.x;
@@ -491,8 +486,7 @@ fn do_miner_ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_Ticker() {
+pub fn Miner_Ticker() {
     do_miner_ticker();
 
     let miner = GAME_STATE.miner.lock().unwrap();
@@ -502,8 +496,7 @@ pub extern "C" fn Miner_Ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_Drawer() {
+pub fn Miner_Drawer() {
     let miner = GAME_STATE.miner.lock().unwrap();
     let mut offset = 0;
     let mut align = miner.align;
@@ -554,8 +547,7 @@ pub extern "C" fn Miner_Drawer() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Miner_Init() {
+pub fn Miner_Init() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     miner.x = 20 * 8;
     miner.y = 13 * 8;
