@@ -347,6 +347,26 @@ pub(crate) fn map_keycode(sym: i32) -> i32 {
 
 // ---- Entry point ------------------------------------------------------------
 
+// Monotonic millisecond clock. TimerSubsystem::ticks() returns u32 ms since
+// SDL init and wraps every ~49.7 days, so accumulate wrapping deltas into a
+// u64 (the pre-safe-API port called SDL_GetTicks64, which is already u64).
+struct Clock {
+    last: u32,
+    total: u64,
+}
+
+impl Clock {
+    fn new() -> Self {
+        Clock { last: 0, total: 0 }
+    }
+
+    fn now(&mut self, ticks: u32) -> u64 {
+        self.total += ticks.wrapping_sub(self.last) as u64;
+        self.last = ticks;
+        self.total
+    }
+}
+
 pub fn run() {
     // `jetsetrusty --replay <script>`: headless, deterministic run for the
     // regression tests (see replay.rs). No SDL is initialised.
@@ -460,15 +480,21 @@ pub fn run() {
     Timer_Set(&mut timer_flash, 25, TICKRATE * 8);
 
     // Main loop ---------------------------------------------------------------
-    // Wall-clock pacer: frame_time advances 1000 units per rendered frame,
-    // while timer.ticks() * TICKRATE puts the millisecond clock on the same
-    // scale, so the loop runs one iteration per 1000/TICKRATE ms (60 Hz).
+    // Wall-clock pacer: frame_time is set to now+1000 per rendered frame, while
+    // now * TICKRATE puts the millisecond clock on the same scale, so the loop
+    // runs one iteration per 1000/TICKRATE ms (60 Hz). Unlike the C original
+    // (System_StartFrame, which does `time += 1000` and therefore fast-forwards
+    // to catch up after any stall), we restart frame_time from the current wall
+    // clock, dropping any backlog: if the loop stalled (e.g. the window was
+    // unfocused and vsync blocked present()), the game resumes at 60 Hz instead
+    // of bursting at full speed. Deliberate deviation from the C original.
+    let mut clock = Clock::new();
     let mut frame_time: u64 = 0;
     while GAME_RUNNING.load(Relaxed) {
-        while frame_time > timer.ticks() as u64 * TICKRATE as u64 {
+        while frame_time > clock.now(timer.ticks()) * TICKRATE as u64 {
             timer.delay(1);
         }
-        frame_time += 1000;
+        frame_time = clock.now(timer.ticks()) * TICKRATE as u64 + 1000;
 
         let frame = Timer_Update(&mut timer_frame);
 
