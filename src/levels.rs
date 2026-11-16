@@ -2,6 +2,7 @@ use crate::common::WIDTH;
 use crate::game::GAME_STATE;
 use crate::game_main::{System_Border, video_flash};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
+use std::cell::RefCell;
 use std::sync::atomic::Ordering;
 
 const LEVEL_W: usize = 32;
@@ -4905,10 +4906,21 @@ static LEVEL_DATA: [LevelData; 60] = [
     },
 ];
 
-// Mutable state should be derived from an immutable source rather than counter-mutated
-static mut ACTIVE_LEVELS: [LevelData; 60] = LEVEL_DATA; // LEVEL_DATA is the source of truth
-
-static mut CONVEY_ROTATE: [usize; 2] = [0; 2];
+// Mutable state derived from the immutable LEVEL_DATA source of truth.
+// Main-thread only, so thread-local RefCells need no unsafe.
+thread_local! {
+    static ACTIVE_LEVELS: RefCell<[LevelData; 60]> = RefCell::new(LEVEL_DATA);
+    static CONVEY_ROTATE: RefCell<[usize; 2]> = const { RefCell::new([0; 2]) };
+    static LEVEL_TILE: RefCell<[Tile; LEVEL_TILES]> = const { RefCell::new([const {
+        Tile {
+            tile_type: TileType::Space,
+            gfx: [0u8; 8],
+            paper: [0; 3],
+            ink: [0; 3],
+            draw_mode: DrawMode::Tile,
+        }
+    }; LEVEL_TILES]) };
+}
 
 static GFX_SPACE: [u8; 8] = [0u8; 8];
 
@@ -4927,26 +4939,12 @@ struct Tile {
     pub draw_mode: DrawMode,
 }
 
-static mut LEVEL_TILE: [Tile; LEVEL_TILES] = [const {
-    Tile {
-        tile_type: TileType::Space,
-        gfx: [0u8; 8],
-        paper: [0; 3],
-        ink: [0; 3],
-        draw_mode: DrawMode::Tile,
-    }
-}; LEVEL_TILES];
-
-#[inline]
-fn tile_mut(cell: usize) -> &'static mut Tile {
-    unsafe { &mut LEVEL_TILE[cell] }
-}
-
 pub fn level_set_border() {
-    unsafe {
-        System_Border(LEVEL_TILE[0].ink[0].into());
-        LEVEL_TILE[0].ink[0] = (LEVEL_TILE[0].ink[0] + 3) & 0xf;
-    }
+    LEVEL_TILE.with(|tiles| {
+        let t = &mut tiles.borrow_mut()[0];
+        System_Border(t.ink[0].into());
+        t.ink[0] = (t.ink[0] + 3) & 0xf;
+    });
 }
 
 fn game_level() -> usize {
@@ -4962,19 +4960,16 @@ pub fn Level_ItemCount() -> i32 {
 }
 
 fn restore_items() {
-    unsafe {
-        ACTIVE_LEVELS = LEVEL_DATA;
-        let active_levels = std::slice::from_raw_parts_mut(
-            std::ptr::addr_of_mut!(ACTIVE_LEVELS).cast::<LevelData>(),
-            LEVEL_DATA.len(),
-        );
-        for level in active_levels.iter_mut() {
+    ACTIVE_LEVELS.with(|a| {
+        let levels = &mut *a.borrow_mut();
+        *levels = LEVEL_DATA;
+        for level in levels.iter_mut() {
             for &item in level.item.iter().take(level.item_count as usize) {
                 let item_pos = item as usize;
                 level.data[item_pos] = 1;
             }
         }
-    }
+    });
 }
 
 pub fn Level_RestoreItems() {
@@ -4996,17 +4991,19 @@ fn do_flash(tile: &mut Tile) {
 
 pub fn Level_EraseItem(tile: usize) {
     let level = game_level();
-    unsafe {
-        ACTIVE_LEVELS[level].data[tile] = 0;
-    }
-    let t = tile_mut(tile);
-    t.tile_type = TileType::Space;
-    t.gfx = GFX_SPACE;
-    unsafe {
-        t.paper[0] = (ACTIVE_LEVELS[level].info[0].attr >> 4) as u8;
-        t.ink[0] = (ACTIVE_LEVELS[level].info[0].attr & 15) as u8;
-    }
-    t.draw_mode = DrawMode::Tile;
+    let attr = ACTIVE_LEVELS.with(|a| {
+        let mut a = a.borrow_mut();
+        a[level].data[tile] = 0;
+        a[level].info[0].attr
+    });
+    LEVEL_TILE.with(|tiles| {
+        let t = &mut tiles.borrow_mut()[tile];
+        t.tile_type = TileType::Space;
+        t.gfx = GFX_SPACE;
+        t.paper[0] = (attr >> 4) as u8;
+        t.ink[0] = (attr & 15) as u8;
+        t.draw_mode = DrawMode::Tile;
+    });
 }
 
 pub fn Level_GetTileRamp(tile: usize) -> TileType {
@@ -5017,7 +5014,7 @@ fn level_get_tile_ramp(tile: usize) -> TileType {
     if tile >= LEVEL_TILES {
         return TileType::Space;
     }
-    match unsafe { LEVEL_TILE[tile].tile_type } {
+    match LEVEL_TILE.with(|t| t.borrow()[tile].tile_type) {
         TileType::RampLC => TileType::RampL,
         TileType::RampRC => TileType::RampR,
         t => t,
@@ -5032,35 +5029,27 @@ fn level_get_tile_type(tile: usize) -> TileType {
     if tile >= LEVEL_TILES {
         return TileType::Space;
     }
-    unsafe {
-        match LEVEL_TILE[tile].tile_type {
-            TileType::RampLC => TileType::ConveyR,
-            TileType::RampRC => TileType::ConveyL,
-            TileType::SolidFloor => {
-                // Use atomic caches to avoid deadlocking
-                let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
-                let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
-                if air == 1 && jump == 0 {
-                    TileType::Solid
-                } else {
-                    TileType::Floor
-                }
+    match LEVEL_TILE.with(|t| t.borrow()[tile].tile_type) {
+        TileType::RampLC => TileType::ConveyR,
+        TileType::RampRC => TileType::ConveyL,
+        TileType::SolidFloor => {
+            // Use atomic caches to avoid deadlocking
+            let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
+            let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
+            if air == 1 && jump == 0 {
+                TileType::Solid
+            } else {
+                TileType::Floor
             }
-            t => t,
         }
+        t => t,
     }
 }
 
 fn level_ticker() {
-    unsafe {
-        let left_offset = CONVEY_ROTATE[0];
-        let right_offset = CONVEY_ROTATE[1];
-
-        let level_tile = std::slice::from_raw_parts_mut(
-            std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(),
-            LEVEL_TILES,
-        );
-        for t in level_tile.iter_mut() {
+    let (left_offset, right_offset) = CONVEY_ROTATE.with(|c| (c.borrow()[0], c.borrow()[1]));
+    LEVEL_TILE.with(|tiles| {
+        for t in tiles.borrow_mut().iter_mut() {
             match t.tile_type {
                 TileType::ConveyL | TileType::RampLC => {
                     t.gfx[left_offset] = t.gfx[left_offset].rotate_right(2);
@@ -5071,7 +5060,7 @@ fn level_ticker() {
                 _ => {}
             }
         }
-    }
+    });
 }
 
 // game.c
@@ -5081,25 +5070,21 @@ pub fn Level_Ticker() {
 }
 
 fn level_drawer() {
-    let level_tile = unsafe {
-        std::slice::from_raw_parts_mut(
-            std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(),
-            LEVEL_TILES,
-        )
-    };
-    for (cell, t) in level_tile.iter_mut().enumerate() {
-        match t.draw_mode {
-            DrawMode::Tile => do_tile(cell, t),
-            DrawMode::Item => {
-                do_item(&mut *t);
-                do_tile(cell, t);
-            }
-            DrawMode::Flash => {
-                do_flash(&mut *t);
-                do_tile(cell, t);
+    LEVEL_TILE.with(|tiles| {
+        for (cell, t) in tiles.borrow_mut().iter_mut().enumerate() {
+            match t.draw_mode {
+                DrawMode::Tile => do_tile(cell, t),
+                DrawMode::Item => {
+                    do_item(t);
+                    do_tile(cell, t);
+                }
+                DrawMode::Flash => {
+                    do_flash(t);
+                    do_tile(cell, t);
+                }
             }
         }
-    }
+    });
 }
 
 pub fn Level_Drawer() {
@@ -5110,55 +5095,63 @@ pub fn Level_Drawer() {
 #[allow(clippy::manual_c_str_literals)]
 pub fn level_init() {
     let level_idx = game_level();
-    let level = unsafe { &ACTIVE_LEVELS[level_idx] };
 
-    let mut item: u8 = 0;
-    for cell in 0..LEVEL_TILES {
-        let last_data = level.data[cell] as usize;
-        let info = &level.info[last_data];
-        let t = tile_mut(cell);
+    ACTIVE_LEVELS.with(|a| {
+        let a = a.borrow();
+        let level = &a[level_idx];
 
-        t.tile_type = info.tile_type;
-        t.gfx = level.gfx[last_data];
-        t.paper[0] = ((info.attr >> 4) & 0xf) as u8;
-        t.ink[0] = (info.attr & 0xf) as u8;
-        t.draw_mode = DrawMode::Tile;
-        if t.tile_type == TileType::Item {
-            t.ink[0] = (item & 3) + 3;
-            item += 1;
-            t.draw_mode = DrawMode::Item;
-        } else if info.attr & 0x100 != 0 {
-            t.paper[1] = t.ink[0];
-            t.ink[1] = t.paper[0];
-            t.draw_mode = DrawMode::Flash;
-        }
-        t.paper[2] = t.paper[0];
-        t.ink[2] = t.ink[0];
-    }
+        let mut item: u8 = 0;
+        LEVEL_TILE.with(|tiles| {
+            let mut tiles = tiles.borrow_mut();
+            for cell in 0..LEVEL_TILES {
+                let last_data = level.data[cell] as usize;
+                let info = &level.info[last_data];
+                let t = &mut tiles[cell];
 
-    // Find conveyor direction from info array directly
-    let conv_dir = level
-        .info
-        .iter()
-        .position(|i| i.tile_type == TileType::ConveyL);
-    let dir: usize = if conv_dir.is_some() { 0 } else { 2 };
+                t.tile_type = info.tile_type;
+                t.gfx = level.gfx[last_data];
+                t.paper[0] = ((info.attr >> 4) & 0xf) as u8;
+                t.ink[0] = (info.attr & 0xf) as u8;
+                t.draw_mode = DrawMode::Tile;
+                if t.tile_type == TileType::Item {
+                    t.ink[0] = (item & 3) + 3;
+                    item += 1;
+                    t.draw_mode = DrawMode::Item;
+                } else if info.attr & 0x100 != 0 {
+                    t.paper[1] = t.ink[0];
+                    t.ink[1] = t.paper[0];
+                    t.draw_mode = DrawMode::Flash;
+                }
+                t.paper[2] = t.paper[0];
+                t.ink[2] = t.ink[0];
+            }
+        });
 
-    // CONVEY_ROTATE originally stored byte offsets into gfx[2]. Now stores tile indices
-    unsafe {
-        CONVEY_ROTATE[0] = dir;
-        CONVEY_ROTATE[1] = 2 - dir;
-    }
+        // Find conveyor direction from info array directly
+        let conv_dir = level
+            .info
+            .iter()
+            .position(|i| i.tile_type == TileType::ConveyL);
+        let dir: usize = if conv_dir.is_some() { 0 } else { 2 };
 
-    video_pixel_fill(129 * WIDTH, 8 * WIDTH);
+        // CONVEY_ROTATE originally stored byte offsets into gfx[2]. Now stores tile indices
+        CONVEY_ROTATE.with(|c| {
+            let mut c = c.borrow_mut();
+            c[0] = dir;
+            c[1] = 2 - dir;
+        });
 
-    // Set paper=0, ink=6. The interior nul is the \x01 control code's argument,
-    // not a terminator; video_write skips control+argument pairs (as does the C original).
-    video_write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
+        video_pixel_fill(129 * WIDTH, 8 * WIDTH);
 
-    let title = std::ffi::CString::new(level.title).unwrap();
-    let title_width = video_text_width(title.as_ptr());
-    video_write(
-        (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,
-        title.as_ptr(),
-    );
+        // Set paper=0, ink=6. The interior nul is the \x01 control code's argument,
+        // not a terminator; video_write skips control+argument pairs (as does the C original).
+        video_write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
+
+        let title = std::ffi::CString::new(level.title).unwrap();
+        let title_width = video_text_width(title.as_ptr());
+        video_write(
+            (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,
+            title.as_ptr(),
+        );
+    });
 }
