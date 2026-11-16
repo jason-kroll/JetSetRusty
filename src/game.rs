@@ -1,5 +1,5 @@
 #![allow(unused)]
-use crate::audio::{Audio_Music, Audio_Play, MUS_PLAY, MUS_STOP};
+use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
 use crate::cheat::Cheat_Responder;
 use crate::game_main::gameInput;
 use crate::gameover::Gameover_Action;
@@ -704,9 +704,8 @@ pub extern "C" fn Game_GotItem() {
         }
     }
 
-    // Audio_Sfx(SFX_ITEM)
     unsafe {
-        crate::audio::Audio_Sfx(0);
+        Audio_Sfx(SFX_ITEM as i32);
     }
 }
 
