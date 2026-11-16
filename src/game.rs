@@ -27,6 +27,7 @@ use crate::miner::{
     Miner_DrawSeqSprite, Miner_Drawer, Miner_IncSeq, Miner_Save, Miner_SetSeq, Miner_Ticker,
 };
 use crate::misc::{Timer_Set, Timer_Update};
+use crate::robots::{Robots_DrawCheat, Robots_Drawer, Robots_Flush, Robots_Init, Robots_Ticker};
 use crate::rope::Rope_Init;
 use crate::title::Title_Action;
 
@@ -64,12 +65,6 @@ pub static mut DO_CLOCK_UPDATE: Event = None;
 // Probably a lot of functions go here!
 unsafe extern "C" {
 
-    fn Robots_DrawCheat();
-    fn Robots_Flush();
-    fn Robots_Init();
-    fn Robots_Ticker();
-    fn Rope_Ticker();
-    fn Robots_Drawer();
     fn System_Border(x: i32);
 }
 

@@ -6,6 +6,7 @@ use crate::game_main::{
 };
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::miner::Miner_Init;
+use crate::robots::Robots_DrawCheat;
 use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::ptr::addr_of_mut;
 use std::sync::atomic::Ordering;
@@ -17,7 +18,6 @@ use crate::video::{Video_CycleColours, Video_Write, Video_WriteLarge};
 unsafe extern "C" {
     fn Game_GameReset();
     fn Game_DrawStatus();
-    fn Robots_DrawCheat();
     fn System_Border(index: i32);
 }
 

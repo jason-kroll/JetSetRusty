@@ -1285,9 +1285,8 @@ fn do_draw_arrow(robot: &Robot) {
 // and `cargo clippy --fix` will happily apply it and break the build. The
 // pattern is deliberate; do not let clippy touch it.
 
-#[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
-pub extern "C" fn Robots_Ticker() {
+pub fn Robots_Ticker() {
     unsafe {
         for robot in &mut *(&raw mut ROBOT_THIS) {
             let do_move = robot.do_move;
@@ -1296,9 +1295,8 @@ pub extern "C" fn Robots_Ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
-pub extern "C" fn Robots_Drawer() {
+pub fn Robots_Drawer() {
     unsafe {
         for robot in &*(&raw const ROBOT_THIS) {
             (robot.do_draw)(robot);
@@ -1306,9 +1304,8 @@ pub extern "C" fn Robots_Drawer() {
     }
 }
 
-#[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
-pub extern "C" fn Robots_Init() {
+pub fn Robots_Init() {
     unsafe {
         let robots = &mut *(&raw mut ROBOT_THIS);
         *robots = ROBOT_START[GAME_STATE.level.load(Ordering::Relaxed) as usize];
@@ -1326,9 +1323,8 @@ pub extern "C" fn Robots_Init() {
     }
 }
 
-#[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
-pub extern "C" fn Robots_Flush() {
+pub fn Robots_Flush() {
     // The Bathroom's toilet (slot 1) switches to its running frames (2 & 3).
     unsafe {
         let robots = &mut *(&raw mut ROBOT_THIS);
@@ -1338,8 +1334,7 @@ pub extern "C" fn Robots_Flush() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Robots_DrawCheat() {
+pub fn Robots_DrawCheat() {
     // Maria's two colour layers, drawn next to the lives in the status area.
     unsafe {
         Video_DrawRobot(LIVES as i32 + WIDTH - 24, ROBOT_GFX[43][0].as_ptr(), 0x7);
