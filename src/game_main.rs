@@ -4,7 +4,7 @@ use crate::common::{Event, HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, Timer_Set, Timer_Update, Video_Viewport, videoColour};
 use sdl2::sys as sdl;
 use std::cell::{Cell, RefCell};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 
 pub const SAMPLERATE: i32 = 22050;
 pub const TICKRATE: i32 = 60;
@@ -102,6 +102,10 @@ thread_local! {
 static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
 static GAME_RUNNING: AtomicBool = AtomicBool::new(true);
 static REPLAY_MODE: AtomicBool = AtomicBool::new(false);
+// `--items N`: debug override for the remaining-item count at game start
+// (negative = unset). Lets you reach the Maria/toilet victory sequence
+// without collecting every item.
+pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
 // ---- Exported C-facing functions --------------------------------------------
 
@@ -319,6 +323,18 @@ pub fn run() {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--replay") {
         std::process::exit(crate::replay::main(&args[2..]));
+    }
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--items" {
+            if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<i32>().ok()) {
+                DEBUG_ITEM_COUNT.store(v, Relaxed);
+                eprintln!("jetsetrusty: --items {v} (remaining-item count overridden at game start)");
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
     }
 
     // SDL init ----------------------------------------------------------------

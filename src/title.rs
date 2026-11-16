@@ -53,9 +53,14 @@ unsafe extern "C" fn game_start() {
         Game_DrawStatus();
 
         GAME_STATE.level.store(THEBATHROOM, Ordering::Relaxed);
-        GAME_STATE
-            .item_count
-            .store(Level_ItemCount(), Ordering::Relaxed);
+        let debug_items = crate::game_main::DEBUG_ITEM_COUNT.load(Ordering::Relaxed);
+        if debug_items >= 0 {
+            GAME_STATE.item_count.store(debug_items, Ordering::Relaxed);
+        } else {
+            GAME_STATE
+                .item_count
+                .store(Level_ItemCount(), Ordering::Relaxed);
+        }
         Level_RestoreItems();
 
         Miner_Init();
