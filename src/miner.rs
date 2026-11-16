@@ -7,7 +7,7 @@
 // Other modules (robots.rs, levels.rs, die.rs, rope.rs, cheat.rs) read miner
 // state through GAME_STATE as well.
 
-use crate::audio::{Audio_WillySfx, audioPanX};
+use crate::audio::{Audio_WillySfx, set_audioPanX};
 use crate::common::Key;
 use crate::die::Die_Action;
 use crate::game::{
@@ -135,12 +135,12 @@ const fn yalign(y: i32) -> i32 {
 }
 
 pub fn Miner_SetSeq(index: i32, speed: i32) {
-    MINER_TIMER.with(|t| unsafe { Timer_Set(&mut *t.borrow_mut(), 1, speed) });
+    MINER_TIMER.with(|t| Timer_Set(&mut t.borrow_mut(), 1, speed));
     set_miner_seq_index(index as u8);
 }
 
 pub fn Miner_IncSeq() {
-    let next = MINER_TIMER.with(|t| unsafe { Timer_Update(&mut *t.borrow_mut()) } as u8);
+    let next = MINER_TIMER.with(|t| Timer_Update(&mut t.borrow_mut())) as u8;
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
@@ -400,9 +400,7 @@ fn do_miner_ticker() {
             return;
         }
 
-        unsafe {
-            audioPanX = miner.x;
-        }
+        set_audioPanX(miner.x);
         Audio_WillySfx(jump_info.pitch, jump_info.length);
 
         miner.y = y;
@@ -490,9 +488,7 @@ fn do_miner_ticker() {
         GAME_STATE.miner_air.store(12, Ordering::Relaxed);
     }
 
-    unsafe {
-        audioPanX = miner.x;
-    }
+    set_audioPanX(miner.x);
     Audio_WillySfx(78 - miner.air, 4);
     miner.y += 4;
     miner.align = 4;

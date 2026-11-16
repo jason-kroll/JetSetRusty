@@ -97,37 +97,35 @@ fn game_start() {
 }
 
 fn do_title_ticker() {
-    unsafe {
-        if audioMusicPlaying != 0 {
-            if video_flash() != 0 {
-                set_text_jsw_byte(1, b'\x0b');
-                set_text_jsw_byte(3, b'\x02');
-            } else {
-                set_text_jsw_byte(1, b'\x02');
-                set_text_jsw_byte(3, b'\x0b');
-            }
-            return;
+    if audioMusicPlaying() != 0 {
+        if video_flash() != 0 {
+            set_text_jsw_byte(1, b'\x0b');
+            set_text_jsw_byte(3, b'\x02');
+        } else {
+            set_text_jsw_byte(1, b'\x02');
+            set_text_jsw_byte(3, b'\x0b');
         }
-
-        set_colour_cycle(COLOUR_CYCLE_ADJ[colour_cycle() as usize]);
-
-        if text_pos() < TEXT_END {
-            if text_frame() < 6 {
-                set_text_frame(text_frame() + 2);
-                return;
-            }
-            set_text_pos(text_pos() + 1);
-            set_text_frame(0);
-            return;
-        }
-
-        set_action(Some(Title_Action));
+        return;
     }
+
+    set_colour_cycle(COLOUR_CYCLE_ADJ[colour_cycle() as usize]);
+
+    if text_pos() < TEXT_END {
+        if text_frame() < 6 {
+            set_text_frame(text_frame() + 2);
+            return;
+        }
+        set_text_pos(text_pos() + 1);
+        set_text_frame(0);
+        return;
+    }
+
+    set_action(Some(Title_Action));
 }
 
 fn do_title_drawer() {
     unsafe {
-        if audioMusicPlaying != 0 {
+        if audioMusicPlaying() != 0 {
             for &tile in TITLE_JSW.iter().take(100) {
                 TEXT_JSW.with(|t| {
                     Video_Write(tile_2_pixel(tile), t.borrow().as_ptr().cast());

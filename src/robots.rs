@@ -12,7 +12,7 @@
 // `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
 // them by that name.
 
-use crate::audio::{Audio_Sfx, SFX_ARROW, audioPanX};
+use crate::audio::{Audio_Sfx, SFX_ARROW, set_audioPanX};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
@@ -1206,9 +1206,7 @@ fn do_move_static(robot: &mut Robot) {
 fn do_move_arrow_left(robot: &mut Robot) {
     robot.max -= 1;
     if robot.max == 44 {
-        unsafe {
-            audioPanX = 256;
-        }
+        set_audioPanX(256);
         Audio_Sfx(SFX_ARROW as i32);
     }
 
@@ -1222,9 +1220,7 @@ fn do_move_arrow_left(robot: &mut Robot) {
 fn do_move_arrow_right(robot: &mut Robot) {
     robot.max += 1;
     if robot.max == 244 {
-        unsafe {
-            audioPanX = 0;
-        }
+        set_audioPanX(0);
         Audio_Sfx(SFX_ARROW as i32);
     }
 

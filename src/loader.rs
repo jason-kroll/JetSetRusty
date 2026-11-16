@@ -51,7 +51,7 @@ fn do_loader_drawer3() {
 
 fn do_loader_drawer2() {
     unsafe {
-        if audioMusicPlaying != 0 {
+        if audioMusicPlaying() != 0 {
             return;
         }
 

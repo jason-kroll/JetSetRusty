@@ -1,6 +1,9 @@
 #![allow(non_snake_case, dead_code, non_upper_case_globals)]
 
 use crate::misc::{Timer, Timer_Set, Timer_Update};
+use std::cell::Cell;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 // from misc.h
 const SAMPLERATE: i32 = 22050;
@@ -49,11 +52,15 @@ struct Channel {
 struct SfxInfo {
     pitch_table: usize, // which SFX_PITCH row
     pitch_idx: usize,   // current position within that row
-    channel: usize,     // index into AUDIO_CHANNEL
+    channel: usize,     // index into AudioState.channels
     length: i32,
     clock: i32,
-    do_sfx: Event,
-    do_play: Event,
+    // Trampolines take the locked AudioState as their argument, so
+    // Audio_Output can call them while holding the single AUDIO_STATE guard
+    // (std Mutex is not reentrant) — no global CUR_SFX handoff needed beyond
+    // the cur_sfx slot index.
+    do_sfx: Option<fn(&mut AudioState)>,
+    do_play: Option<fn(&mut AudioState)>,
 }
 
 // ---- static data ------------------------------------------------------------
@@ -161,194 +168,172 @@ static SFX_PITCH: [&[i32]; 6] = [
     &[0],                                                                                        // SFX_NONE
 ];
 
-// ---- mutable globals --------------------------------------------------------
+// ---- mutable state ----------------------------------------------------------
+// Audio_Output runs on SDL's audio callback thread, while Audio_Sfx /
+// Audio_Music / Audio_Play / Audio_Init run on the main thread, so the mixer
+// state lives behind one mutex. Every critical section is a handful of field
+// writes, so the audio thread never blocks for long. In replay mode both run
+// lockstep on the main thread, so locking is uncontended there and the output
+// stays deterministic. audioMusicPlaying is also polled by the loader/title
+// screens on the main thread, so it stays a plain atomic; audioPanX is only
+// ever touched on the main thread, so it is a thread-local Cell.
 
-pub static mut audioMusicPlaying: i32 = MUS_STOP;
+static AUDIO_MUSIC_PLAYING: AtomicI32 = AtomicI32::new(MUS_STOP);
 
-#[unsafe(no_mangle)]
-pub static mut audioPanX: i32 = 0;
+thread_local! {
+    static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
+}
 
-static mut AUDIO_CHANNEL: [Channel; NCHANNELS] = [
-    Channel {
-        left: [0, 0, 0],
-        right: [0, 0, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [0, 0, 0],
-        right: [0, 0, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [0, 0, 0],
-        right: [0, 0, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [MUSICVOLUME, -MUSICVOLUME, 0],
-        right: [-MUSICVOLUME, MUSICVOLUME, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [MUSICVOLUME, -MUSICVOLUME, 0],
-        right: [-MUSICVOLUME, MUSICVOLUME, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [MUSICVOLUME, -MUSICVOLUME, 0],
-        right: [-MUSICVOLUME, MUSICVOLUME, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [MUSICVOLUME, -MUSICVOLUME, 0],
-        right: [-MUSICVOLUME, MUSICVOLUME, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-    Channel {
-        left: [MUSICVOLUME, -MUSICVOLUME, 0],
-        right: [-MUSICVOLUME, MUSICVOLUME, 0],
-        phase: 0,
-        frequency: 0,
-        do_phase: None,
-    },
-];
+pub fn audioMusicPlaying() -> i32 {
+    AUDIO_MUSIC_PLAYING.load(Ordering::Relaxed)
+}
 
-static mut AUDIO_SFX: [SfxInfo; NSFX] = [
-    SfxInfo {
-        pitch_table: SFX_NONE,
-        pitch_idx: 0,
-        channel: 0,
-        length: 0,
-        clock: 0,
-        do_sfx: None,
-        do_play: None,
-    },
-    SfxInfo {
-        pitch_table: SFX_NONE,
-        pitch_idx: 0,
-        channel: 1,
-        length: 0,
-        clock: 0,
-        do_sfx: None,
-        do_play: None,
-    },
-    SfxInfo {
-        pitch_table: SFX_NONE,
-        pitch_idx: 0,
-        channel: 2,
-        length: 0,
-        clock: 0,
-        do_sfx: None,
-        do_play: None,
-    },
-];
+pub fn audioPanX() -> i32 {
+    AUDIO_PAN_X.with(Cell::get)
+}
 
-// Index of the sfx slot being processed by the trampoline functions below.
-static mut CUR_SFX: usize = 0;
+pub fn set_audioPanX(pan: i32) {
+    AUDIO_PAN_X.with(|c| c.set(pan));
+}
 
-static mut musicIndex: usize = 0;
-static mut musicTempo: i32 = TICKRATE;
-static mut musicPitch: i32 = 0;
-static mut musicClock: i32 = 0;
-static mut musicDelta: i32 = 0;
-static mut curMusicTable: usize = 0;
-static mut curMusicIdx: usize = 0;
-static mut samplesMusic: i32 = 0;
-static mut musicChannels: usize = 0;
+struct AudioState {
+    channels: [Channel; NCHANNELS],
+    sfx: [SfxInfo; NSFX],
+    // Index of the sfx slot being processed by the trampoline functions below.
+    cur_sfx: usize,
+    music_index: usize,
+    music_tempo: i32,
+    music_pitch: i32,
+    music_clock: i32,
+    music_delta: i32,
+    cur_music_table: usize,
+    cur_music_idx: usize,
+    samples_music: i32,
+    music_channels: usize,
+    sfx_clock: i32,
+    samples_sfx: i32,
+    timer_sfx: Timer,
+    timer_music: Timer,
+}
 
-static mut sfxClock: i32 = 0;
-static mut samplesSfx: i32 = 0;
+static AUDIO_STATE: Mutex<AudioState> = Mutex::new(AudioState::new());
 
-static mut timerSfx: Timer = Timer {
-    acc: 0,
-    rate: 0,
-    remainder: 0,
-    divisor: 0,
-};
-static mut timerMusic: Timer = Timer {
-    acc: 0,
-    rate: 0,
-    remainder: 0,
-    divisor: 0,
-};
+impl AudioState {
+    const fn new() -> Self {
+        const fn channel(volume: i32) -> Channel {
+            Channel {
+                left: [volume, -volume, 0],
+                right: [-volume, volume, 0],
+                phase: 0,
+                frequency: 0,
+                do_phase: None,
+            }
+        }
+        const fn sfx_slot(channel: usize) -> SfxInfo {
+            SfxInfo {
+                pitch_table: SFX_NONE,
+                pitch_idx: 0,
+                channel,
+                length: 0,
+                clock: 0,
+                do_sfx: None,
+                do_play: None,
+            }
+        }
+        AudioState {
+            channels: [
+                channel(0),
+                channel(0),
+                channel(0),
+                channel(MUSICVOLUME),
+                channel(MUSICVOLUME),
+                channel(MUSICVOLUME),
+                channel(MUSICVOLUME),
+                channel(MUSICVOLUME),
+            ],
+            sfx: [sfx_slot(0), sfx_slot(1), sfx_slot(2)],
+            cur_sfx: 0,
+            music_index: 0,
+            music_tempo: TICKRATE,
+            music_pitch: 0,
+            music_clock: 0,
+            music_delta: 0,
+            cur_music_table: 0,
+            cur_music_idx: 0,
+            samples_music: 0,
+            music_channels: 0,
+            sfx_clock: 0,
+            samples_sfx: 0,
+            timer_sfx: Timer {
+                rate: 0,
+                acc: 0,
+                remainder: 0,
+                divisor: 0,
+            },
+            timer_music: Timer {
+                rate: 0,
+                acc: 0,
+                remainder: 0,
+                divisor: 0,
+            },
+        }
+    }
+}
 
 // ---- trampoline functions ---------------------------------------------------
-// Trampolines stored in Event slots (plain fn pointers).
-// CUR_SFX must be set before calling them.
+// Trampolines stored in SfxInfo slots (plain fn pointers); AudioState.cur_sfx
+// selects the slot they operate on.
 
 // Sentinel: stored in Channel.do_phase to mark channel as "on".
 // The actual oscillator logic is inlined in Audio_Output's mixing loop.
-
 fn do_phase_fn() {}
 
-fn sfx_off_trampoline() {
-    let i = unsafe { CUR_SFX };
-    unsafe {
-        AUDIO_SFX[i].do_sfx = None;
-        let ch = AUDIO_SFX[i].channel;
-        AUDIO_CHANNEL[ch].do_phase = None;
-        AUDIO_CHANNEL[ch].left[2] = 0;
-        AUDIO_CHANNEL[ch].right[2] = 0;
-    }
+fn sfx_off_trampoline(s: &mut AudioState) {
+    let i = s.cur_sfx;
+    s.sfx[i].do_sfx = None;
+    let ch = s.sfx[i].channel;
+    s.channels[ch].do_phase = None;
+    s.channels[ch].left[2] = 0;
+    s.channels[ch].right[2] = 0;
 }
 
-fn sfx_play_trampoline() {
-    let i = unsafe { CUR_SFX };
-    unsafe {
-        let pitch = SFX_PITCH[AUDIO_SFX[i].pitch_table][AUDIO_SFX[i].pitch_idx] as usize;
-        let ch = AUDIO_SFX[i].channel;
-        AUDIO_CHANNEL[ch].frequency = FREQUENCY_TABLE[pitch];
-        let len = AUDIO_SFX[i].length;
-        AUDIO_SFX[i].clock += len;
-        AUDIO_SFX[i].pitch_idx += 1;
-        if SFX_PITCH[AUDIO_SFX[i].pitch_table][AUDIO_SFX[i].pitch_idx] > 0 {
-            return;
-        }
-        AUDIO_SFX[i].do_sfx = Some(sfx_off_trampoline);
+fn sfx_play_trampoline(s: &mut AudioState) {
+    let i = s.cur_sfx;
+    let pitch = SFX_PITCH[s.sfx[i].pitch_table][s.sfx[i].pitch_idx] as usize;
+    let ch = s.sfx[i].channel;
+    s.channels[ch].frequency = FREQUENCY_TABLE[pitch];
+    let len = s.sfx[i].length;
+    s.sfx[i].clock += len;
+    s.sfx[i].pitch_idx += 1;
+    if SFX_PITCH[s.sfx[i].pitch_table][s.sfx[i].pitch_idx] > 0 {
+        return;
     }
+    s.sfx[i].do_sfx = Some(sfx_off_trampoline);
 }
 
-fn sfx_willy_trampoline() {
-    let i = unsafe { CUR_SFX };
-    unsafe {
-        let ch = AUDIO_SFX[i].channel;
-        AUDIO_CHANNEL[ch].do_phase = Some(do_phase_fn);
-        let len = AUDIO_SFX[i].length;
-        AUDIO_SFX[i].clock += len;
-        AUDIO_SFX[i].do_sfx = Some(sfx_off_trampoline);
-    }
+fn sfx_willy_trampoline(s: &mut AudioState) {
+    let i = s.cur_sfx;
+    let ch = s.sfx[i].channel;
+    s.channels[ch].do_phase = Some(do_phase_fn);
+    let len = s.sfx[i].length;
+    s.sfx[i].clock += len;
+    s.sfx[i].do_sfx = Some(sfx_off_trampoline);
 }
 
-fn sfx_on_trampoline() {
-    let i = unsafe { CUR_SFX };
-    unsafe {
-        let ch = AUDIO_SFX[i].channel;
-        AUDIO_CHANNEL[ch].do_phase = Some(do_phase_fn);
-        AUDIO_SFX[i].do_sfx = AUDIO_SFX[i].do_play;
-        let do_sfx = AUDIO_SFX[i].do_sfx;
-        if let Some(f) = do_sfx {
-            f();
-        }
+fn sfx_on_trampoline(s: &mut AudioState) {
+    let i = s.cur_sfx;
+    let ch = s.sfx[i].channel;
+    s.channels[ch].do_phase = Some(do_phase_fn);
+    s.sfx[i].do_sfx = s.sfx[i].do_play;
+    let do_sfx = s.sfx[i].do_sfx;
+    if let Some(f) = do_sfx {
+        f(s);
     }
 }
 
 // ---- helpers ----------------------------------------------------------------
 
-unsafe fn channel_stereo(ch: &mut Channel, left: i32, right: i32) {
+fn channel_stereo(ch: &mut Channel, left: i32, right: i32) {
     let l = (SFXVOLUME * left) >> 8;
     let r = (SFXVOLUME * right) >> 8;
     ch.left[0] = l;
@@ -357,226 +342,222 @@ unsafe fn channel_stereo(ch: &mut Channel, left: i32, right: i32) {
     ch.right[1] = r;
 }
 
-unsafe fn channel_pan(ch: &mut Channel, pan: usize) {
+fn channel_pan(ch: &mut Channel, pan: usize) {
     let p = PAN_TABLE[pan];
-    unsafe {
-        channel_stereo(ch, p, 256 - p);
-    }
+    channel_stereo(ch, p, 256 - p);
 }
 
-unsafe fn music_reset() {
-    unsafe {
-        for i in 0..NMUSIC {
-            let ch = &mut AUDIO_CHANNEL[MUSIC_CH[i]];
-            ch.do_phase = None;
-            ch.left[2] = 0;
-            ch.right[2] = 0;
-        }
-        curMusicTable = musicIndex;
-        curMusicIdx = 0;
-        musicDelta = 0;
-        musicClock = 0;
+fn music_reset(s: &mut AudioState) {
+    for i in 0..NMUSIC {
+        let ch = &mut s.channels[MUSIC_CH[i]];
+        ch.do_phase = None;
+        ch.left[2] = 0;
+        ch.right[2] = 0;
     }
+    s.cur_music_table = s.music_index;
+    s.cur_music_idx = 0;
+    s.music_delta = 0;
+    s.music_clock = 0;
 }
 
 // ---- public API -------------------------------------------------------------
 
 pub fn Audio_ReduceMusicSpeed() {
-    unsafe {
-        musicPitch -= 1;
-        musicTempo -= 6;
-        Timer_Set(&raw mut timerMusic, SAMPLERATE, musicTempo);
-    }
+    let mut s = AUDIO_STATE.lock().unwrap();
+    s.music_pitch -= 1;
+    s.music_tempo -= 6;
+    let tempo = s.music_tempo;
+    Timer_Set(&mut s.timer_music, SAMPLERATE, tempo);
 }
 
 pub fn Audio_WillySfx(note: i32, length: i32) {
-    unsafe {
-        let ch = AUDIO_SFX[0].channel;
-        AUDIO_CHANNEL[ch].frequency = FREQUENCY_TABLE[note as usize];
-        AUDIO_SFX[0].clock = sfxClock;
-        channel_pan(&mut AUDIO_CHANNEL[ch], audioPanX as usize);
-        AUDIO_SFX[0].length = length;
-        AUDIO_SFX[0].do_sfx = Some(sfx_willy_trampoline);
-    }
+    let mut s = AUDIO_STATE.lock().unwrap();
+    let ch = s.sfx[0].channel;
+    s.channels[ch].frequency = FREQUENCY_TABLE[note as usize];
+    s.sfx[0].clock = s.sfx_clock;
+    channel_pan(&mut s.channels[ch], audioPanX() as usize);
+    s.sfx[0].length = length;
+    s.sfx[0].do_sfx = Some(sfx_willy_trampoline);
 }
 
 pub fn Audio_Sfx(sfx: i32) {
-    unsafe {
-        let sfx = sfx as usize;
+    let mut s = AUDIO_STATE.lock().unwrap();
+    let sfx = sfx as usize;
+    let pan = audioPanX();
 
-        let target_slot = if sfx == SFX_GAMEOVER || sfx == SFX_DIE {
-            // Schedule channels 0 and 1 to stop; don't call immediately.
-            AUDIO_SFX[0].do_sfx = Some(sfx_off_trampoline);
-            AUDIO_SFX[1].do_sfx = Some(sfx_off_trampoline);
-            2
-        } else if sfx == SFX_ARROW {
-            2
-        } else {
-            1
-        };
+    let target_slot = if sfx == SFX_GAMEOVER || sfx == SFX_DIE {
+        // Schedule channels 0 and 1 to stop; don't call immediately.
+        s.sfx[0].do_sfx = Some(sfx_off_trampoline);
+        s.sfx[1].do_sfx = Some(sfx_off_trampoline);
+        2
+    } else if sfx == SFX_ARROW {
+        2
+    } else {
+        1
+    };
 
-        match sfx {
-            SFX_ITEM => {
-                AUDIO_SFX[1].length = 1;
-                AUDIO_SFX[1].pitch_table = SFX_ITEM;
-                AUDIO_SFX[1].pitch_idx = 0;
-                channel_pan(&mut AUDIO_CHANNEL[AUDIO_SFX[1].channel], audioPanX as usize);
-                AUDIO_SFX[1].do_play = Some(sfx_play_trampoline);
-            }
-            SFX_ARROW => {
-                AUDIO_SFX[2].length = 1;
-                AUDIO_SFX[2].pitch_table = SFX_ARROW;
-                AUDIO_SFX[2].pitch_idx = 0;
-                let pan = audioPanX;
-                channel_stereo(&mut AUDIO_CHANNEL[AUDIO_SFX[2].channel], 256 - pan, pan);
-                AUDIO_SFX[2].do_play = Some(sfx_play_trampoline);
-            }
-            SFX_DIE => {
-                AUDIO_SFX[2].length = 1;
-                AUDIO_SFX[2].pitch_table = SFX_DIE;
-                AUDIO_SFX[2].pitch_idx = 0;
-                channel_pan(&mut AUDIO_CHANNEL[AUDIO_SFX[2].channel], audioPanX as usize);
-                AUDIO_SFX[2].do_play = Some(sfx_play_trampoline);
-            }
-            SFX_GAMEOVER => {
-                AUDIO_SFX[2].length = 2;
-                AUDIO_SFX[2].pitch_table = SFX_GAMEOVER;
-                AUDIO_SFX[2].pitch_idx = 0;
-                channel_stereo(&mut AUDIO_CHANNEL[AUDIO_SFX[2].channel], 256, -256);
-                AUDIO_SFX[2].do_play = Some(sfx_play_trampoline);
-            }
-            _ => {}
+    match sfx {
+        SFX_ITEM => {
+            s.sfx[1].length = 1;
+            s.sfx[1].pitch_table = SFX_ITEM;
+            s.sfx[1].pitch_idx = 0;
+            let ch = s.sfx[1].channel;
+            channel_pan(&mut s.channels[ch], pan as usize);
+            s.sfx[1].do_play = Some(sfx_play_trampoline);
         }
-
-        AUDIO_SFX[target_slot].do_sfx = Some(sfx_on_trampoline);
-        AUDIO_SFX[target_slot].clock = sfxClock;
+        SFX_ARROW => {
+            s.sfx[2].length = 1;
+            s.sfx[2].pitch_table = SFX_ARROW;
+            s.sfx[2].pitch_idx = 0;
+            let ch = s.sfx[2].channel;
+            channel_stereo(&mut s.channels[ch], 256 - pan, pan);
+            s.sfx[2].do_play = Some(sfx_play_trampoline);
+        }
+        SFX_DIE => {
+            s.sfx[2].length = 1;
+            s.sfx[2].pitch_table = SFX_DIE;
+            s.sfx[2].pitch_idx = 0;
+            let ch = s.sfx[2].channel;
+            channel_pan(&mut s.channels[ch], pan as usize);
+            s.sfx[2].do_play = Some(sfx_play_trampoline);
+        }
+        SFX_GAMEOVER => {
+            s.sfx[2].length = 2;
+            s.sfx[2].pitch_table = SFX_GAMEOVER;
+            s.sfx[2].pitch_idx = 0;
+            let ch = s.sfx[2].channel;
+            channel_stereo(&mut s.channels[ch], 256, -256);
+            s.sfx[2].do_play = Some(sfx_play_trampoline);
+        }
+        _ => {}
     }
+
+    s.sfx[target_slot].do_sfx = Some(sfx_on_trampoline);
+    s.sfx[target_slot].clock = s.sfx_clock;
 }
 
-pub unsafe fn Audio_Output(output: *mut i16) {
-    unsafe {
-        if samplesMusic == 0 {
-            samplesMusic = Timer_Update(&raw mut timerMusic);
+pub fn Audio_Output(output: &mut [i16; 2]) {
+    let mut s = AUDIO_STATE.lock().unwrap();
 
-            if audioMusicPlaying != 0 {
-                if musicDelta == musicClock {
-                    // Process all events due this tick (time==0 events chain immediately).
-                    loop {
-                        let data = MUSIC_SCORE[curMusicTable][curMusicIdx];
-                        curMusicIdx += 1;
-                        let ch = (data & 0x0f) as usize;
+    if s.samples_music == 0 {
+        s.samples_music = Timer_Update(&mut s.timer_music);
 
-                        match data & 0xf0 {
-                            x if x == EV_NOTEON => {
-                                let note =
-                                    MUSIC_SCORE[curMusicTable][curMusicIdx] as i32 + musicPitch;
-                                curMusicIdx += 1;
-                                AUDIO_CHANNEL[MUSIC_CH[ch]].frequency =
-                                    FREQUENCY_TABLE[note as usize];
-                                AUDIO_CHANNEL[MUSIC_CH[ch]].do_phase = Some(do_phase_fn);
-                            }
-                            x if x == EV_END => {
-                                audioMusicPlaying = MUSIC_SCORE[curMusicTable][curMusicIdx] as i32;
-                                music_reset();
-                                // MUS_PLAY → time=0 → continue loop from top of reset score
-                                // MUS_STOP → time=1 → break
-                                if audioMusicPlaying == MUS_STOP {
-                                    break;
-                                }
-                                continue;
-                            }
-                            _ => {
-                                // EV_NOTEOFF
-                                let ch_ref = &mut AUDIO_CHANNEL[MUSIC_CH[ch]];
-                                ch_ref.do_phase = None;
-                                ch_ref.left[2] = 0;
-                                ch_ref.right[2] = 0;
-                            }
+        if audioMusicPlaying() != 0 {
+            if s.music_delta == s.music_clock {
+                // Process all events due this tick (time==0 events chain immediately).
+                loop {
+                    let data = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx];
+                    s.cur_music_idx += 1;
+                    let ch = (data & 0x0f) as usize;
+
+                    match data & 0xf0 {
+                        x if x == EV_NOTEON => {
+                            let note = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32
+                                + s.music_pitch;
+                            s.cur_music_idx += 1;
+                            s.channels[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
+                            s.channels[MUSIC_CH[ch]].do_phase = Some(do_phase_fn);
                         }
-
-                        let time = MUSIC_SCORE[curMusicTable][curMusicIdx] as i32;
-                        curMusicIdx += 1;
-                        musicDelta += time;
-                        if time != 0 {
-                            break;
+                        x if x == EV_END => {
+                            let playing = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
+                            AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
+                            music_reset(&mut s);
+                            // MUS_PLAY → time=0 → continue loop from top of reset score
+                            // MUS_STOP → time=1 → break
+                            if playing == MUS_STOP {
+                                break;
+                            }
+                            continue;
+                        }
+                        _ => {
+                            // EV_NOTEOFF
+                            let ch_ref = &mut s.channels[MUSIC_CH[ch]];
+                            ch_ref.do_phase = None;
+                            ch_ref.left[2] = 0;
+                            ch_ref.right[2] = 0;
                         }
                     }
-                }
-                musicClock += 1;
-            }
-        }
 
-        if samplesSfx == 0 {
-            samplesSfx = Timer_Update(&raw mut timerSfx);
-
-            let audio_sfx =
-                std::slice::from_raw_parts(std::ptr::addr_of!(AUDIO_SFX).cast::<SfxInfo>(), NSFX);
-            for (i, sfx) in audio_sfx.iter().enumerate() {
-                if sfx.clock == sfxClock {
-                    CUR_SFX = i;
-                    if let Some(f) = sfx.do_sfx {
-                        f();
+                    let time = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
+                    s.cur_music_idx += 1;
+                    s.music_delta += time;
+                    if time != 0 {
+                        break;
                     }
                 }
             }
-
-            sfxClock += 1;
+            s.music_clock += 1;
         }
-
-        // Mix all active channels into output[L] and output[R].
-        let out_l = &mut *output;
-        let out_r = &mut *output.add(1);
-        *out_l = 0;
-        *out_r = 0;
-
-        let audio_channel = std::slice::from_raw_parts_mut(
-            std::ptr::addr_of_mut!(AUDIO_CHANNEL).cast::<Channel>(),
-            NCHANNELS,
-        );
-        for ch in audio_channel.iter_mut().take(musicChannels) {
-            if ch.do_phase.is_some() {
-                // Square wave oscillator: phase MSB selects left[0]/left[1]
-                let phase = (ch.phase >> 31) as usize;
-                ch.left[2] = ch.left[phase];
-                ch.right[2] = ch.right[phase];
-                ch.phase = ch.phase.wrapping_add(ch.frequency);
-            } else {
-                ch.left[2] = 0;
-                ch.right[2] = 0;
-            }
-            *out_l = out_l.wrapping_add(ch.left[2] as i16);
-            *out_r = out_r.wrapping_add(ch.right[2] as i16);
-        }
-
-        samplesMusic -= 1;
-        samplesSfx -= 1;
     }
+
+    if s.samples_sfx == 0 {
+        s.samples_sfx = Timer_Update(&mut s.timer_sfx);
+
+        for i in 0..NSFX {
+            if s.sfx[i].clock == s.sfx_clock {
+                s.cur_sfx = i;
+                let do_sfx = s.sfx[i].do_sfx;
+                if let Some(f) = do_sfx {
+                    f(&mut s);
+                }
+            }
+        }
+
+        s.sfx_clock += 1;
+    }
+
+    // Mix all active channels into output[0] (L) and output[1] (R).
+    let mut out_l: i16 = 0;
+    let mut out_r: i16 = 0;
+
+    let music_channels = s.music_channels;
+    for ch in s.channels.iter_mut().take(music_channels) {
+        if ch.do_phase.is_some() {
+            // Square wave oscillator: phase MSB selects left[0]/left[1]
+            let phase = (ch.phase >> 31) as usize;
+            ch.left[2] = ch.left[phase];
+            ch.right[2] = ch.right[phase];
+            ch.phase = ch.phase.wrapping_add(ch.frequency);
+        } else {
+            ch.left[2] = 0;
+            ch.right[2] = 0;
+        }
+        out_l = out_l.wrapping_add(ch.left[2] as i16);
+        out_r = out_r.wrapping_add(ch.right[2] as i16);
+    }
+
+    output[0] = out_l;
+    output[1] = out_r;
+
+    s.samples_music -= 1;
+    s.samples_sfx -= 1;
 }
 
 pub fn Audio_Play(playing: i32) {
-    unsafe {
-        audioMusicPlaying = playing;
-        musicChannels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
-    }
+    AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
+    let mut s = AUDIO_STATE.lock().unwrap();
+    s.music_channels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
 }
 
 pub fn Audio_Music(music: i32, playing: i32) {
-    unsafe {
-        musicIndex = music as usize;
-        music_reset();
-        musicPitch = 0;
-        musicTempo = TICKRATE;
+    {
+        let mut s = AUDIO_STATE.lock().unwrap();
+        s.music_index = music as usize;
+        music_reset(&mut s);
+        s.music_pitch = 0;
+        s.music_tempo = TICKRATE;
 
-        AUDIO_SFX[0].do_sfx = None;
-        AUDIO_SFX[1].do_sfx = None;
-        AUDIO_SFX[2].do_sfx = None;
+        s.sfx[0].do_sfx = None;
+        s.sfx[1].do_sfx = None;
+        s.sfx[2].do_sfx = None;
 
-        samplesMusic = 0;
-        Timer_Set(&raw mut timerMusic, SAMPLERATE, TICKRATE);
-        Audio_Play(playing);
+        s.samples_music = 0;
+        Timer_Set(&mut s.timer_music, SAMPLERATE, TICKRATE);
     }
+    Audio_Play(playing);
 }
 
 pub fn Audio_Init() {
-    unsafe { Timer_Set(&raw mut timerSfx, SAMPLERATE, TICKRATE) };
+    let mut s = AUDIO_STATE.lock().unwrap();
+    Timer_Set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
 }

@@ -265,7 +265,7 @@ pub fn game_init_room() {
     }
 
     // Timer
-    unsafe { Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE) };
+    Timer_Set(&mut game.timer.lock().unwrap(), 12, TICKRATE);
     game.frame.store(1, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
@@ -595,9 +595,9 @@ pub fn DoGameTicker() {
     }
 
     // Update game frame
-    let frame = unsafe {
+    let frame = {
         let mut timer = game.timer.lock().unwrap();
-        Timer_Update(&mut *timer)
+        Timer_Update(&mut timer)
     };
     game.frame.store(frame, Ordering::Relaxed);
     if frame == 0 {
@@ -679,14 +679,10 @@ pub fn Game_GotItem() {
     // audioPanX = minerWilly.x
     // Use try_lock to avoid deadlock if we already hold the miner lock
     if let Ok(miner_guard) = game.miner.try_lock() {
-        unsafe {
-            crate::audio::audioPanX = miner_guard.x;
-        }
+        crate::audio::set_audioPanX(miner_guard.x);
     }
 
-    unsafe {
-        Audio_Sfx(SFX_ITEM as i32);
-    }
+    Audio_Sfx(SFX_ITEM as i32);
 }
 
 // Port of C's ClockTicker; called once per game frame from DoGameTicker.

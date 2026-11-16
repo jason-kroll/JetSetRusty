@@ -180,8 +180,9 @@ unsafe extern "C" fn sdl_audio_callback(
 ) {
     let mut output = stream as *mut i16;
     while length > 0 {
-        unsafe { Audio_Output(output) };
-        unsafe { output = output.add(2) };
+        let frame = unsafe { &mut *output.cast::<[i16; 2]>() };
+        Audio_Output(frame);
+        output = unsafe { output.add(2) };
         length -= 4;
     }
 }
@@ -231,7 +232,7 @@ pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -
     set_game_input(Key::None as i32);
     fire(ticker());
     fire(drawer());
-    toggle_video_flash(unsafe { Timer_Update(timer_flash) });
+    toggle_video_flash(Timer_Update(timer_flash));
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,
@@ -275,7 +276,7 @@ pub(crate) fn audio_init() {
 }
 
 pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
-    unsafe { Audio_Output(stereo_frame.as_mut_ptr()) };
+    Audio_Output(stereo_frame);
 }
 
 // Poll one SDL event, update gameInput, return false when the queue is empty.
@@ -484,10 +485,8 @@ pub fn run() {
     // tear-free output, but vsync must not be relied on for pacing: several
     // drivers and compositors silently ignore PRESENTVSYNC, which lets the
     // loop spin unthrottled and the game run many times too fast.
-    unsafe {
-        Timer_Set(&raw mut timer_frame, TICKRATE, TICKRATE);
-        Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
-    }
+    Timer_Set(&mut timer_frame, TICKRATE, TICKRATE);
+    Timer_Set(&mut timer_flash, 25, TICKRATE * 8);
 
     // Main loop ---------------------------------------------------------------
     // Wall-clock pacer: frame_time advances 1000 units per rendered frame,
@@ -500,7 +499,7 @@ pub fn run() {
         }
         frame_time += 1000;
 
-        let frame = unsafe { Timer_Update(&raw mut timer_frame) };
+        let frame = Timer_Update(&mut timer_frame);
 
         for _ in 0..frame {
             game_frame(&mut timer_flash, || {

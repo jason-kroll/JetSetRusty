@@ -135,22 +135,20 @@ impl std::fmt::Debug for Timer {
     }
 }
 
-pub unsafe fn Timer_Set(timer: *mut Timer, numerator: i32, divisor: i32) {
-    let t = unsafe { &mut *timer };
-    t.acc = 0;
-    t.rate = numerator / divisor;
-    t.remainder = numerator - t.rate * divisor;
-    t.divisor = divisor;
+pub fn Timer_Set(timer: &mut Timer, numerator: i32, divisor: i32) {
+    timer.acc = 0;
+    timer.rate = numerator / divisor;
+    timer.remainder = numerator - timer.rate * divisor;
+    timer.divisor = divisor;
 }
 
-pub unsafe fn Timer_Update(timer: *mut Timer) -> i32 {
-    let t = unsafe { &mut *timer };
-    t.acc += t.remainder;
-    if t.acc < t.divisor {
-        return t.rate;
+pub fn Timer_Update(timer: &mut Timer) -> i32 {
+    timer.acc += timer.remainder;
+    if timer.acc < timer.divisor {
+        return timer.rate;
     }
-    t.acc -= t.divisor;
-    t.rate + 1
+    timer.acc -= timer.divisor;
+    timer.rate + 1
 }
 
 // External --------------------------------------------------------------------

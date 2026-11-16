@@ -197,7 +197,7 @@ pub fn main(args: &[String]) -> i32 {
     seed_rng(script.seed);
     audio_init();
     let mut timer_flash = Timer::default();
-    unsafe { Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8) };
+    Timer_Set(&mut timer_flash, 25, TICKRATE * 8);
 
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
