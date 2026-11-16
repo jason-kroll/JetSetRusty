@@ -2,52 +2,61 @@
 
 use crate::common::{Event, HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, Timer_Set, Timer_Update, Video_Viewport, videoColour};
-use sdl2::sys as sdl;
+use sdl2::EventPump;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
+use sdl2::event::Event as SdlEvent;
+use sdl2::keyboard::{Keycode, Scancode};
+use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use std::cell::{Cell, RefCell};
+use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 
 pub const SAMPLERATE: i32 = 22050;
 pub const TICKRATE: i32 = 60;
 
-// SDL key code table indexed by Key enum discriminant (Key::Left=0 .. Key::T=35)
-const SDL_KEYS: [sdl::SDL_Keycode; 36] = [
-    sdl::SDL_KeyCode::SDLK_LEFT as i32,
-    sdl::SDL_KeyCode::SDLK_RIGHT as i32,
-    sdl::SDL_KeyCode::SDLK_SPACE as i32,
-    sdl::SDL_KeyCode::SDLK_RETURN as i32,
-    sdl::SDL_KeyCode::SDLK_LSHIFT as i32,
-    sdl::SDL_KeyCode::SDLK_RSHIFT as i32,
-    sdl::SDL_KeyCode::SDLK_1 as i32,
-    sdl::SDL_KeyCode::SDLK_2 as i32,
-    sdl::SDL_KeyCode::SDLK_3 as i32,
-    sdl::SDL_KeyCode::SDLK_4 as i32,
-    sdl::SDL_KeyCode::SDLK_5 as i32,
-    sdl::SDL_KeyCode::SDLK_6 as i32,
-    sdl::SDL_KeyCode::SDLK_7 as i32,
-    sdl::SDL_KeyCode::SDLK_8 as i32,
-    sdl::SDL_KeyCode::SDLK_9 as i32,
-    sdl::SDL_KeyCode::SDLK_0 as i32,
-    sdl::SDL_KeyCode::SDLK_a as i32,
-    sdl::SDL_KeyCode::SDLK_b as i32,
-    sdl::SDL_KeyCode::SDLK_c as i32,
-    sdl::SDL_KeyCode::SDLK_d as i32,
-    sdl::SDL_KeyCode::SDLK_e as i32,
-    sdl::SDL_KeyCode::SDLK_f as i32,
-    sdl::SDL_KeyCode::SDLK_g as i32,
-    sdl::SDL_KeyCode::SDLK_h as i32,
-    sdl::SDL_KeyCode::SDLK_i as i32,
-    sdl::SDL_KeyCode::SDLK_j as i32,
-    sdl::SDL_KeyCode::SDLK_k as i32,
-    sdl::SDL_KeyCode::SDLK_l as i32,
-    sdl::SDL_KeyCode::SDLK_m as i32,
-    sdl::SDL_KeyCode::SDLK_n as i32,
-    sdl::SDL_KeyCode::SDLK_o as i32,
-    sdl::SDL_KeyCode::SDLK_p as i32,
-    sdl::SDL_KeyCode::SDLK_q as i32,
-    sdl::SDL_KeyCode::SDLK_r as i32,
-    sdl::SDL_KeyCode::SDLK_s as i32,
-    sdl::SDL_KeyCode::SDLK_t as i32,
-];
+// SDL key codes indexed by Key enum discriminant (Key::Left=0 .. Key::T=35)
+static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
+    [
+        Keycode::Left.into_i32(),
+        Keycode::Right.into_i32(),
+        Keycode::Space.into_i32(),
+        Keycode::Return.into_i32(),
+        Keycode::LShift.into_i32(),
+        Keycode::RShift.into_i32(),
+        Keycode::NUM_1.into_i32(),
+        Keycode::NUM_2.into_i32(),
+        Keycode::NUM_3.into_i32(),
+        Keycode::NUM_4.into_i32(),
+        Keycode::NUM_5.into_i32(),
+        Keycode::NUM_6.into_i32(),
+        Keycode::NUM_7.into_i32(),
+        Keycode::NUM_8.into_i32(),
+        Keycode::NUM_9.into_i32(),
+        Keycode::NUM_0.into_i32(),
+        Keycode::A.into_i32(),
+        Keycode::B.into_i32(),
+        Keycode::C.into_i32(),
+        Keycode::D.into_i32(),
+        Keycode::E.into_i32(),
+        Keycode::F.into_i32(),
+        Keycode::G.into_i32(),
+        Keycode::H.into_i32(),
+        Keycode::I.into_i32(),
+        Keycode::J.into_i32(),
+        Keycode::K.into_i32(),
+        Keycode::L.into_i32(),
+        Keycode::M.into_i32(),
+        Keycode::N.into_i32(),
+        Keycode::O.into_i32(),
+        Keycode::P.into_i32(),
+        Keycode::Q.into_i32(),
+        Keycode::R.into_i32(),
+        Keycode::S.into_i32(),
+        Keycode::T.into_i32(),
+    ]
+});
 
 use crate::audio::{Audio_Init, Audio_Output};
 use crate::loader::Loader_Action;
@@ -111,8 +120,8 @@ pub(crate) fn toggle_video_flash(bit: i32) {
 
 // ---- Module-private state ---------------------------------------------------
 
-// The key state is a raw pointer needed by exported functions, but only ever
-// accessed on the main thread — thread_local Cell avoids static mut.
+// The event pump is owned by run() but stored here so System_IsKey and
+// system_get_event can reach it from deep in the game code. Main thread only.
 //
 // FRAMEBUFFER is everything the game has drawn: one palette index (0-15) per
 // pixel, written by System_SetPixel. It persists across frames, because the
@@ -120,7 +129,7 @@ pub(crate) fn toggle_video_flash(bit: i32) {
 // to the SDL texture once per frame. Keeping it in our own buffer, not a
 // locked SDL surface, makes the game's output independent of SDL.
 thread_local! {
-    static KEY_STATE:   Cell<*const u8>                          = const { Cell::new(std::ptr::null()) };
+    static EVENT_PUMP:  RefCell<Option<EventPump>>               = const { RefCell::new(None) };
     static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
     // In replay mode, the SDL keycodes the script is holding down this frame;
     // System_IsKey reads this instead of SDL's keyboard state. None = live play.
@@ -155,11 +164,16 @@ pub fn System_IsKey(key: i32) -> i32 {
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
         return held as i32;
     }
-    let key_state = KEY_STATE.with(Cell::get);
-    unsafe {
-        let scancode = sdl::SDL_GetScancodeFromKey(sym);
-        *key_state.add(scancode as usize) as i32
-    }
+    // Live play: read SDL's keyboard state through the event pump.
+    EVENT_PUMP.with(|p| {
+        let pump = p.borrow();
+        let pump = pump
+            .as_ref()
+            .expect("System_IsKey called before run() initialised SDL");
+        let keycode = Keycode::from_i32(sym).expect("unknown SDL keycode");
+        let scancode = Scancode::from_keycode(keycode).expect("keycode without scancode");
+        pump.keyboard_state().is_scancode_pressed(scancode) as i32
+    })
 }
 
 pub fn System_SetPixel(pos: i32, index: i32) {
@@ -172,40 +186,40 @@ pub fn System_Border(index: i32) {
 
 // ---- Private SDL helpers ----------------------------------------------------
 
-// Must be `unsafe extern "C"` — that is the required signature for SDL_AudioCallback.
-unsafe extern "C" fn sdl_audio_callback(
-    _userdata: *mut core::ffi::c_void,
-    stream: *mut u8,
-    mut length: i32,
-) {
-    let mut output = stream as *mut i16;
-    while length > 0 {
-        let frame = unsafe { &mut *output.cast::<[i16; 2]>() };
-        Audio_Output(frame);
-        output = unsafe { output.add(2) };
-        length -= 4;
+// SDL calls this on its audio thread with the whole output buffer; we fill it
+// one stereo frame at a time. The sdl2 crate generates the required
+// `unsafe extern "C"` trampoline internally, so this callback itself is safe.
+struct SdlAudioCallback;
+
+impl AudioCallback for SdlAudioCallback {
+    type Channel = i16;
+
+    fn callback(&mut self, out: &mut [i16]) {
+        for frame in out.as_chunks_mut::<2>().0 {
+            Audio_Output(frame);
+        }
     }
 }
 
-// Copy the palette-index framebuffer to the (locked) SDL surface as RGB. Only
+// Copy the palette-index framebuffer into the streaming texture as RGB. Only
 // the B, G, R bytes are written; the alpha byte is left untouched, as the
-// original per-pixel writes did.
-fn present_frame(surface: &sdl::SDL_Surface) {
-    let pixels = surface.pixels as *mut u8;
-    let bpp = unsafe { (*surface.format).BytesPerPixel } as i32;
-    FRAMEBUFFER.with(|fb| {
-        for (pos, &index) in fb.borrow().iter().enumerate() {
-            let pos = pos as i32;
-            let offset = (pos / WIDTH) * surface.pitch + (pos & 255) * bpp;
-            let c = &videoColour[index as usize];
-            unsafe {
-                let pixel = pixels.add(offset as usize);
-                *pixel = c.b;
-                *pixel.add(1) = c.g;
-                *pixel.add(2) = c.r;
-            }
-        }
-    });
+// original per-pixel writes did. ARGB8888 is 4 bytes/pixel, laid out B,G,R,A
+// in memory on little-endian.
+fn present_frame(texture: &mut Texture) {
+    texture
+        .with_lock(None, |buf: &mut [u8], pitch: usize| {
+            FRAMEBUFFER.with(|fb| {
+                for (pos, &index) in fb.borrow().iter().enumerate() {
+                    let pos = pos as i32;
+                    let offset = ((pos / WIDTH) * pitch as i32 + (pos & 255) * 4) as usize;
+                    let c = &videoColour[index as usize];
+                    buf[offset] = c.b;
+                    buf[offset + 1] = c.g;
+                    buf[offset + 2] = c.r;
+                }
+            });
+        })
+        .expect("lock streaming texture");
 }
 
 // Call an Event's function pointer if it is set.
@@ -281,50 +295,47 @@ pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
 
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
-    unsafe {
-        set_game_input(Key::None as i32);
+    set_game_input(Key::None as i32);
 
-        let mut event: sdl::SDL_Event = std::mem::zeroed();
-        if sdl::SDL_PollEvent(&raw mut event) == 0 {
+    EVENT_PUMP.with(|p| {
+        let mut pump = p.borrow_mut();
+        let Some(pump) = pump.as_mut() else {
             return false;
+        };
+        match pump.poll_event() {
+            None => false,
+            Some(SdlEvent::Quit { .. }) => {
+                DoQuit();
+                true
+            }
+            Some(SdlEvent::KeyDown {
+                keycode: Some(keycode),
+                repeat: false,
+                ..
+            }) => {
+                set_game_input(map_keycode(keycode.into_i32()));
+                true
+            }
+            Some(_) => true,
         }
-
-        let event_type = event.type_;
-
-        if event_type == sdl::SDL_EventType::SDL_QUIT as u32 {
-            DoQuit();
-            return true;
-        }
-        if event_type != sdl::SDL_EventType::SDL_KEYDOWN as u32 {
-            return true;
-        }
-        if event.key.repeat != 0 {
-            return true;
-        }
-
-        set_game_input(map_keycode(event.key.keysym.sym));
-
-        true
-    }
+    })
 }
 
 // Map an SDL keycode to the game's one-shot input (gameInput) for a keydown.
 // Shared by live play and replay, so scripted presses map exactly like real ones.
 pub(crate) fn map_keycode(sym: i32) -> i32 {
-    let k1 = sdl::SDL_KeyCode::SDLK_1 as i32;
-    let ka = sdl::SDL_KeyCode::SDLK_a as i32;
+    let k1 = Keycode::NUM_1.into_i32();
+    let ka = Keycode::A.into_i32();
 
-    if sym == sdl::SDL_KeyCode::SDLK_RETURN as i32 {
+    if sym == Keycode::Return.into_i32() {
         Key::Enter as i32
-    } else if sym == sdl::SDL_KeyCode::SDLK_ESCAPE as i32 {
+    } else if sym == Keycode::Escape.into_i32() {
         Key::Escape as i32
-    } else if sym == sdl::SDL_KeyCode::SDLK_PAUSE as i32 || sym == sdl::SDL_KeyCode::SDLK_TAB as i32
-    {
+    } else if sym == Keycode::Pause.into_i32() || sym == Keycode::Tab.into_i32() {
         Key::Pause as i32
-    } else if sym == sdl::SDL_KeyCode::SDLK_LALT as i32 || sym == sdl::SDL_KeyCode::SDLK_RALT as i32
-    {
+    } else if sym == Keycode::LAlt.into_i32() || sym == Keycode::RAlt.into_i32() {
         Key::Mute as i32
-    } else if sym >= k1 && sym <= sdl::SDL_KeyCode::SDLK_4 as i32 {
+    } else if sym >= k1 && sym <= Keycode::NUM_4.into_i32() {
         Key::K1 as i32 + (sym - k1)
     } else if matches!(sym - ka, 4 | 8 | 15 | 17 | 19 | 22 | 24) {
         // e i p r t w y
@@ -359,100 +370,69 @@ pub fn run() {
     }
 
     // SDL init ----------------------------------------------------------------
-    unsafe { sdl::SDL_Init(sdl::SDL_INIT_VIDEO | sdl::SDL_INIT_AUDIO) };
-    unsafe { sdl::SDL_SetHint(c"SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS".as_ptr(), c"0".as_ptr()) };
+    let sdl = sdl2::init().expect("SDL init");
+    sdl2::hint::set("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
 
-    let mut mode = sdl::SDL_DisplayMode {
-        format: 0,
-        w: 0,
-        h: 0,
-        refresh_rate: 0,
-        driverdata: std::ptr::null_mut(),
-    };
-    unsafe { sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode) };
+    let video = sdl.video().expect("SDL video subsystem");
+    let mode = video.desktop_display_mode(0).expect("desktop display mode");
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
     let multiply = Video_Viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
-    let viewport = sdl::SDL_Rect {
-        x: vx,
-        y: vy,
-        w: vw,
-        h: vh,
-    };
+    let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
 
     // Window and renderer -----------------------------------------------------
-    let window = unsafe {
-        sdl::SDL_CreateWindow(
-            c"Jet-Set Willy".as_ptr(),
-            sdl::SDL_WINDOWPOS_CENTERED_MASK as i32,
-            sdl::SDL_WINDOWPOS_CENTERED_MASK as i32,
-            0,
-            0,
-            sdl::SDL_WindowFlags::SDL_WINDOW_FULLSCREEN_DESKTOP as u32,
-        )
-    };
+    let window = video
+        .window("Jet-Set Willy", 0, 0)
+        .position_centered()
+        .fullscreen_desktop()
+        .build()
+        .expect("create window");
+    let mut canvas = window
+        .into_canvas()
+        .accelerated()
+        .present_vsync()
+        .target_texture()
+        .build()
+        .expect("create canvas");
 
-    let renderer = unsafe {
-        sdl::SDL_CreateRenderer(
-            window,
-            -1,
-            (sdl::SDL_RendererFlags::SDL_RENDERER_TARGETTEXTURE as u32)
-                | (sdl::SDL_RendererFlags::SDL_RENDERER_ACCELERATED as u32)
-                | (sdl::SDL_RendererFlags::SDL_RENDERER_PRESENTVSYNC as u32),
+    sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "2");
+    let texture_creator = canvas.texture_creator();
+    let mut target = texture_creator
+        .create_texture_target(
+            PixelFormatEnum::ARGB8888,
+            (WIDTH * multiply) as u32,
+            (HEIGHT * multiply) as u32,
         )
-    };
+        .expect("create target texture");
+    sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
+    let mut texture = texture_creator
+        .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH as u32, HEIGHT as u32)
+        .expect("create streaming texture");
 
-    unsafe { sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"2".as_ptr()) };
-    let target = unsafe {
-        sdl::SDL_CreateTexture(
-            renderer,
-            sdl::SDL_PixelFormatEnum::SDL_PIXELFORMAT_ARGB8888 as u32,
-            sdl::SDL_TextureAccess::SDL_TEXTUREACCESS_TARGET as i32,
-            WIDTH * multiply,
-            HEIGHT * multiply,
-        )
-    };
-
-    unsafe { sdl::SDL_SetHint(c"SDL_RENDER_SCALE_QUALITY".as_ptr(), c"0".as_ptr()) };
-    let texture = unsafe {
-        sdl::SDL_CreateTexture(
-            renderer,
-            sdl::SDL_PixelFormatEnum::SDL_PIXELFORMAT_ARGB8888 as u32,
-            sdl::SDL_TextureAccess::SDL_TEXTUREACCESS_STREAMING as i32,
-            WIDTH,
-            HEIGHT,
-        )
-    };
-
-    unsafe { sdl::SDL_ShowCursor(sdl::SDL_DISABLE as i32) };
+    sdl.mouse().show_cursor(false);
 
     // Audio -------------------------------------------------------------------
-    let want = sdl::SDL_AudioSpec {
-        freq: SAMPLERATE,
-        format: sdl::AUDIO_S16SYS as sdl::SDL_AudioFormat,
-        channels: 2,
-        silence: 0,
-        samples: 256,
-        padding: 0,
-        size: 0,
-        callback: Some(sdl_audio_callback),
-        userdata: std::ptr::null_mut(),
-    };
-    let audio = unsafe {
-        sdl::SDL_OpenAudioDevice(
-            std::ptr::null(),
-            0,
-            &raw const want,
-            std::ptr::null_mut(),
-            0,
+    // 22050 Hz stereo S16 (i16 Channel = native-endian S16SYS), 256-sample
+    // buffers, pull-based via the AudioCallback above.
+    let audio = sdl.audio().expect("SDL audio subsystem");
+    let audio_device = audio
+        .open_playback(
+            None,
+            &AudioSpecDesired {
+                freq: Some(SAMPLERATE),
+                channels: Some(2),
+                samples: Some(256),
+            },
+            |_spec| SdlAudioCallback,
         )
-    };
-    unsafe { sdl::SDL_PauseAudioDevice(audio, 0) };
+        .expect("open audio device");
+    audio_device.resume();
 
-    // Keyboard and RNG --------------------------------------------------------
-    KEY_STATE.with(|c| {
-        c.set(unsafe { sdl::SDL_GetKeyboardState(std::ptr::null_mut()) });
-    });
+    // Events, keyboard, timer, RNG ----------------------------------------------
+    let event_pump = sdl.event_pump().expect("SDL event pump");
+    EVENT_PUMP.with(|p| *p.borrow_mut() = Some(event_pump));
+    let timer = sdl.timer().expect("SDL timer subsystem");
+
     unsafe { srand(time(std::ptr::null_mut::<i64>()) as u32) };
 
     Audio_Init();
@@ -481,12 +461,12 @@ pub fn run() {
 
     // Main loop ---------------------------------------------------------------
     // Wall-clock pacer: frame_time advances 1000 units per rendered frame,
-    // while SDL_GetTicks64() * TICKRATE puts the millisecond clock on the same
+    // while timer.ticks() * TICKRATE puts the millisecond clock on the same
     // scale, so the loop runs one iteration per 1000/TICKRATE ms (60 Hz).
     let mut frame_time: u64 = 0;
     while GAME_RUNNING.load(Relaxed) {
-        while frame_time > unsafe { sdl::SDL_GetTicks64() } * TICKRATE as u64 {
-            unsafe { sdl::SDL_Delay(1) }
+        while frame_time > timer.ticks() as u64 * TICKRATE as u64 {
+            timer.delay(1);
         }
         frame_time += 1000;
 
@@ -502,32 +482,23 @@ pub fn run() {
             });
         }
 
-        let mut sdl_surface: *mut sdl::SDL_Surface = std::ptr::null_mut();
-        unsafe { sdl::SDL_LockTextureToSurface(texture, std::ptr::null(), &raw mut sdl_surface) };
-        if let Some(surface) = unsafe { sdl_surface.as_ref() } {
-            present_frame(surface);
-        }
-        unsafe { sdl::SDL_UnlockTexture(texture) };
+        present_frame(&mut texture);
 
         let border = &videoColour[BORDER_INDEX.load(Relaxed)];
-        unsafe {
-            sdl::SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, 0xff);
-            sdl::SDL_RenderClear(renderer);
-            sdl::SDL_SetRenderTarget(renderer, target);
-            sdl::SDL_RenderCopy(renderer, texture, std::ptr::null(), std::ptr::null());
-            sdl::SDL_SetRenderTarget(renderer, std::ptr::null_mut());
-            sdl::SDL_RenderCopy(renderer, target, std::ptr::null(), &raw const viewport);
-            sdl::SDL_RenderPresent(renderer);
-        }
+        canvas.set_draw_color(Color::RGB(border.r, border.g, border.b));
+        canvas.clear();
+        canvas
+            .with_texture_canvas(&mut target, |c| {
+                c.copy(&texture, None, None)
+                    .expect("copy game texture to target");
+            })
+            .expect("render target support");
+        canvas
+            .copy(&target, None, Some(viewport))
+            .expect("copy target to window");
+        canvas.present();
     }
 
-    // Teardown ----------------------------------------------------------------
-    unsafe {
-        sdl::SDL_CloseAudioDevice(audio);
-        sdl::SDL_DestroyTexture(texture);
-        sdl::SDL_DestroyTexture(target);
-        sdl::SDL_DestroyRenderer(renderer);
-        sdl::SDL_DestroyWindow(window);
-        sdl::SDL_Quit();
-    }
+    // Teardown: SDL_Quit and friends run via Drop when sdl, canvas, the
+    // textures, and the audio device go out of scope.
 }
