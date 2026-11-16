@@ -23,7 +23,7 @@ use crate::common::{
 
 use crate::game_main::{DoNothing, TICKRATE, set_action, set_drawer, set_responder, set_ticker};
 use crate::levels::level_init;
-use crate::misc::Timer_Set;
+use crate::misc::{Timer_Set, Timer_Update};
 use crate::rope::Rope_Init;
 use crate::title::Title_Action;
 
@@ -74,7 +74,6 @@ unsafe extern "C" {
     fn Rope_Ticker();
     fn Robots_Drawer();
     fn System_Border(x: i32);
-    fn Timer_Update(timer: *mut Timer) -> i32;
 }
 
 // Enums (from game.h)
@@ -267,7 +266,7 @@ pub fn game_init_room() {
     }
 
     // Timer
-    Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE);
+    unsafe { Timer_Set(&mut *game.timer.lock().unwrap(), 12, TICKRATE) };
     game.frame.store(1, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);

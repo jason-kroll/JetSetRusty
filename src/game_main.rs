@@ -236,7 +236,7 @@ pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -
     set_game_input(Key::None as i32);
     fire(ticker());
     fire(drawer());
-    toggle_video_flash(Timer_Update(timer_flash));
+    toggle_video_flash(unsafe { Timer_Update(timer_flash) });
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,
@@ -376,14 +376,16 @@ pub fn run() {
     unsafe { sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode) };
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let multiply = Video_Viewport(
-        mode.w,
-        mode.h,
-        &raw mut vx,
-        &raw mut vy,
-        &raw mut vw,
-        &raw mut vh,
-    );
+    let multiply = unsafe {
+        Video_Viewport(
+            mode.w,
+            mode.h,
+            &raw mut vx,
+            &raw mut vy,
+            &raw mut vw,
+            &raw mut vh,
+        )
+    };
     let viewport = sdl::SDL_Rect {
         x: vx,
         y: vy,
@@ -487,8 +489,10 @@ pub fn run() {
     // tear-free output, but vsync must not be relied on for pacing: several
     // drivers and compositors silently ignore PRESENTVSYNC, which lets the
     // loop spin unthrottled and the game run many times too fast.
-    Timer_Set(&raw mut timer_frame, TICKRATE, TICKRATE);
-    Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
+    unsafe {
+        Timer_Set(&raw mut timer_frame, TICKRATE, TICKRATE);
+        Timer_Set(&raw mut timer_flash, 25, TICKRATE * 8);
+    }
 
     // Main loop ---------------------------------------------------------------
     // Wall-clock pacer: frame_time advances 1000 units per rendered frame,
@@ -501,7 +505,7 @@ pub fn run() {
         }
         frame_time += 1000;
 
-        let frame = Timer_Update(&raw mut timer_frame);
+        let frame = unsafe { Timer_Update(&raw mut timer_frame) };
 
         for _ in 0..frame {
             game_frame(&mut timer_flash, || {

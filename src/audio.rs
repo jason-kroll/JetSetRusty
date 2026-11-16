@@ -585,5 +585,5 @@ pub extern "C" fn Audio_Music(music: i32, playing: i32) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Audio_Init() {
-    Timer_Set(&raw mut timerSfx, SAMPLERATE, TICKRATE);
+    unsafe { Timer_Set(&raw mut timerSfx, SAMPLERATE, TICKRATE) };
 }

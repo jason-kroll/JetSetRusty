@@ -10,7 +10,6 @@ pub struct Colour {
 }
 
 #[allow(non_upper_case_globals)]
-#[unsafe(no_mangle)]
 pub static videoColour: [Colour; 16] = [
     Colour {
         r: 0x00,
@@ -136,8 +135,7 @@ impl std::fmt::Debug for Timer {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Timer_Set(timer: *mut Timer, numerator: i32, divisor: i32) {
+pub unsafe fn Timer_Set(timer: *mut Timer, numerator: i32, divisor: i32) {
     let t = unsafe { &mut *timer };
     t.acc = 0;
     t.rate = numerator / divisor;
@@ -145,8 +143,7 @@ pub extern "C" fn Timer_Set(timer: *mut Timer, numerator: i32, divisor: i32) {
     t.divisor = divisor;
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Timer_Update(timer: *mut Timer) -> i32 {
+pub unsafe fn Timer_Update(timer: *mut Timer) -> i32 {
     let t = unsafe { &mut *timer };
     t.acc += t.remainder;
     if t.acc < t.divisor {
@@ -157,8 +154,8 @@ pub extern "C" fn Timer_Update(timer: *mut Timer) -> i32 {
 }
 
 // External --------------------------------------------------------------------
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_Viewport(
+
+pub unsafe fn Video_Viewport(
     width: i32,
     height: i32,
     x: *mut i32,
