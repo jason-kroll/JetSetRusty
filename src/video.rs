@@ -287,8 +287,7 @@ pub fn video_text_width(text: *const i8) -> i32 {
 }
 
 // game.c and title.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_CycleColours() -> i32 {
+pub fn Video_CycleColours() -> i32 {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for pos in 0..(WIDTH * HEIGHT) as usize {
@@ -299,8 +298,7 @@ pub extern "C" fn Video_CycleColours() -> i32 {
 }
 
 // gameover.c, game.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8) {
+pub fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8) {
     let mut pos = pos;
     let mut size = size;
 
@@ -316,8 +314,7 @@ pub extern "C" fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8) {
 }
 
 // game.c is still using this
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_PixelInkFill(mut pos: i32, mut size: i32, ink: u8) {
+pub fn Video_PixelInkFill(mut pos: i32, mut size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     while size > 0 {
         if video_get_pixel(&mut pixels, pos) & 1 != 0 {
@@ -351,8 +348,7 @@ pub fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
 }
 
 // robots.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawArrow(pos: i32, dir: i32) {
+pub fn Video_DrawArrow(pos: i32, dir: i32) {
     let width = WIDTH;
     let mut pos = pos + dir;
 
@@ -394,8 +390,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 }
 
 // miner.c still needs this
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
+pub unsafe fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
     let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
 
     let attr = [0x8i32, 0x8, 0x8, 0x1];
@@ -428,8 +423,7 @@ pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32
 }
 
 // robots.c needs this
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
+pub unsafe fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
     let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
     let mut pos = pos + 15;
 
@@ -450,11 +444,10 @@ pub extern "C" fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
 }
 
 pub fn video_draw_robot(pos: i32, line: [i32; 16], ink: u8) {
-    Video_DrawRobot(pos, line.as_ptr() as *const u16, ink);
+    unsafe { Video_DrawRobot(pos, line.as_ptr() as *const u16, ink) };
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8) {
+pub unsafe fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8) {
     let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
     let colour = [paper, ink];
     let mut pos = pos + 15;
@@ -488,12 +481,11 @@ fn text_code(text: &[u8], ink: &mut [u8; 2]) -> bool {
 }
 
 pub fn video_write_large(x: i32, y: i32, text: *const i8) {
-    Video_WriteLarge(x, y, text);
+    unsafe { Video_WriteLarge(x, y, text) };
 }
 
 // used by game.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
+pub unsafe fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
     let mut x = x;
     let pos = y * WIDTH;
 
@@ -532,7 +524,7 @@ pub extern "C" fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
 }
 
 pub fn video_write(pos: i32, text: *const i8) {
-    Video_Write(pos, text);
+    unsafe { Video_Write(pos, text) };
 }
 
 fn find_string_end(mut p: *const u8) -> usize {
@@ -550,8 +542,7 @@ fn find_string_end(mut p: *const u8) -> usize {
 }
 
 // game.c
-#[unsafe(no_mangle)]
-pub extern "C" fn Video_Write(pos: i32, text: *const i8) {
+pub unsafe fn Video_Write(pos: i32, text: *const i8) {
     let text = unsafe {
         let len = find_string_end(text as *const u8);
         std::slice::from_raw_parts(text as *const u8, len)

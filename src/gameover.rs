@@ -6,12 +6,10 @@ use std::ptr::addr_of;
 
 // External functions
 use crate::title::Title_Action;
+use crate::video::{Video_DrawSprite, Video_PixelPaperFill, Video_WriteLarge};
 
 unsafe extern "C" {
     fn System_Border(index: i32);
-    fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8);
-    fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
-    fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8);
 }
 
 static PLINTH_SPRITE: [u16; 16] = [

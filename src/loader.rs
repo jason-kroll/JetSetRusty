@@ -42,7 +42,7 @@ fn do_loader_ticker() {
 }
 
 fn do_loader_drawer3() {
-    Video_WriteLarge(6 * 8, 11 * 8, (&raw const LOADER_TEXT).cast::<i8>());
+    unsafe { Video_WriteLarge(6 * 8, 11 * 8, (&raw const LOADER_TEXT).cast::<i8>()) };
 }
 
 fn do_loader_drawer2() {

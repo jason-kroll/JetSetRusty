@@ -11,15 +11,14 @@ use std::sync::atomic::Ordering;
 
 use crate::game::GameMode;
 
+use crate::video::{Video_CycleColours, Video_Write, Video_WriteLarge};
+
 unsafe extern "C" {
     fn Game_GameReset();
     fn Game_DrawStatus();
     fn Miner_Init();
     fn Robots_DrawCheat();
-    fn Video_Write(pos: i32, text: *const i8);
     fn System_Border(index: i32);
-    fn Video_CycleColours() -> i32;
-    fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
 }
 
 use crate::game_main::{DoNothing, DoQuit};

@@ -519,11 +519,13 @@ pub extern "C" fn Miner_Drawer() {
     }
 
     let row = unsafe { MINER_FRAME } + ((miner.dir << 2) | miner.frame) as usize;
-    if Video_DrawMiner(
-        ((miner.y + offset) << 8) | miner.x,
-        MINER_SPRITE[row].as_ptr(),
-        GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
-    ) != 0
+    if unsafe {
+        Video_DrawMiner(
+            ((miner.y + offset) << 8) | miner.x,
+            MINER_SPRITE[row].as_ptr(),
+            GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
+        )
+    } != 0
     {
         set_action(Some(Die_Action));
         return;
