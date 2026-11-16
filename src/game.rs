@@ -365,23 +365,27 @@ pub extern "C" fn do_game_responder() {
 pub extern "C" fn do_game_drawer() {
     let game = &*GAME_STATE;
 
-    if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
-        game_draw_lives();
-    }
-
     if (game.frame.load(Ordering::Relaxed) == 0) {
         return;
     }
 
-    // WARN: This maybe should be lower
-    // TODO: Test the victory sequence!
+    // Matches the C original's DoGameDrawer order: level and robots (including
+    // the flushing toilet) are drawn in GM_TOILET mode; only miner/rope/clock
+    // are skipped, so Willy visibly disappears into the toilet during the flush.
+    unsafe {
+        Level_Drawer();
+        Robots_Drawer();
+    }
+
+    if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
+        game_draw_lives();
+    }
+
     if (game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8) {
         return;
     }
 
     unsafe {
-        Level_Drawer();
-        Robots_Drawer();
         Miner_Drawer();
 
         // Remember we've got function-pointer globals, so let's remember this
