@@ -1,3 +1,4 @@
+use crate::audio::{Audio_Play, Audio_Sfx, MUS_STOP, SFX_GAMEOVER};
 use crate::common::{Action, DoNothing, Drawer, Responder, Ticker, WIDTH};
 use crate::video::video_pixel_fill;
 use std::ptr::addr_of;
@@ -8,13 +9,8 @@ unsafe extern "C" {
     fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8);
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8);
-    fn Audio_Play(playing: i32);
-    fn Audio_Sfx(sfx: i32);
     fn Title_Action();
 }
-
-const MUS_STOP: i32 = 0;
-const SFX_GAMEOVER: i32 = 2;
 
 static PLINTH_SPRITE: [u16; 16] = [
     14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0,
@@ -102,7 +98,7 @@ unsafe extern "C" fn gameover_init() {
         BOOT_TICKS = 0;
 
         Audio_Play(MUS_STOP);
-        Audio_Sfx(SFX_GAMEOVER);
+        Audio_Sfx(SFX_GAMEOVER as i32);
 
         Ticker = Some(gameover_ticker);
     }

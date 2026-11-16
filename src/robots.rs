@@ -12,15 +12,11 @@
 // `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
 // them by that name.
 
-use crate::audio::{Audio_Sfx, audioPanX};
+use crate::audio::{Audio_Sfx, SFX_ARROW, audioPanX};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
 use std::sync::atomic::Ordering;
-
-// audio.h SFX enum — audio.rs keeps its copy private, so restate the one we
-// need here.
-const SFX_ARROW: i32 = 3;
 
 // C `POS(x, y)`: tile column x, pixel row y → videoPixel buffer offset.
 const fn pos(x: i32, y: i32) -> i32 {
@@ -1210,7 +1206,7 @@ fn do_move_arrow_left(robot: &mut Robot) {
         unsafe {
             audioPanX = 256;
         }
-        Audio_Sfx(SFX_ARROW);
+        Audio_Sfx(SFX_ARROW as i32);
     }
 
     if robot.max < 0 {
@@ -1226,7 +1222,7 @@ fn do_move_arrow_right(robot: &mut Robot) {
         unsafe {
             audioPanX = 0;
         }
-        Audio_Sfx(SFX_ARROW);
+        Audio_Sfx(SFX_ARROW as i32);
     }
 
     if robot.max > 255 {
