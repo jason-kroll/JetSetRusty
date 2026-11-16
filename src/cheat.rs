@@ -1,6 +1,7 @@
 use crate::common::{Event, Key};
 use crate::game::{GAME_STATE, Game_CheatEnabled, game_init_room, game_pause};
 use crate::game_main::{System_IsKey, game_input, set_action};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // These will move to game.rs when we port that
@@ -8,9 +9,16 @@ const FIRSTLANDING: i32 = 28;
 
 static CHEAT_CODE: &[u8] = b"writetyper";
 
-#[unsafe(no_mangle)]
-#[allow(non_upper_case_globals)]
-pub static mut Cheat_Responder: Event = Some(cheat_disabled);
+thread_local! {
+    static CHEAT_RESPONDER: Cell<Event> = const { Cell::new(Some(cheat_disabled)) };
+}
+
+pub fn cheat_responder() -> Event {
+    CHEAT_RESPONDER.with(Cell::get)
+}
+fn set_cheat_responder(f: Event) {
+    CHEAT_RESPONDER.with(|c| c.set(f));
+}
 
 pub fn Cheat_Enabled() {
     let mut level: i32 = 0;
@@ -66,7 +74,5 @@ pub fn cheat_disabled() {
 
     Game_CheatEnabled();
 
-    unsafe {
-        Cheat_Responder = Some(Cheat_Enabled);
-    }
+    set_cheat_responder(Some(Cheat_Enabled));
 }

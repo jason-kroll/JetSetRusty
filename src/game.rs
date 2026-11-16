@@ -1,6 +1,6 @@
 #![allow(unused)]
 use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
-use crate::cheat::Cheat_Responder;
+use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
 use crate::levels::{self, Level_Dir, Level_Drawer, Level_Ticker};
@@ -33,6 +33,7 @@ use crate::robots::{Robots_DrawCheat, Robots_Drawer, Robots_Flush, Robots_Init, 
 use crate::rope::Rope_Init;
 use crate::title::Title_Action;
 
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
 
@@ -62,7 +63,16 @@ pub const THEBEACH: i32 = 57;
 const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
 // Static callback variable(s)
-pub static mut DO_CLOCK_UPDATE: Event = None;
+thread_local! {
+    static DO_CLOCK_UPDATE: Cell<Event> = const { Cell::new(None) };
+}
+
+fn do_clock_update() -> Event {
+    DO_CLOCK_UPDATE.with(Cell::get)
+}
+fn set_do_clock_update(f: Event) {
+    DO_CLOCK_UPDATE.with(|c| c.set(f));
+}
 
 // Probably a lot of functions go here!
 // Enums (from game.h)
@@ -336,7 +346,7 @@ pub fn do_game_responder() {
         }
         x if x == Key::Escape as i32 => set_action(Some(Title_Action)),
         _ => {
-            if let Some(handler) = unsafe { Cheat_Responder } {
+            if let Some(handler) = cheat_responder() {
                 unsafe { handler() };
             }
         }
@@ -371,10 +381,10 @@ pub fn do_game_drawer() {
 
         // Remember we've got function-pointer globals, so let's remember this
         // pattern and not accidentally jump into the variable's storage
-        if let Some(func) = rope::Rope_Drawer {
+        if let Some(func) = rope::rope_drawer() {
             func();
         }
-        if let Some(func) = DO_CLOCK_UPDATE {
+        if let Some(func) = do_clock_update() {
             func();
         }
     }
@@ -400,7 +410,7 @@ pub fn do_draw_clock() {
 
     unsafe {
         Video_WriteLarge((WIDTH - 60), STATUS as i32, text.as_ptr() as *const i8);
-        DO_CLOCK_UPDATE = Some(DoNothing);
+        set_do_clock_update(Some(DoNothing));
     }
 }
 
@@ -439,7 +449,7 @@ pub fn Game_GameReset() {
 
     // DoClockUpdate = DoDrawClock
     unsafe {
-        DO_CLOCK_UPDATE = Some(DoDrawClock);
+        set_do_clock_update(Some(DoDrawClock));
     }
 
     // gameClockTicks = 0
@@ -643,7 +653,7 @@ pub fn DoGameTicker() {
 
     // Tick rope
     unsafe {
-        if let Some(f) = rope::Rope_Ticker {
+        if let Some(f) = rope::rope_ticker() {
             f();
         }
     }
@@ -711,7 +721,7 @@ pub fn clock_ticker() {
     }
 
     unsafe {
-        DO_CLOCK_UPDATE = Some(DoDrawClock);
+        set_do_clock_update(Some(DoDrawClock));
     }
 }
 

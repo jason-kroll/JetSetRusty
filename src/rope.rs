@@ -4,6 +4,7 @@
 use crate::common::{Event, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{VIDEO_PIXEL, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 const ROPE_SEGS: i32 = 33;
@@ -154,9 +155,23 @@ static ROPE: RopeState = RopeState {
 // C-visible function pointer variables (game.c calls these indirectly)
 // ----------------------------------------------------------------------------
 
-pub static mut Rope_Ticker: Event = None;
+thread_local! {
+    static ROPE_TICKER: Cell<Event> = const { Cell::new(None) };
+    static ROPE_DRAWER: Cell<Event> = const { Cell::new(None) };
+}
 
-pub static mut Rope_Drawer: Event = None;
+pub fn rope_ticker() -> Event {
+    ROPE_TICKER.with(Cell::get)
+}
+pub fn set_rope_ticker(f: Event) {
+    ROPE_TICKER.with(|c| c.set(f));
+}
+pub fn rope_drawer() -> Event {
+    ROPE_DRAWER.with(Cell::get)
+}
+pub fn set_rope_drawer(f: Event) {
+    ROPE_DRAWER.with(|c| c.set(f));
+}
 
 // ----------------------------------------------------------------------------
 // Extern declarations - the real C globals shared with levels.rs and the C code
@@ -296,10 +311,8 @@ pub fn Rope_Init() {
         SWIMMINGPOOL => (16, 7),
         THEBEACH => (14, 5),
         _ => {
-            unsafe {
-                Rope_Ticker = Some(DoNothing);
-                Rope_Drawer = Some(DoNothing);
-            }
+            set_rope_ticker(Some(DoNothing));
+            set_rope_drawer(Some(DoNothing));
             return;
         }
     };
@@ -311,10 +324,8 @@ pub fn Rope_Init() {
     ROPE.side.store(0, Ordering::Relaxed);
     ROPE.hold.store(0, Ordering::Relaxed);
 
-    unsafe {
-        Rope_Ticker = Some(rope_ticker_fn);
-        Rope_Drawer = Some(rope_drawer_fn);
-    }
+    set_rope_ticker(Some(rope_ticker_fn));
+    set_rope_drawer(Some(rope_drawer_fn));
 }
 
 fn DoNothing() {}
