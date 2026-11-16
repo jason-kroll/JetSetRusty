@@ -1,7 +1,5 @@
 // jetset willy
 
-#![allow(dead_code)]
-
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{DoNothing, DoQuit, System_Rnd, Title_Action};
 use crate::common::{HEIGHT, WIDTH};

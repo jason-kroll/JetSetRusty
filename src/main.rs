@@ -1,4 +1,4 @@
-#![allow(non_snake_case, non_upper_case_globals)] // C-style names are kept deliberately to match the C original
+#![allow(non_snake_case)] // C-style names are kept deliberately to match the C original (until the Phase B rename)
 
 mod audio;
 mod cheat;

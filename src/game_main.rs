@@ -1,7 +1,7 @@
-#![allow(non_snake_case, non_upper_case_globals)]
+#![allow(non_snake_case)]
 
 use crate::common::{Event, HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, Timer_Set, Timer_Update, Video_Viewport, videoColour};
+use crate::misc::{Timer, Timer_Set, Timer_Update, VIDEO_COLOUR, Video_Viewport};
 use sdl2::EventPump;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event as SdlEvent;
@@ -16,7 +16,8 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 pub const SAMPLERATE: i32 = 22050;
 pub const TICKRATE: i32 = 60;
 
-// SDL key codes indexed by Key enum discriminant (Key::Left=0 .. Key::T=35)
+// SDL key codes indexed by key value 0..35 (Key::Left=0 .. Key::A=10 plus the
+// letter range 10..35 produced arithmetically by map_keycode)
 static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
     [
         Keycode::Left.into_i32(),
@@ -210,7 +211,7 @@ fn present_frame(texture: &mut Texture) {
                 for (pos, &index) in fb.borrow().iter().enumerate() {
                     let pos = pos as i32;
                     let offset = ((pos / WIDTH) * pitch as i32 + (pos & 255) * 4) as usize;
-                    let c = &videoColour[index as usize];
+                    let c = &VIDEO_COLOUR[index as usize];
                     buf[offset] = c.b;
                     buf[offset + 1] = c.g;
                     buf[offset + 2] = c.r;
@@ -513,7 +514,7 @@ pub fn run() {
 
         present_frame(&mut texture);
 
-        let border = &videoColour[BORDER_INDEX.load(Relaxed)];
+        let border = &VIDEO_COLOUR[BORDER_INDEX.load(Relaxed)];
         canvas.set_draw_color(Color::RGB(border.r, border.g, border.b));
         canvas.clear();
         canvas

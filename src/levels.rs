@@ -5091,7 +5091,6 @@ pub fn Level_Drawer() {
 }
 
 // c"" literals forbid the interior nul bytes these control strings carry
-#[allow(clippy::manual_c_str_literals)]
 pub fn level_init() {
     let level_idx = game_level();
 

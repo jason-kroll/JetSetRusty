@@ -7,8 +7,7 @@ pub struct Colour {
     pub b: u8,
 }
 
-#[allow(non_upper_case_globals)]
-pub static videoColour: [Colour; 16] = [
+pub static VIDEO_COLOUR: [Colour; 16] = [
     Colour {
         r: 0x00,
         g: 0x00,

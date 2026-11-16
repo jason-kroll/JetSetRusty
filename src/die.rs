@@ -1,4 +1,4 @@
-#![allow(non_snake_case, dead_code, non_upper_case_globals)]
+#![allow(non_snake_case)]
 
 use crate::audio::{Audio_ReduceMusicSpeed, Audio_Sfx, SFX_DIE, set_audioPanX};
 use crate::common::WIDTH;
@@ -12,7 +12,7 @@ use crate::game_main::{DoNothing, System_Border};
 use crate::gameover::Gameover_Action;
 use crate::miner::Miner_Restore;
 
-static dieBlank: [u16; 16] = [0; 16];
+static DIE_BLANK: [u16; 16] = [0; 16];
 thread_local! {
     static DIE_LEVEL: Cell<i32> = const { Cell::new(0) };
 }
@@ -41,7 +41,7 @@ fn Die_Ticker() {
 
     Video_DrawSprite(
         LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
-        &dieBlank,
+        &DIE_BLANK,
         0x0,
         0x0,
     );

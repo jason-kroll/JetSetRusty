@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use crate::common::{HEIGHT, WIDTH, system_set_pixel};
 
 use std::sync::LazyLock;
@@ -19,11 +17,6 @@ pub const CHAR_HEIGHT_LARGE: usize = CHAR_HEIGHT * 2;
 #[inline]
 pub const fn tile_2_pixel(t: i32) -> i32 {
     ((t & 992) << 6) | ((t & 31) << 3)
-}
-
-#[inline]
-pub const fn yalign(y: i32) -> i32 {
-    4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
 #[derive(Clone, Copy)]

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::levels;
 
 // Screen dimensions, i32 as per original C
@@ -22,42 +20,14 @@ pub enum Key {
     K2,
     K3,
     K4,
-    K5,
-    K6,
-    K7,
-    K8,
-    K9,
-    K0,
     A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-    Escape,
+    // Letters B..Z are never constructed as variants — map_keycode produces
+    // letter inputs arithmetically as `Key::A as i32 + offset` (values 10..35,
+    // which still index SDL_KEYS in game_main.rs). Escape is pinned at 36 so
+    // the discriminant layout below stays stable.
+    Escape = 36,
     Pause,
     Mute,
-    Quit,
     Else,
     None,
 }

@@ -37,7 +37,7 @@ use crate::game_main::{
     SAMPLERATE, TICKRATE, audio_init, audio_output, border_index, game_frame, game_running,
     map_keycode, seed_rng, set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
-use crate::misc::{Timer, Timer_Set, videoColour};
+use crate::misc::{Timer, Timer_Set, VIDEO_COLOUR};
 use sdl2::sys::SDL_KeyCode as K;
 use std::io::Write;
 
@@ -155,7 +155,7 @@ fn write_ppm(path: &str) -> std::io::Result<()> {
     let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
     with_framebuffer(|fb| {
         for &index in fb {
-            let c = &videoColour[index as usize];
+            let c = &VIDEO_COLOUR[index as usize];
             out.extend_from_slice(&[c.r, c.g, c.b]);
         }
     });

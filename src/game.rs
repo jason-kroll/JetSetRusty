@@ -1,10 +1,9 @@
-#![allow(unused)]
 #![warn(unused_unsafe)]
 use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
-use crate::levels::{self, Level_Dir, Level_Drawer, Level_Ticker};
+use crate::levels::{Level_Dir, Level_Drawer, Level_Ticker};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
@@ -49,13 +48,10 @@ pub const STATUS: usize = 21 * 8 + 4;
 pub const THEDRIVE: i32 = 4;
 pub const QUIRKAFLEEG: i32 = 16;
 pub const ONTHEROOF: i32 = 18;
-pub const BALLROOMEAST: i32 = 20;
 pub const COLDSTORE: i32 = 25;
-pub const THECHAPEL: i32 = 27;
 pub const FIRSTLANDING: i32 = 28;
 pub const NIGHTMAREROOM: i32 = 29;
 pub const SWIMMINGPOOL: i32 = 31;
-pub const EASTWALL: i32 = 32;
 pub const THEBATHROOM: i32 = 33;
 pub const MASTERBEDROOM: i32 = 35;
 pub const THEBEACH: i32 = 57;
@@ -91,29 +87,6 @@ pub enum Direction {
     Right,
     Below,
     Left,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TileType {
-    Item = 0,
-    Space,
-    Solid,
-    Floor,
-    SolidFloor,
-    ConveyL,
-    ConveyR,
-    RampL,
-    RampR,
-    RampLC,
-    RampRC,
-    Harm,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ConveyorDir {
-    None = 0,
-    Left,
-    Right,
 }
 
 // miner struct (from game.h)
@@ -163,34 +136,6 @@ pub struct GameState {
     pub score_clock: Mutex<[u8; 3]>,
     pub score_items: Mutex<u8>,
     pub timer: Mutex<Timer>,
-}
-
-// Let's only do these for complicated ones
-impl GameState {
-    // Atomic operations (very fast)
-    pub fn increment_clock_ticks(&self) {
-        self.clock_ticks.fetch_add(1, Ordering::Relaxed);
-    }
-    pub fn increment_item_count(&self) {
-        self.item_count.fetch_add(1, Ordering::Relaxed);
-    }
-    pub fn increment_score_items(&self) {
-        let mut items = self.score_items.lock().unwrap();
-        *items += 1;
-    }
-
-    // Timer operations
-    pub fn get_timer(&self) -> Timer {
-        *self.timer.lock().unwrap()
-    }
-
-    pub fn update_timer<F>(&self, f: F)
-    where
-        F: FnOnce(&mut Timer),
-    {
-        let mut timer = self.timer.lock().unwrap();
-        f(&mut timer);
-    }
 }
 
 // Per-room border colour, indexed by level. Was the `levelBorder` C global (in
@@ -250,7 +195,7 @@ pub fn game_init_room() {
 
     // Write to GAME_STATE
     game.miner_attr_split.store(6, Ordering::Relaxed);
-    if (game.level.load(Ordering::Relaxed) == SWIMMINGPOOL) {
+    if game.level.load(Ordering::Relaxed) == SWIMMINGPOOL {
         game.miner_attr_split.store(5, Ordering::Relaxed); // willy goes blue when underwater
     }
 
@@ -283,7 +228,7 @@ pub fn game_pause(state: bool) {
         .store(if state { 1 } else { 0 }, Ordering::Relaxed);
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
-        if (game.cheat_enabled.load(Ordering::Relaxed)) {
+        if game.cheat_enabled.load(Ordering::Relaxed) {
             set_ticker(Some(DoNothing));
             set_drawer(Some(DoNothing));
         } else {
@@ -342,7 +287,7 @@ pub fn do_game_responder() {
 pub fn do_game_drawer() {
     let game = &*GAME_STATE;
 
-    if (game.frame.load(Ordering::Relaxed) == 0) {
+    if game.frame.load(Ordering::Relaxed) == 0 {
         return;
     }
 
@@ -352,11 +297,11 @@ pub fn do_game_drawer() {
     Level_Drawer();
     Robots_Drawer();
 
-    if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
+    if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
         game_draw_lives();
     }
 
-    if (game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8) {
+    if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
         return;
     }
 
@@ -388,7 +333,7 @@ pub fn do_draw_clock() {
         text[4] = (score_clock[1] / 10) + b'0';
     }
 
-    Video_WriteLarge((WIDTH - 60), STATUS as i32, &text[..]);
+    Video_WriteLarge(WIDTH - 60, STATUS as i32, &text[..]);
     set_do_clock_update(Some(DoNothing));
 }
 
@@ -659,15 +604,15 @@ pub fn clock_ticker() {
 
     let mut clock = game.score_clock.lock().unwrap();
     clock[0] += 1;
-    if (clock[0] == 60) {
+    if clock[0] == 60 {
         clock[0] = 0;
         clock[1] += 1;
-        if (clock[1] == 12) {
+        if clock[1] == 12 {
             clock[2] = 1 - clock[2];
             if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
                 set_action(Some(Gameover_Action));
             }
-        } else if (clock[1] == 13) {
+        } else if clock[1] == 13 {
             clock[1] = 1;
         }
     }
@@ -683,10 +628,6 @@ pub fn game_draw_lives() {
         let pos = LIVES + l * 16;
         Miner_DrawSeqSprite(pos as i32, 0x0, ink);
     }
-}
-
-pub fn GameDrawLives() {
-    game_draw_lives();
 }
 
 pub fn game_draw_status() {
@@ -719,7 +660,7 @@ pub fn game_draw_status() {
     // DoDrawClock();
     do_draw_clock();
 
-    // GameDrawLives();
+    // C: GameDrawLives();
     game_draw_lives();
 }
 
@@ -729,7 +670,6 @@ pub fn Game_DrawStatus() {
 
 #[allow(non_snake_case)]
 pub fn Game_Action() {
-    let game = &*GAME_STATE;
     set_responder(Some(do_game_responder));
     // Runs once next frame, inits the room, then installs DoGameTicker and
     // sets Action = DoNothing. Matches C's `Ticker = Game_InitRoom`.

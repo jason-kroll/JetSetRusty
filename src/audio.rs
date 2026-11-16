@@ -1,4 +1,4 @@
-#![allow(non_snake_case, dead_code, non_upper_case_globals)]
+#![allow(non_snake_case)]
 
 use crate::misc::{Timer, Timer_Set, Timer_Update};
 use std::cell::Cell;
@@ -17,7 +17,6 @@ const NCHANNELS: usize = 8;
 const NMUSIC: usize = 5;
 const NSFX: usize = 3;
 
-const EV_NOTEOFF: i16 = 0x00;
 const EV_NOTEON: i16 = 0x10;
 const EV_END: i16 = 0x40;
 
@@ -29,7 +28,6 @@ pub const SFX_ITEM: usize = 0;
 pub const SFX_DIE: usize = 1;
 pub const SFX_GAMEOVER: usize = 2;
 pub const SFX_ARROW: usize = 3;
-pub const SFX_WILLY: usize = 4;
 pub const SFX_NONE: usize = 5;
 
 // musicChannel[i] maps to audioChannel index
