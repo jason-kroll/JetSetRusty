@@ -8,39 +8,45 @@ use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_te
 use crate::codes::Codes_Action;
 use crate::game_main::DoNothing;
 use crate::title::Title_Action;
+use std::cell::{Cell, RefCell};
 
 // MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2 (from audio.h enum order)
 const MUS_LOADER: i32 = 2;
 
-static mut LOADER_TICKS: u32 = 0;
-// \x01\x07 = set paper 7, \x02\x02 = set ink 2 (colors flip with videoFlash)
-static mut LOADER_TEXT: [u8; 25] = *b"\x01\x07\x02\x02JetSet Willy Loading\0";
+thread_local! {
+    static LOADER_TICKS: Cell<u32> = const { Cell::new(0) };
+    // \x01\x07 = set paper 7, \x02\x02 = set ink 2 (colors flip with videoFlash)
+    static LOADER_TEXT: RefCell<[u8; 25]> =
+        const { RefCell::new(*b"\x01\x07\x02\x02JetSet Willy Loading\0") };
+}
 
 fn do_loader_responder() {
     set_action(Some(Title_Action))
 }
 
 fn do_loader_ticker() {
-    unsafe {
-        // Use raw pointers to avoid static_mut_refs lint (Rust 2024)
-        let text = (&raw mut LOADER_TEXT).cast::<u8>();
+    LOADER_TEXT.with(|t| {
+        let mut text = t.borrow_mut();
         if video_flash() != 0 {
-            text.add(1).write(7);
-            text.add(3).write(2);
+            text[1] = 7;
+            text[3] = 2;
         } else {
-            text.add(1).write(2);
-            text.add(3).write(7);
+            text[1] = 2;
+            text[3] = 7;
         }
-        // Matches C's post-increment: transition when value was 256
-        if LOADER_TICKS == 256 {
-            set_action(Some(Codes_Action));
-        }
-        LOADER_TICKS += 1;
+    });
+    // Matches C's post-increment: transition when value was 256
+    let ticks = LOADER_TICKS.with(Cell::get);
+    if ticks == 256 {
+        set_action(Some(Codes_Action));
     }
+    LOADER_TICKS.with(|c| c.set(ticks + 1));
 }
 
 fn do_loader_drawer3() {
-    unsafe { Video_WriteLarge(6 * 8, 11 * 8, (&raw const LOADER_TEXT).cast::<i8>()) };
+    LOADER_TEXT.with(|t| unsafe {
+        Video_WriteLarge(6 * 8, 11 * 8, t.borrow().as_ptr().cast());
+    });
 }
 
 fn do_loader_drawer2() {
