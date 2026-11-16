@@ -1,10 +1,10 @@
-use crate::common::{Action, Event, Key};
+use crate::common::{Event, Key};
 use crate::game::{GAME_STATE, Game_CheatEnabled, game_init_room, game_pause};
+use crate::game_main::{game_input, set_action};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // These will move to game.rs when we port that
 unsafe extern "C" {
-    static mut gameInput: i32;
     fn System_IsKey(key: i32) -> i32;
 }
 
@@ -49,9 +49,7 @@ pub extern "C" fn Cheat_Enabled() {
 
     GAME_STATE.level.store(level, Ordering::Relaxed);
 
-    unsafe {
-        Action = Some(game_init_room);
-    }
+    set_action(Some(game_init_room));
 }
 
 pub extern "C" fn cheat_disabled() {
@@ -61,7 +59,7 @@ pub extern "C" fn cheat_disabled() {
     if GAME_STATE.level.load(Ordering::Relaxed) != FIRSTLANDING
         || miner.y != 104
         || CHEAT_CODE[CHEAT_POS.load(Ordering::Relaxed)]
-            != (unsafe { gameInput } - Key::A as i32 + b'a' as i32) as u8
+            != (game_input() - Key::A as i32 + b'a' as i32) as u8
     {
         game_pause(false);
         return;
