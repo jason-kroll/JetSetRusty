@@ -64,7 +64,6 @@ use crate::loader::Loader_Action;
 unsafe extern "C" {
     fn rand() -> i32;
     fn srand(seed: u32);
-    fn time(t: *mut i64) -> i64;
 }
 
 // ---- Dispatcher state -------------------------------------------------------
@@ -453,7 +452,12 @@ pub fn run() {
     EVENT_PUMP.with(|p| *p.borrow_mut() = Some(event_pump));
     let timer = sdl.timer().expect("SDL timer subsystem");
 
-    unsafe { srand(time(std::ptr::null_mut::<i64>()) as u32) };
+    // Seed from the wall clock, like the C original's srand(time(NULL)).
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    unsafe { srand(now as u32) };
 
     Audio_Init();
 
