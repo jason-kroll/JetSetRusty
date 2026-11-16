@@ -81,6 +81,60 @@ pub static mut gameInput: i32 = Key::None as i32;
 #[unsafe(no_mangle)]
 pub static mut videoFlash: i32 = 0;
 
+// Safe accessors for the dispatcher globals. Storage is still `static mut`
+// for now; phase 1 of the C-ABI shed migrates all callers to these accessors,
+// then the final step swaps the storage to thread-local Cells and deletes
+// the statics (removing these allows). The allows are only for the commits
+// in between, before every caller has migrated.
+#[allow(dead_code)]
+pub(crate) fn set_action(f: Event) {
+    unsafe { Action = f };
+}
+#[allow(dead_code)]
+pub(crate) fn action() -> Event {
+    unsafe { Action }
+}
+#[allow(dead_code)]
+pub(crate) fn set_responder(f: Event) {
+    unsafe { Responder = f };
+}
+#[allow(dead_code)]
+pub(crate) fn responder() -> Event {
+    unsafe { Responder }
+}
+#[allow(dead_code)]
+pub(crate) fn set_ticker(f: Event) {
+    unsafe { Ticker = f };
+}
+#[allow(dead_code)]
+pub(crate) fn ticker() -> Event {
+    unsafe { Ticker }
+}
+#[allow(dead_code)]
+pub(crate) fn set_drawer(f: Event) {
+    unsafe { Drawer = f };
+}
+#[allow(dead_code)]
+pub(crate) fn drawer() -> Event {
+    unsafe { Drawer }
+}
+#[allow(dead_code)]
+pub(crate) fn set_game_input(key: i32) {
+    unsafe { gameInput = key };
+}
+#[allow(dead_code)]
+pub(crate) fn game_input() -> i32 {
+    unsafe { gameInput }
+}
+#[allow(dead_code)]
+pub(crate) fn video_flash() -> i32 {
+    unsafe { videoFlash }
+}
+#[allow(dead_code)]
+pub(crate) fn toggle_video_flash(bit: i32) {
+    unsafe { videoFlash ^= bit };
+}
+
 // ---- Module-private state ---------------------------------------------------
 
 // The key state is a raw pointer needed by exported functions, but only ever
@@ -116,10 +170,8 @@ pub extern "C" fn DoNothing() {}
 pub extern "C" fn DoQuit() {
     GAME_RUNNING.store(false, Relaxed);
     // Setting these to None is equivalent to DoNothing — fire() is a no-op on None.
-    unsafe {
-        Drawer = None;
-        Ticker = None;
-    }
+    set_drawer(None);
+    set_ticker(None);
 }
 
 #[unsafe(no_mangle)]
@@ -200,20 +252,18 @@ fn fire(event: Event) {
 // None once the queue is empty. Shared by live play and replay so both run the
 // exact same frame logic.
 pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<i32>) {
-    unsafe {
-        fire(Action);
-        while let Some(input) = next_input() {
-            gameInput = input;
-            if gameInput != Key::None as i32 {
-                fire(Responder);
-            }
+    fire(action());
+    while let Some(input) = next_input() {
+        set_game_input(input);
+        if game_input() != Key::None as i32 {
+            fire(responder());
         }
-        // As in live play, where the final (empty) poll leaves gameInput at None.
-        gameInput = Key::None as i32;
-        fire(Ticker);
-        fire(Drawer);
-        videoFlash ^= Timer_Update(timer_flash);
     }
+    // As in live play, where the final (empty) poll leaves gameInput at None.
+    set_game_input(Key::None as i32);
+    fire(ticker());
+    fire(drawer());
+    toggle_video_flash(Timer_Update(timer_flash));
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,
@@ -263,7 +313,7 @@ pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
     unsafe {
-        gameInput = Key::None as i32;
+        set_game_input(Key::None as i32);
 
         let mut event: sdl::SDL_Event = std::mem::zeroed();
         if sdl::SDL_PollEvent(&raw mut event) == 0 {
@@ -283,7 +333,7 @@ fn system_get_event() -> bool {
             return true;
         }
 
-        gameInput = map_keycode(event.key.keysym.sym);
+        set_game_input(map_keycode(event.key.keysym.sym));
 
         true
     }
