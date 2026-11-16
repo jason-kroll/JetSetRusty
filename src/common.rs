@@ -64,10 +64,7 @@ pub enum Key {
 }
 
 // Globals defined in game_main.rs, re-exported here for convenience
-pub use crate::game_main::{
-    Action, DoNothing, DoQuit, Drawer, Responder, System_Rnd, System_SetPixel, Ticker, gameInput,
-    videoFlash,
-};
+pub use crate::game_main::{Action, DoNothing, DoQuit, System_Rnd, System_SetPixel, videoFlash};
 
 // Forward declarations of remaining C functions
 unsafe extern "C" {

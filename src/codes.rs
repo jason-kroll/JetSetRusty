@@ -3,15 +3,16 @@
 #![allow(dead_code)]
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
-use crate::common::{Action, DoNothing, DoQuit, System_Rnd, Title_Action, gameInput};
-use crate::common::{Drawer, HEIGHT, Responder, Ticker, WIDTH};
+use crate::common::{DoNothing, DoQuit, System_Rnd, Title_Action};
+use crate::common::{HEIGHT, WIDTH};
+use crate::game_main::{
+    game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
+};
 
 use crate::video::{video_draw_robot, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
 
 unsafe extern "C" {
-    pub static mut videoFlash: i32;
-
     fn System_Border(index: i32);
 }
 
@@ -122,7 +123,7 @@ impl CodesState {
     }
 
     fn do_codes_ticker(&mut self) {
-        if unsafe { videoFlash } != 0 {
+        if video_flash() != 0 {
             self.cell[0] = 0x02;
             self.cell[2] = 0x01;
         } else {
@@ -142,7 +143,7 @@ impl CodesState {
     // c"" literals forbid the interior nul bytes these control strings carry
     #[allow(clippy::manual_c_str_literals)]
     fn do_codes_responder(&mut self) {
-        match unsafe { gameInput } {
+        match game_input() {
             KEY_1 => self.key = 1, // blue
             KEY_2 => self.key = 2, // red
             KEY_3 => self.key = 3, // magenta
@@ -159,9 +160,7 @@ impl CodesState {
                     | self.code_val(3, 0);
 
                 if entered == self.needed {
-                    unsafe {
-                        Action = Some(Title_Action);
-                    }
+                    set_action(Some(Title_Action));
                     return;
                 }
 
@@ -208,11 +207,11 @@ impl CodesState {
 
             self.get_code();
 
-            Responder = Some(DoCodesResponder);
-            Ticker = Some(DoCodesTicker);
-            Drawer = Some(DoCodesDrawer);
+            set_responder(Some(DoCodesResponder));
+            set_ticker(Some(DoCodesTicker));
+            set_drawer(Some(DoCodesDrawer));
 
-            Action = Some(DoNothing);
+            set_action(Some(DoNothing));
         }
     }
 }
