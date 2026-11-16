@@ -107,9 +107,9 @@ fn parse_script(text: &str) -> Result<Script, String> {
                     "item_count" => SetOp::ItemCount(
                         val.parse::<i32>().map_err(|_| err("expected an integer"))?,
                     ),
-                    "level" => SetOp::Level(
-                        val.parse::<i32>().map_err(|_| err("expected an integer"))?,
-                    ),
+                    "level" => {
+                        SetOp::Level(val.parse::<i32>().map_err(|_| err("expected an integer"))?)
+                    }
                     "mode" => SetOp::Mode(match *val {
                         "normal" => 0,
                         "maria" => 1,

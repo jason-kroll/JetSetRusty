@@ -329,7 +329,9 @@ pub fn run() {
         if args[i] == "--items" {
             if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<i32>().ok()) {
                 DEBUG_ITEM_COUNT.store(v, Relaxed);
-                eprintln!("jetsetrusty: --items {v} (remaining-item count overridden at game start)");
+                eprintln!(
+                    "jetsetrusty: --items {v} (remaining-item count overridden at game start)"
+                );
             }
             i += 2;
         } else {
