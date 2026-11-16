@@ -30,18 +30,18 @@ Ticker    — logic/physics update
 Drawer    — rendering
 ```
 
-These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs` (and re-exported by `common.rs`); sibling modules reference them via `extern` (a holdover from the C ABI — the symbols are Rust-defined now). Each state transition works by re-assigning the pointer (e.g., `Action = Some(Title_Action)`). The `Event` type is `Option<unsafe extern "C" fn()>`, so an unset slot is `None` and behaves as a no-op.
+These are `thread_local! Cell`s defined in `game_main.rs` behind safe accessors (`set_action`/`action`, `set_responder`/`responder`, `set_ticker`/`ticker`, `set_drawer`/`drawer`, plus `set_game_input`/`game_input` and `video_flash`/`toggle_video_flash`); they are main-thread only, so no synchronization is needed. Each state transition works by re-assigning the slot (e.g., `set_action(Some(Title_Action))`). The `Event` type is `Option<fn()>`, so an unset slot is `None` and behaves as a no-op.
 
 ### Ported to Rust (`src/*.rs`)
 
 | Module | Role |
 |--------|------|
 | `main.rs` | Entry point — calls `game_main::run()` |
-| `game_main.rs` | SDL2 init, main loop (wall-clock 60 Hz pacer — see *Frame pacing*), SDL audio callback (`sdl_audio_callback` → `Audio_Output`), keyboard polling, the four function-pointer globals. Owns `FRAMEBUFFER` (see *Graphics Model*) and `game_frame()`, the per-tick body shared by live play and replay. |
+| `game_main.rs` | SDL2 init, main loop (wall-clock 60 Hz pacer — see *Frame pacing*), SDL audio callback (`sdl_audio_callback` → `Audio_Output`), keyboard polling, the four dispatcher slots. Owns `FRAMEBUFFER` (see *Graphics Model*) and `game_frame()`, the per-tick body shared by live play and replay. |
 | `replay.rs` | Headless deterministic replay (`jetsetrusty --replay <script>`) for the regression tests: scripted input, fixed RNG seed, lockstep audio, per-frame FNV-1a hashes of video and audio. No SDL. |
-| `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum (`#[repr(i32)]`), `Event` type alias, re-exports of `game_main` globals, extern decls for any unported C `*_Action` |
+| `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum, `Event` type alias (`Option<fn()>`) |
 | `video.rs` | Full rendering engine — `videoPixel` buffer, sprite drawing, two character sets (8px/128-char and 16px/96-char) |
-| `misc.rs` | 16-color `videoColour` palette (`#[no_mangle]`), `Timer` struct, `Video_Viewport` |
+| `misc.rs` | 16-color `videoColour` palette, `Timer` struct, `Video_Viewport` |
 | `cheat.rs` | "writetyper" cheat detection, level selection (1–60). The cheat flag lives in `GAME_STATE.cheat_enabled` (the old `static mut cheatEnabled` is gone). |
 | `die.rs` | Death animation and life-loss sequence |
 | `audio.rs` | Square-wave synth — 8-channel mixer (3 SFX + 5 music), polyphonic sequencer, stereo panning |
@@ -51,9 +51,9 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 | `levels.rs` | Level data and room layout definitions |
 | `rope.rs` | Rope swing physics and rendering |
 | `codes.rs` | Copy-protection code entry and validation |
-| `game.rs` | Port of `game.c`/`game.h` — complete (no `unimplemented!()` stubs). Owns `Game_Action`, `DoGameTicker`, `do_game_drawer`, `game_init_room`, `clock_ticker`, `Game_ChangeLevel`, `Game_GameReset`, `game_pause`, and the `GAME_STATE` model (see below) — now the single source of truth for shared game state. Calls robot physics (`Robots_*`) — the Rust impls in `robots.rs`, via C-ABI extern decls. |
-| `miner.rs` | Port of `miner.c` — Willy physics (`Miner_*`): input, jump/fall/walk, ramps/conveyors, collision, item pickup, sprite rendering. Willy's state (`minerWilly` / `minerWillyRope` / `minerAttrSplit`) has been **dissolved into `GAME_STATE`** (the `miner` mutex plus the `miner_air` / `miner_jump` / `miner_willy_rope` / `miner_attr_split` atomic caches); no shared globals remain here. The `Miner_*` entry points keep their C ABI only because `game.rs`/`die.rs` call them by name. |
-| `robots.rs` | Port of `robots.c` — the guardians: per-room hostile sprites, the toilet, Maria, the two screen-crossing arrows. Robot state (`robotThis[8]`, the `curRobot` cursor) was file-static and is now Rust-private (no `#[repr(C)]`/`#[no_mangle]`); only the five `Robots_*` entry points keep their C ABI, since `game.rs`/`title.rs` still call them by name. Now reads shared state (`GAME_STATE.miner`, `level`, `mode`, `clock_ticks`) **directly from `GAME_STATE`** — the old `c_*` alias reads are gone. The `&mut *(&raw mut ROBOT_THIS)` accessors carry `#[allow(clippy::deref_addrof)]` — see *Lints*. |
+| `game.rs` | Port of `game.c`/`game.h` — complete (no `unimplemented!()` stubs). Owns `Game_Action`, `DoGameTicker`, `do_game_drawer`, `game_init_room`, `clock_ticker`, `Game_ChangeLevel`, `Game_GameReset`, `game_pause`, and the `GAME_STATE` model (see below) — now the single source of truth for shared game state. Calls robot physics (`Robots_*`) — the Rust impls in `robots.rs`, imported directly. |
+| `miner.rs` | Port of `miner.c` — Willy physics (`Miner_*`): input, jump/fall/walk, ramps/conveyors, collision, item pickup, sprite rendering. Willy's state (`minerWilly` / `minerWillyRope` / `minerAttrSplit`) has been **dissolved into `GAME_STATE`** (the `miner` mutex plus the `miner_air` / `miner_jump` / `miner_willy_rope` / `miner_attr_split` atomic caches); no shared globals remain here. The `Miner_*` entry points are plain `pub fn`s called from `game.rs`/`die.rs`. |
+| `robots.rs` | Port of `robots.c` — the guardians: per-room hostile sprites, the toilet, Maria, the two screen-crossing arrows. Robot state (`robotThis[8]`, the `curRobot` cursor) is Rust-private in a thread-local `RefCell`; the five `Robots_*` entry points are plain `pub fn`s. Reads shared state (`GAME_STATE.miner`, `level`, `mode`, `clock_ticks`) **directly from `GAME_STATE`**. |
 
 ### Migration status — Milestone 2 complete
 
@@ -66,7 +66,7 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 
 The teardown that followed deleted the vestigial scaffolding: the orphaned `cglobals.rs`, the empty `c_*` placeholder block in `common.rs`, the `sync_c_to_rust`/`sync_rust_to_c` bridges and their 34 call sites, the `{ }` scopes that existed only to drop mutex guards before a sync call, and the stale two-world comments (`robots.rs` header, `game.rs`). Scopes that still matter were kept — e.g. `Game_ChangeLevel` drops the `miner` guard before `game_init_room()`, because `Miner_Save` locks `GAME_STATE.miner` itself.
 
-Beyond that, the whole C-ABI apparatus — `#[unsafe(no_mangle)]` on functions, the `unsafe extern "C"` call decls, the `Event = Option<unsafe extern "C" fn()>` typedef — is now Rust-to-Rust across a C ABI boundary that no longer needs to exist. Shedding it is optional future cleanup, not required for correctness. For this reason `Level_Ticker`/`level_init` (`levels.rs`), `Rope_Ticker`/`Rope_Init` (`rope.rs`), the `Miner_*` functions (`miner.rs`), and the `Robots_*` functions (`robots.rs`) are still called through `unsafe extern "C"` decls from `game.rs`/`title.rs`/`die.rs`.
+The C-ABI shed is **complete**: there are no `#[unsafe(no_mangle)]` items, no `static mut`, and no `unsafe extern "C"` call decls left in `src/`. All former extern-decl entry points (`Level_Ticker`/`level_init`, `Rope_Ticker`/`Rope_Init`, `Miner_*`, `Robots_*`, `Video_*`, `System_*`, …) are plain `pub fn`s imported with `use`. `Event` is `Option<fn()>`. The only remaining FFI is genuine: libc `rand`/`srand`/`time` (declared in `game_main.rs`, needed for replay determinism) and the `sdl_audio_callback` signature required by SDL. The `#[repr(i32)]`/`#[repr(C)]` attributes on `Key`, `Colour`, `Pixel`, `Miner`, `Timer`, and the game enums are gone too — nothing C-facing needs them. C-style names (`Miner_Ticker`, …) are kept deliberately to match the C original, not for ABI.
 
 Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The complete original C/SDL2 implementation lives, buildable, in **`reference/c-original/`**: a pristine snapshot of upstream `github.com/fawtytoo/JetSetWilly` at this repo's `db7fc50` import, with its own `Makefile` (`make` there builds it with gcc + libSDL2 — no mixer). It is **not compiled by Cargo** and is reference only; see `reference/c-original/PROVENANCE.md`. The exact *as-transcribed* version of any ported module stays in git history (e.g. `git show <pre-port-commit>:src/robots.c`).
 
@@ -80,12 +80,12 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### FFI Conventions
 
-- Rust functions exported to C: `#[unsafe(no_mangle)]` with C-style names (e.g., `Video_DrawSprite`, `Audio_Init`)
-- C functions called from Rust: declared as `unsafe extern "C"` blocks in each Rust file (or `common.rs`)
-- Shared globals: `static mut` with `#[unsafe(no_mangle)]`; Rust 2024 edition requires `&raw mut` / `&raw const` to take pointers to them (avoids `static_mut_refs` lint)
-- `Key` enum and `Colour` struct are `#[repr(C)]`/`#[repr(i32)]` for ABI compatibility; `Colour` has a `_padding: u8` field to match the C layout
+Only two real FFI boundaries remain, both in `game_main.rs`:
 
-**Module hierarchy for FFI declarations** (from `notes.md`): if an unported C function is used by multiple modules, declare it in `common.rs`. If only one module uses it, declare it locally. As a C file is ported, replace its extern declarations with the real `pub` Rust impl in the natural module — do **not** put FFI decls in a sibling module and import them, which inverts the dependency graph.
+- libc `rand`/`srand`/`time`, declared in one `unsafe extern "C"` block (replay determinism depends on libc `rand`)
+- `sdl_audio_callback`, which must be `unsafe extern "C" fn` because that is SDL's required callback signature; it converts the raw stream pointer to `&mut [i16; 2]` and calls the safe `Audio_Output`
+
+Everything else is Rust-to-Rust: C-style names are kept deliberately to match the C original (crate-wide `#![allow(non_snake_case, non_upper_case_globals)]` in `main.rs`), but nothing is exported or called through a C ABI anymore. When adding code, prefer safe Rust types at module boundaries; use `&raw mut`/`&raw const` only for raw SDL out-params.
 
 ### Graphics Model
 
@@ -101,7 +101,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 - 8 channels: indices 0–2 are SFX slots, 3–7 are music channels
 - Square wave oscillator: MSB of `phase` (u32) selects between two amplitude values
 - Music scores are `&[i16]` slices with events encoded as `(channel | type, note, duration)` triplets; `EV_END` terminates and either loops (`MUS_PLAY`) or stops (`MUS_STOP`)
-- `audioPanX` (exported to C) controls stereo position for SFX
+- `audioPanX` (a thread-local `Cell` in `audio.rs`, main-thread only) controls stereo position for SFX; `audioMusicPlaying` is an `AtomicI32` polled by the loader/title screens. The rest of the mixer state lives behind one `Mutex<AudioState>` shared with the main thread
 
 ### Frame pacing
 
@@ -109,7 +109,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### Lints
 
-`CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. Beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build. The affected `robots.rs` functions carry `#[allow(clippy::deref_addrof)]` for this reason (`4e36bf1`); keep that pattern for any new `static mut` accessor.
+`CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. There are no `static mut`s left, but if one ever reappears, beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build (`4e36bf1`).
 
 The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian graphics in `robots.rs`, music/SFX tables in `audio.rs`, and friends) are protected with `#[rustfmt::skip]`, so running `cargo fmt` is safe and will not rewrite them.
 
@@ -125,7 +125,7 @@ The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian g
 
 ## Debugging
 
-No C is compiled, so the C-ABI shapes (the `#[unsafe(no_mangle)]` entry points and `extern "C"` call decls) are Rust-to-Rust and largely invisible to valgrind; it still guards the raw SDL sys calls:
+No C is compiled and no C-ABI shapes remain, so the only `unsafe` left is the raw SDL sys calls (plus libc `rand`/`srand`/`time`); valgrind still guards those:
 
 ```sh
 valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40
