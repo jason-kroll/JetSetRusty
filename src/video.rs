@@ -276,9 +276,13 @@ pub fn video_get_pixel(pixels: &mut [Pixel], pos: i32) -> i32 {
     pixels[pos as usize].point as i32
 }
 
-pub fn video_text_width(text: *const i8) -> i32 {
-    let text = unsafe { std::ffi::CStr::from_ptr(text) }.to_bytes();
-    text.iter().map(|&ch| CHAR_SET[ch as usize][0] as i32).sum()
+pub fn video_text_width(text: &[u8]) -> i32 {
+    // Same semantics as the old CStr::from_ptr: stop at the first NUL byte.
+    let end = text.iter().position(|&b| b == 0).unwrap_or(text.len());
+    text[..end]
+        .iter()
+        .map(|&ch| CHAR_SET[ch as usize][0] as i32)
+        .sum()
 }
 
 // game.c and title.c
@@ -385,9 +389,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 }
 
 // miner.c still needs this
-pub unsafe fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
-
+pub fn Video_DrawMiner(pos: i32, line: &[u16; 16], level: i32) -> i32 {
     let attr = [0x8i32, 0x8, 0x8, 0x1];
     let mut die = 0i32;
 
@@ -418,8 +420,7 @@ pub unsafe fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32 {
 }
 
 // robots.c needs this
-pub unsafe fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
+pub fn Video_DrawRobot(pos: i32, line: &[u16; 16], ink: u8) {
     let mut pos = pos + 15;
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
@@ -438,12 +439,20 @@ pub unsafe fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
     }
 }
 
-pub fn video_draw_robot(pos: i32, line: [i32; 16], ink: u8) {
-    unsafe { Video_DrawRobot(pos, line.as_ptr() as *const u16, ink) };
+pub fn video_draw_robot(pos: i32, line: &[i32; 16], ink: u8) {
+    // The C original passed an int[16] where a u16* was expected, so the
+    // raster lines are the interleaved low/high halves of the first 8 i32s
+    // (all values are < 2^16, so the high halves are zero). Reproduce that
+    // byte layout exactly.
+    let mut words = [0u16; 16];
+    for (i, &v) in line[..8].iter().enumerate() {
+        words[2 * i] = v as u16;
+        words[2 * i + 1] = (v >> 16) as u16;
+    }
+    Video_DrawRobot(pos, &words, ink);
 }
 
-pub unsafe fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8) {
-    let line: &[u16] = unsafe { std::slice::from_raw_parts(line, 16) }; // raw pointer until the C-ABI surface is shed
+pub fn Video_DrawSprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) {
     let colour = [paper, ink];
     let mut pos = pos + 15;
 
@@ -475,19 +484,16 @@ fn text_code(text: &[u8], ink: &mut [u8; 2]) -> bool {
     }
 }
 
-pub fn video_write_large(x: i32, y: i32, text: *const i8) {
-    unsafe { Video_WriteLarge(x, y, text) };
+pub fn video_write_large(x: i32, y: i32, text: &[u8]) {
+    Video_WriteLarge(x, y, text);
 }
 
 // used by game.c
-pub unsafe fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
+pub fn Video_WriteLarge(x: i32, y: i32, text: &[u8]) {
     let mut x = x;
     let pos = y * WIDTH;
 
-    let text = unsafe {
-        let len = find_string_end(text as *const u8);
-        std::slice::from_raw_parts(text as *const u8, len)
-    };
+    let text = &text[..find_string_end(text)];
 
     // WARN: Locks!
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
@@ -518,30 +524,29 @@ pub unsafe fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
     }
 }
 
-pub fn video_write(pos: i32, text: *const i8) {
-    unsafe { Video_Write(pos, text) };
+pub fn video_write(pos: i32, text: &[u8]) {
+    Video_Write(pos, text);
 }
 
-fn find_string_end(mut p: *const u8) -> usize {
-    unsafe {
-        let start = p;
-        while *p != 0 {
-            if *p == 0x1 || *p == 0x2 {
-                p = p.add(2); // skip control + data byte
-            } else {
-                p = p.add(1);
-            }
+// Length of the NUL-terminated string at the start of `text`. A NUL right
+// after a 0x01/0x02 control byte is that control's argument, not the
+// terminator, so control+argument pairs are skipped (as in the C original).
+fn find_string_end(text: &[u8]) -> usize {
+    let mut i = 0;
+    while i < text.len() {
+        match text[i] {
+            0 => break,
+            0x1 | 0x2 if i + 1 >= text.len() => break, // dangling control byte
+            0x1 | 0x2 => i += 2,                       // skip control + data byte
+            _ => i += 1,
         }
-        p.offset_from(start) as usize
     }
+    i
 }
 
 // game.c
-pub unsafe fn Video_Write(pos: i32, text: *const i8) {
-    let text = unsafe {
-        let len = find_string_end(text as *const u8);
-        std::slice::from_raw_parts(text as *const u8, len)
-    };
+pub fn Video_Write(pos: i32, text: &[u8]) {
+    let text = &text[..find_string_end(text)];
 
     // WARN: Locks
     let mut pixels = VIDEO_PIXEL.lock().unwrap();

@@ -372,16 +372,7 @@ pub fn run() {
     unsafe { sdl::SDL_GetDesktopDisplayMode(0, &raw mut mode) };
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let multiply = unsafe {
-        Video_Viewport(
-            mode.w,
-            mode.h,
-            &raw mut vx,
-            &raw mut vy,
-            &raw mut vw,
-            &raw mut vh,
-        )
-    };
+    let multiply = Video_Viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
     let viewport = sdl::SDL_Rect {
         x: vx,
         y: vy,

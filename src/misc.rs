@@ -133,34 +133,28 @@ pub fn Timer_Update(timer: &mut Timer) -> i32 {
 
 // External --------------------------------------------------------------------
 
-pub unsafe fn Video_Viewport(
+pub fn Video_Viewport(
     width: i32,
     height: i32,
-    x: *mut i32,
-    y: *mut i32,
-    w: *mut i32,
-    h: *mut i32,
+    x: &mut i32,
+    y: &mut i32,
+    w: &mut i32,
+    h: &mut i32,
 ) -> i32 {
     if height * 4 / 3 <= width {
         // landscape
-        unsafe {
-            *h = (HEIGHT * height) / (HEIGHT + 16) as f32 as i32;
-            *w = *h * 4 / 3;
-        }
+        *h = (HEIGHT * height) / (HEIGHT + 16) as f32 as i32;
+        *w = *h * 4 / 3;
     } else {
         // portrait
-        unsafe {
-            *w = (WIDTH * width) / (WIDTH + 16) as f32 as i32;
-            *h = *w * 3 / 4;
-        }
+        *w = (WIDTH * width) / (WIDTH + 16) as f32 as i32;
+        *h = *w * 3 / 4;
     }
 
-    unsafe {
-        *x = (width - *w) / 2;
-        *y = (height - *h) / 2;
-    }
+    *x = (width - *w) / 2;
+    *y = (height - *h) / 2;
 
-    let mut multiply = unsafe { *h / HEIGHT };
+    let mut multiply = *h / HEIGHT;
     if multiply < 1 {
         multiply = 1;
     }

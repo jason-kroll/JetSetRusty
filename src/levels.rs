@@ -5144,13 +5144,13 @@ pub fn level_init() {
 
         // Set paper=0, ink=6. The interior nul is the \x01 control code's argument,
         // not a terminator; video_write skips control+argument pairs (as does the C original).
-        video_write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
+        video_write(0, b"\x01\x00\x02\x06\x00");
 
         let title = std::ffi::CString::new(level.title).unwrap();
-        let title_width = video_text_width(title.as_ptr());
+        let title_width = video_text_width(title.as_bytes_with_nul());
         video_write(
             (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,
-            title.as_ptr(),
+            title.as_bytes_with_nul(),
         );
     });
 }

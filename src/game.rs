@@ -403,10 +403,8 @@ pub fn do_draw_clock() {
         text[4] = (score_clock[1] / 10) + b'0';
     }
 
-    unsafe {
-        Video_WriteLarge((WIDTH - 60), STATUS as i32, text.as_ptr() as *const i8);
-        set_do_clock_update(Some(DoNothing));
-    }
+    Video_WriteLarge((WIDTH - 60), STATUS as i32, &text[..]);
+    set_do_clock_update(Some(DoNothing));
 }
 
 pub fn DoDrawClock() {
@@ -750,9 +748,7 @@ pub fn game_draw_status() {
     let items_label: Vec<u8> = vec![
         0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0,
     ];
-    unsafe {
-        Video_WriteLarge(4, STATUS as i32, items_label.as_ptr() as *const i8);
-    }
+    Video_WriteLarge(4, STATUS as i32, &items_label[..]);
 
     // DrawItems() equivalent
     let score_items = *game.score_items.lock().unwrap();
@@ -763,9 +759,7 @@ pub fn game_draw_status() {
         items_text[4] = (score_items / 10) + b'0';
     }
 
-    unsafe {
-        Video_WriteLarge(6 * 8 + 4, STATUS as i32, items_text.as_ptr() as *const i8);
-    }
+    Video_WriteLarge(6 * 8 + 4, STATUS as i32, &items_text[..]);
 
     // DoDrawClock();
     do_draw_clock();

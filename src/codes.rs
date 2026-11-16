@@ -83,7 +83,7 @@ impl CodesState {
         location[2] = (self.needed % 18) as u8 + b'A';
         location[3] = (self.needed / 18) as u8 + b'0';
 
-        video_write_large(29 * 8, 8 * 8, location.as_ptr() as *const i8);
+        video_write_large(29 * 8, 8 * 8, &location[..]);
 
         self.needed = CODES_DIGIT[self.needed as usize];
 
@@ -132,8 +132,7 @@ impl CodesState {
         self.pos = (self.pos + 1) & 3;
     }
 
-    // c"" literals forbid the interior nul bytes these control strings carry
-    #[allow(clippy::manual_c_str_literals)]
+    // b"" byte-string literals carry the interior nul bytes these control strings need
     fn do_codes_responder(&mut self) {
         match game_input() {
             KEY_1 => self.key = 1, // blue
@@ -161,11 +160,10 @@ impl CodesState {
                     return;
                 }
 
-                // Null terminator required: video_write_large takes a C string (*const i8).
                 video_write_large(
                     0,
                     8 * 8,
-                    b"\x01\x00\x02\x05Sorry, try code at location     \x00".as_ptr() as *const i8,
+                    b"\x01\x00\x02\x05Sorry, try code at location     \x00",
                 );
                 self.attempt = 2;
                 self.get_code();
@@ -177,24 +175,23 @@ impl CodesState {
         }
     }
 
-    // c"" literals forbid the interior nul bytes these control strings carry
-    #[allow(clippy::manual_c_str_literals)]
+    // b"" byte-string literals carry the interior nul bytes these control strings need
     fn codes_action(&mut self) {
         System_Border(0);
         video_pixel_fill(0, WIDTH * HEIGHT);
         video_write_large(
             0,
             8 * 8,
-            b"\x01\x00\x02\x05Enter Code at grid location     \x00".as_ptr() as *const i8,
+            b"\x01\x00\x02\x05Enter Code at grid location     \x00",
         );
-        video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".as_ptr());
-        video_draw_robot(88 * WIDTH + 2 * 8, CODES_SPRITE[0], 1);
-        video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".as_ptr());
-        video_draw_robot(88 * WIDTH + 5 * 8, CODES_SPRITE[1], 2);
-        video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".as_ptr());
-        video_draw_robot(88 * WIDTH + 8 * 8, CODES_SPRITE[2], 3);
-        video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".as_ptr());
-        video_draw_robot(88 * WIDTH + 11 * 8, CODES_SPRITE[3], 4);
+        video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".to_bytes_with_nul());
+        video_draw_robot(88 * WIDTH + 2 * 8, &CODES_SPRITE[0], 1);
+        video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".to_bytes_with_nul());
+        video_draw_robot(88 * WIDTH + 5 * 8, &CODES_SPRITE[1], 2);
+        video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".to_bytes_with_nul());
+        video_draw_robot(88 * WIDTH + 8 * 8, &CODES_SPRITE[2], 3);
+        video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".to_bytes_with_nul());
+        video_draw_robot(88 * WIDTH + 11 * 8, &CODES_SPRITE[3], 4);
 
         self.get_code();
 
@@ -235,8 +232,8 @@ fn draw_cursor(code: &[i32; 4], cell: &mut [u8; 7], pos: i32) {
     let pixel = 88 * WIDTH + 16 * 8;
     // In the original code, cell[1] gets mutated. Don't immediately know why or what for.
     cell[1] = code[pos as usize] as u8;
-    video_write(pixel + pos * 24, cell.as_ptr() as *const i8);
-    video_write(pixel + 8 * WIDTH + pos * 24, cell.as_ptr() as *const i8);
+    video_write(pixel + pos * 24, &cell[..]);
+    video_write(pixel + 8 * WIDTH + pos * 24, &cell[..]);
 }
 
 // jetset willy

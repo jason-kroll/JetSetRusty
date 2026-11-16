@@ -29,27 +29,25 @@ fn Die_Drawer() {
 }
 
 fn Die_Ticker() {
-    unsafe {
-        set_die_level(die_level() - 1);
-        if die_level() > 0 {
-            return;
-        }
-
-        if GAME_STATE.lives.load(Ordering::Relaxed) < 0 {
-            set_action(Some(Gameover_Action));
-            return;
-        }
-
-        Video_DrawSprite(
-            LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
-            dieBlank.as_ptr(),
-            0x0,
-            0x0,
-        );
-        Miner_Restore();
-        Audio_ReduceMusicSpeed();
-        set_action(Some(Game_Action));
+    set_die_level(die_level() - 1);
+    if die_level() > 0 {
+        return;
     }
+
+    if GAME_STATE.lives.load(Ordering::Relaxed) < 0 {
+        set_action(Some(Gameover_Action));
+        return;
+    }
+
+    Video_DrawSprite(
+        LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
+        &dieBlank,
+        0x0,
+        0x0,
+    );
+    Miner_Restore();
+    Audio_ReduceMusicSpeed();
+    set_action(Some(Game_Action));
 }
 
 fn Die_Init() {

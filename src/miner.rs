@@ -146,9 +146,7 @@ pub fn Miner_IncSeq() {
 
 pub fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
     let row = MINER_SEQUENCE[miner_seq_index() as usize];
-    unsafe {
-        Video_DrawSprite(pos, MINER_SPRITE[row].as_ptr(), paper, ink);
-    }
+    Video_DrawSprite(pos, &MINER_SPRITE[row], paper, ink);
 }
 
 // MINER_STORE is used for save/restore of miner state across room transitions.
@@ -525,13 +523,11 @@ pub fn Miner_Drawer() {
     }
 
     let row = miner_frame() + ((miner.dir << 2) | miner.frame) as usize;
-    if unsafe {
-        Video_DrawMiner(
-            ((miner.y + offset) << 8) | miner.x,
-            MINER_SPRITE[row].as_ptr(),
-            GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
-        )
-    } != 0
+    if Video_DrawMiner(
+        ((miner.y + offset) << 8) | miner.x,
+        &MINER_SPRITE[row],
+        GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
+    ) != 0
     {
         set_action(Some(Die_Action));
         return;

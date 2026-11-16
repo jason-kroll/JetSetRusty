@@ -124,27 +124,25 @@ fn do_title_ticker() {
 }
 
 fn do_title_drawer() {
-    unsafe {
-        if audioMusicPlaying() != 0 {
-            for &tile in TITLE_JSW.iter().take(100) {
-                TEXT_JSW.with(|t| {
-                    Video_Write(tile_2_pixel(tile), t.borrow().as_ptr().cast());
-                });
-            }
-            return;
+    if audioMusicPlaying() != 0 {
+        for &tile in TITLE_JSW.iter().take(100) {
+            TEXT_JSW.with(|t| {
+                Video_Write(tile_2_pixel(tile), &t.borrow()[..]);
+            });
         }
-
-        if colour_cycle() == 1 {
-            System_Border(Video_CycleColours());
-        }
-
-        Video_WriteLarge(0, 0, c"\x01\x01\x02\x07".as_ptr());
-        Video_WriteLarge(
-            -(text_frame() & 6),
-            19 * 8,
-            TEXT_TICKER.as_ptr().add(text_pos() as usize) as *const i8,
-        );
+        return;
     }
+
+    if colour_cycle() == 1 {
+        System_Border(Video_CycleColours());
+    }
+
+    Video_WriteLarge(0, 0, c"\x01\x01\x02\x07".to_bytes_with_nul());
+    Video_WriteLarge(
+        -(text_frame() & 6),
+        19 * 8,
+        &TEXT_TICKER[text_pos() as usize..],
+    );
 }
 
 fn do_title_responder() {
@@ -155,90 +153,75 @@ fn do_title_responder() {
     }
 }
 
-// c"" literals forbid the interior nul bytes these control strings carry
-#[allow(clippy::manual_c_str_literals)]
+// b"" byte-string literals carry the interior nul bytes these control strings need
 fn do_title_init() {
-    unsafe {
-        System_Border(0x0);
-        video_pixel_fill(0, WIDTH * HEIGHT);
+    System_Border(0x0);
+    video_pixel_fill(0, WIDTH * HEIGHT);
 
-        Video_Write(
-            16 * WIDTH + 144,
-            b"\x01\x00\x02\x05\x10\x11\x12\x13\0".as_ptr() as *const i8,
-        );
-        Video_Write(
-            24 * WIDTH + 128,
-            c"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14".as_ptr(),
-        );
-        Video_Write(
-            32 * WIDTH + 112,
-            b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\0".as_ptr()
-                as *const i8,
-        );
-        Video_Write(
-            40 * WIDTH + 96,
-            b"\x01\x00\x02\x05\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x14\x14\0"
-                .as_ptr() as *const i8,
-        );
-        Video_Write(
+    Video_Write(16 * WIDTH + 144, b"\x01\x00\x02\x05\x10\x11\x12\x13\0");
+    Video_Write(
+        24 * WIDTH + 128,
+        c"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14".to_bytes_with_nul(),
+    );
+    Video_Write(
+        32 * WIDTH + 112,
+        b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\0",
+    );
+    Video_Write(
+        40 * WIDTH + 96,
+        b"\x01\x00\x02\x05\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x14\x14\0",
+    );
+    Video_Write(
             48 * WIDTH + 80,
-            b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\x02\x01\x10\x14\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\x02\x01\x10\x14\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             56 * WIDTH + 64,
-            b"\x01\x00\x02\x05\x14\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x02\x00\x10\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x00\x02\x05\x14\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x02\x00\x10\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             64 * WIDTH + 64,
-            b"\x01\x05\x02\x01\x12\x13\x14\x14\x01\x09\x02\x05\x12\x13\x02\x00\x10\x11\x01\x00\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x05\x02\x01\x12\x13\x14\x14\x01\x09\x02\x05\x12\x13\x02\x00\x10\x11\x01\x00\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             72 * WIDTH + 64,
-            b"\x01\x01\x14\x14\x01\x05\x02\x01\x12\x13\x14\x14\x01\x00\x02\x05\x12\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x01\x14\x14\x01\x05\x02\x01\x12\x13\x14\x14\x01\x00\x02\x05\x12\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             80 * WIDTH + 64,
-            b"\x01\x01\x02\x00\x12\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x00\x02\x05\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x01\x02\x00\x12\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x00\x02\x05\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             88 * WIDTH + 80,
-            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
+    Video_Write(
             96 * WIDTH + 96,
-            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0"
-                .as_ptr() as *const i8,
+            b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-        Video_Write(
-            104 * WIDTH + 112,
-            b"\x01\x01\x02\x00\x14\x13\x14\x14\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
-        );
-        Video_Write(
-            112 * WIDTH + 128,
-            c"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14".as_ptr(),
-        );
-        Video_Write(
-            120 * WIDTH + 144,
-            c"\x01\x01\x12\x13\x01\x09\x10\x11".as_ptr(),
-        );
+    Video_Write(
+        104 * WIDTH + 112,
+        b"\x01\x01\x02\x00\x14\x13\x14\x14\x14\x14\x01\x09\x14\x14\0",
+    );
+    Video_Write(
+        112 * WIDTH + 128,
+        c"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14".to_bytes_with_nul(),
+    );
+    Video_Write(
+        120 * WIDTH + 144,
+        c"\x01\x01\x12\x13\x01\x09\x10\x11".to_bytes_with_nul(),
+    );
 
-        Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0".as_ptr() as *const i8);
-        Video_WriteLarge(0, 19 * 8, TEXT_TICKER.as_ptr() as *const i8);
+    Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0");
+    Video_WriteLarge(0, 19 * 8, TEXT_TICKER);
 
-        set_text_pos(0);
-        set_text_frame(-1);
-        set_colour_cycle(1);
+    set_text_pos(0);
+    set_text_frame(-1);
+    set_colour_cycle(1);
 
-        Audio_Music(MUS_TITLE, MUS_PLAY);
+    Audio_Music(MUS_TITLE, MUS_PLAY);
 
-        set_ticker(Some(do_title_ticker));
-    }
+    set_ticker(Some(do_title_ticker));
 }
 
 pub fn Title_Action() {

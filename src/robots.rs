@@ -1249,25 +1249,21 @@ fn do_move_maria(robot: &mut Robot) {
 fn do_draw_robot(robot: &Robot) {
     // C would dereference a null gfx here; a data-table bug, so fail loudly.
     let gfx = robot.gfx.expect("do_draw_robot: robot has no gfx");
-    unsafe {
-        Video_DrawRobot(
-            robot.pos,
-            gfx[(robot.f_index & robot.f_mask) as usize].as_ptr(),
-            robot.ink,
-        );
-    }
+    Video_DrawRobot(
+        robot.pos,
+        &gfx[(robot.f_index & robot.f_mask) as usize],
+        robot.ink,
+    );
 }
 
 fn do_draw_toilet(robot: &Robot) {
     let gfx = robot.gfx.expect("do_draw_toilet: robot has no gfx");
-    unsafe {
-        Video_DrawSprite(
-            robot.pos,
-            gfx[(robot.f_index & robot.f_mask) as usize].as_ptr(),
-            0x0,
-            0x7,
-        );
-    }
+    Video_DrawSprite(
+        robot.pos,
+        &gfx[(robot.f_index & robot.f_mask) as usize],
+        0x0,
+        0x7,
+    );
 }
 
 fn do_draw_arrow(robot: &Robot) {
@@ -1325,8 +1321,6 @@ pub fn Robots_Flush() {
 
 pub fn Robots_DrawCheat() {
     // Maria's two colour layers, drawn next to the lives in the status area.
-    unsafe {
-        Video_DrawRobot(LIVES as i32 + WIDTH - 24, ROBOT_GFX[43][0].as_ptr(), 0x7);
-        Video_DrawRobot(LIVES as i32 + WIDTH - 24, ROBOT_GFX[44][0].as_ptr(), 0x5);
-    }
+    Video_DrawRobot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[43][0], 0x7);
+    Video_DrawRobot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[44][0], 0x5);
 }
