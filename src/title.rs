@@ -1,6 +1,9 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
-use crate::common::{Action, Drawer, HEIGHT, Key, Responder, Ticker, WIDTH, gameInput, videoFlash};
+use crate::common::{HEIGHT, Key, WIDTH};
 use crate::game::{GAME_STATE, Game_Action};
+use crate::game_main::{
+    game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
+};
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::ptr::addr_of_mut;
@@ -81,7 +84,7 @@ unsafe extern "C" fn game_start() {
 unsafe extern "C" fn do_title_ticker() {
     unsafe {
         if audioMusicPlaying != 0 {
-            if videoFlash != 0 {
+            if video_flash() != 0 {
                 TEXT_JSW[1] = b'\x0b';
                 TEXT_JSW[3] = b'\x02';
             } else {
@@ -103,7 +106,7 @@ unsafe extern "C" fn do_title_ticker() {
             return;
         }
 
-        Action = Some(Title_Action);
+        set_action(Some(Title_Action));
     }
 }
 
@@ -131,9 +134,9 @@ unsafe extern "C" fn do_title_drawer() {
 
 unsafe extern "C" fn do_title_responder() {
     unsafe {
-        if gameInput == Key::Enter as i32 {
-            Action = Some(game_start);
-        } else if gameInput == Key::Escape as i32 {
+        if game_input() == Key::Enter as i32 {
+            set_action(Some(game_start));
+        } else if game_input() == Key::Escape as i32 {
             DoQuit();
         }
     }
@@ -221,16 +224,14 @@ unsafe extern "C" fn do_title_init() {
 
         Audio_Music(MUS_TITLE, MUS_PLAY);
 
-        Ticker = Some(do_title_ticker);
+        set_ticker(Some(do_title_ticker));
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Title_Action() {
-    unsafe {
-        Responder = Some(do_title_responder);
-        Ticker = Some(do_title_init);
-        Drawer = Some(do_title_drawer);
-        Action = Some(DoNothing);
-    }
+    set_responder(Some(do_title_responder));
+    set_ticker(Some(do_title_init));
+    set_drawer(Some(do_title_drawer));
+    set_action(Some(DoNothing));
 }
