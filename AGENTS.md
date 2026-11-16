@@ -66,7 +66,7 @@ These are `thread_local! Cell`s defined in `game_main.rs` behind safe accessors 
 
 The teardown that followed deleted the vestigial scaffolding: the orphaned `cglobals.rs`, the empty `c_*` placeholder block in `common.rs`, the `sync_c_to_rust`/`sync_rust_to_c` bridges and their 34 call sites, the `{ }` scopes that existed only to drop mutex guards before a sync call, and the stale two-world comments (`robots.rs` header, `game.rs`). Scopes that still matter were kept — e.g. `Game_ChangeLevel` drops the `miner` guard before `game_init_room()`, because `Miner_Save` locks `GAME_STATE.miner` itself.
 
-The C-ABI shed is **complete**: there are no `#[unsafe(no_mangle)]` items, no `static mut`, and no `unsafe extern "C"` call decls left in `src/`. All former extern-decl entry points (`Level_Ticker`/`level_init`, `Rope_Ticker`/`Rope_Init`, `Miner_*`, `Robots_*`, `Video_*`, `System_*`, …) are plain `pub fn`s imported with `use`. `Event` is `Option<fn()>`. The only remaining FFI is genuine: libc `rand`/`srand`/`time` (declared in `game_main.rs`, needed for replay determinism). SDL itself is used entirely through the `sdl2` crate's safe API, so the only `unsafe` blocks left in the crate are the three libc call sites. The `#[repr(i32)]`/`#[repr(C)]` attributes on `Key`, `Colour`, `Pixel`, `Miner`, `Timer`, and the game enums are gone too — nothing C-facing needs them. C-style names (`Miner_Ticker`, …) are kept deliberately to match the C original, not for ABI.
+The C-ABI shed is **complete**: there are no `#[unsafe(no_mangle)]` items, no `static mut`, and no `unsafe extern "C"` call decls left in `src/`. All former extern-decl entry points (`Level_Ticker`/`level_init`, `Rope_Ticker`/`Rope_Init`, `Miner_*`, `Robots_*`, `Video_*`, `System_*`, …) are plain `pub fn`s imported with `use`. `Event` is `Option<fn()>`. SDL is used entirely through the `sdl2` crate's safe API, and libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator, pinned to libc's exact sequence by unit tests plus the golden replays), so the crate contains zero `unsafe`. The `#[repr(i32)]`/`#[repr(C)]` attributes on `Key`, `Colour`, `Pixel`, `Miner`, `Timer`, and the game enums are gone too — nothing C-facing needs them. C-style names (`Miner_Ticker`, …) are kept deliberately to match the C original, not for ABI.
 
 Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The complete original C/SDL2 implementation lives, buildable, in **`reference/c-original/`**: a pristine snapshot of upstream `github.com/fawtytoo/JetSetWilly` at this repo's `db7fc50` import, with its own `Makefile` (`make` there builds it with gcc + libSDL2 — no mixer). It is **not compiled by Cargo** and is reference only; see `reference/c-original/PROVENANCE.md`. The exact *as-transcribed* version of any ported module stays in git history (e.g. `git show <pre-port-commit>:src/robots.c`).
 
@@ -80,11 +80,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### FFI Conventions
 
-Only one real FFI boundary remains, in `game_main.rs`:
-
-- libc `rand`/`srand`/`time`, declared in one `unsafe extern "C"` block (replay determinism depends on libc `rand`)
-
-SDL is used through the `sdl2` crate's safe high-level API (`sdl2::init()`, `Sdl::video()/audio()/event_pump()/timer()`, `Canvas` + `Texture::with_lock`, `EventPump::poll_event` + `keyboard_state`, `AudioSubsystem::open_playback` with an `AudioCallback` impl — the crate generates the required `extern "C"` audio trampoline internally). The only `unsafe` blocks left in the crate are the three libc call sites.
+There is no FFI left in our code — the crate contains zero `unsafe`. SDL is used entirely through the `sdl2` crate's safe high-level API (`sdl2::init()`, `Sdl::video()/audio()/event_pump()/timer()`, `Canvas` + `Texture::with_lock`, `EventPump::poll_event` + `keyboard_state`, `AudioSubsystem::open_playback` with an `AudioCallback` impl — the crate generates the required `extern "C"` audio trampoline internally, so the only `unsafe` anywhere is inside the `sdl2` crate itself). libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator; replay determinism is preserved because unit tests there pin reference vectors captured from the real libc `rand`, and the golden replays confirm it in-game).
 
 Everything else is Rust-to-Rust: C-style names are kept deliberately to match the C original (crate-wide `#![allow(non_snake_case, non_upper_case_globals)]` in `main.rs`), but nothing is exported or called through a C ABI anymore. When adding code, prefer safe Rust types at module boundaries.
 
@@ -126,7 +122,7 @@ The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian g
 
 ## Debugging
 
-No C is compiled and no C-ABI shapes remain, so the only `unsafe` in our code is the three libc `rand`/`srand`/`time` call sites; valgrind still guards the raw SDL calls inside the `sdl2` crate:
+No C is compiled and our code contains zero `unsafe`; valgrind still guards the raw SDL calls inside the `sdl2` crate:
 
 ```sh
 valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40

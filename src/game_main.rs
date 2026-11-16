@@ -61,10 +61,9 @@ static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
 use crate::audio::{Audio_Init, Audio_Output};
 use crate::loader::Loader_Action;
 
-unsafe extern "C" {
-    fn rand() -> i32;
-    fn srand(seed: u32);
-}
+// libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
+// generator, pinned to libc's exact sequence by tests there), so no libc FFI
+// remains in the crate.
 
 // ---- Dispatcher state -------------------------------------------------------
 // The four Event slots plus gameInput/videoFlash. All are main-thread only
@@ -155,7 +154,7 @@ pub fn DoQuit() {
 }
 
 pub fn System_Rnd() -> i32 {
-    unsafe { rand() }
+    crate::rng::rand()
 }
 
 pub fn System_IsKey(key: i32) -> i32 {
@@ -277,7 +276,7 @@ pub(crate) fn set_replay_held(keys: Option<Vec<i32>>) {
 }
 
 pub(crate) fn seed_rng(seed: u32) {
-    unsafe { srand(seed) };
+    crate::rng::srand(seed);
 }
 
 pub(crate) fn game_running() -> bool {
@@ -457,7 +456,7 @@ pub fn run() {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    unsafe { srand(now as u32) };
+    crate::rng::srand(now as u32);
 
     Audio_Init();
 

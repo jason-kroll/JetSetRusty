@@ -13,6 +13,7 @@ mod loader;
 mod miner;
 mod misc;
 mod replay;
+mod rng;
 mod robots;
 mod rope;
 mod title;
