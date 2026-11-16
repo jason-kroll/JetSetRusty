@@ -26,7 +26,6 @@ pub const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Pixel {
     ink: u8,

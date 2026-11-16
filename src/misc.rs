@@ -1,12 +1,10 @@
 use crate::common::{HEIGHT, WIDTH};
 
 // Colour table ----------------------------------------------------------------
-#[repr(C)]
 pub struct Colour {
     pub r: u8,
     pub g: u8,
     pub b: u8,
-    pub _padding: u8,
 }
 
 #[allow(non_upper_case_globals)]
@@ -15,109 +13,91 @@ pub static videoColour: [Colour; 16] = [
         r: 0x00,
         g: 0x00,
         b: 0x00,
-        _padding: 0,
     }, // black
     Colour {
         r: 0x00,
         g: 0x00,
         b: 0xff,
-        _padding: 0,
     }, // blue
     Colour {
         r: 0xff,
         g: 0x00,
         b: 0x00,
-        _padding: 0,
     }, // red
     Colour {
         r: 0xff,
         g: 0x00,
         b: 0xff,
-        _padding: 0,
     }, // magenta
     Colour {
         r: 0x00,
         g: 0xff,
         b: 0x00,
-        _padding: 0,
     }, // green
     Colour {
         r: 0x00,
         g: 0xaa,
         b: 0xff,
-        _padding: 0,
     }, // light blue
     Colour {
         r: 0xff,
         g: 0xff,
         b: 0x00,
-        _padding: 0,
     }, // yellow
     Colour {
         r: 0xff,
         g: 0xff,
         b: 0xff,
-        _padding: 0,
     }, // white
     Colour {
         r: 0xcc,
         g: 0xcc,
         b: 0xcc,
-        _padding: 0,
     }, // mid grey (only for Willy or BT_SOLID)
     Colour {
         r: 0x00,
         g: 0x55,
         b: 0xff,
-        _padding: 0,
     }, // mid blue
     Colour {
         r: 0xaa,
         g: 0x00,
         b: 0x00,
-        _padding: 0,
     }, // mid red
     Colour {
         r: 0x55,
         g: 0x00,
         b: 0x00,
-        _padding: 0,
     }, // dark red
     Colour {
         r: 0x00,
         g: 0xaa,
         b: 0x00,
-        _padding: 0,
     }, // mid green
     Colour {
         r: 0x00,
         g: 0x55,
         b: 0x00,
-        _padding: 0,
     }, // dark green
     Colour {
         r: 0xff,
         g: 0x80,
         b: 0x00,
-        _padding: 0,
     }, // orange
     Colour {
         r: 0x80,
         g: 0x40,
         b: 0x00,
-        _padding: 0,
     }, // brown
 ];
 
 // Timer -----------------------------------------------------------------------
 #[derive(Clone, Copy, Default)]
-#[repr(C)]
 pub struct Timer {
     // Field order matches the original C `TIMER` ({rate, acc, remainder,
-    // divisor}). This used to be a live ABI contract — the struct was aliased
-    // over the C `gameTimer` global and passed to Timer_Set/Timer_Update from C.
-    // It's pure Rust with no FFI now (gameTimer dissolved into GAME_STATE.timer),
-    // so `#[repr(C)]` is kept only for provenance and is harmless.
+    // divisor}) for provenance. This used to be a live ABI contract — the
+    // struct was aliased over the C `gameTimer` global — but with no FFI left
+    // the `#[repr(C)]` is gone and only the field order remains as a nod to C.
     pub rate: i32,
     pub acc: i32,
     pub remainder: i32,

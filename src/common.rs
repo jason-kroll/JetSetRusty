@@ -10,7 +10,6 @@ pub const HEIGHT: i32 = 192;
 pub type Event = Option<fn()>;
 
 // Key codes enum
-#[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Left,

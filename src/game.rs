@@ -76,7 +76,6 @@ fn set_do_clock_update(f: Event) {
 
 // Probably a lot of functions go here!
 // Enums (from game.h)
-#[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GameMode {
     Normal = 0,
@@ -85,7 +84,6 @@ pub enum GameMode {
     Toilet,
 }
 
-#[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Direction {
     Above = 0,
@@ -94,7 +92,6 @@ pub enum Direction {
     Left,
 }
 
-#[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TileType {
     Item = 0,
@@ -111,7 +108,6 @@ pub enum TileType {
     Harm,
 }
 
-#[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConveyorDir {
     None = 0,
@@ -120,7 +116,6 @@ pub enum ConveyorDir {
 }
 
 // miner struct (from game.h)
-#[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Miner {
     // Initialize to all zeros w/ Default

@@ -10,7 +10,6 @@ const LEVEL_HEIGHT: usize = 16;
 const LEVEL_TILES: usize = LEVEL_W * LEVEL_HEIGHT; // 32 * 16 is 512
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
 pub enum TileType {
     Item,
     Space,
