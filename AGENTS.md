@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository. It follows the cross-tool `AGENTS.md` convention (read by Vibe, Claude Code, Codex, Gemini CLI, and others) rather than a tool-specific filename; `CONVENTIONS.md` holds the short hard rules.
 
 ## What This Is
 
@@ -53,7 +53,7 @@ These are `#[unsafe(no_mangle)] pub static mut` globals defined in `game_main.rs
 | `codes.rs` | Copy-protection code entry and validation |
 | `game.rs` | Port of `game.c`/`game.h` — complete (no `unimplemented!()` stubs). Owns `Game_Action`, `DoGameTicker`, `do_game_drawer`, `game_init_room`, `clock_ticker`, `Game_ChangeLevel`, `Game_GameReset`, `game_pause`, and the `GAME_STATE` model (see below) — now the single source of truth for shared game state. Calls robot physics (`Robots_*`) — the Rust impls in `robots.rs`, via C-ABI extern decls. |
 | `miner.rs` | Port of `miner.c` — Willy physics (`Miner_*`): input, jump/fall/walk, ramps/conveyors, collision, item pickup, sprite rendering. Willy's state (`minerWilly` / `minerWillyRope` / `minerAttrSplit`) has been **dissolved into `GAME_STATE`** (the `miner` mutex plus the `miner_air` / `miner_jump` / `miner_willy_rope` / `miner_attr_split` atomic caches); no shared globals remain here. The `Miner_*` entry points keep their C ABI only because `game.rs`/`die.rs` call them by name. |
-| `robots.rs` | Port of `robots.c` — the guardians: per-room hostile sprites, the toilet, Maria, the two screen-crossing arrows. Robot state (`robotThis[8]`, the `curRobot` cursor) was file-static and is now Rust-private (no `#[repr(C)]`/`#[no_mangle]`); only the five `Robots_*` entry points keep their C ABI, since `game.rs`/`title.rs` still call them by name. Now reads shared state (`GAME_STATE.miner`, `level`, `mode`, `clock_ticks`) **directly from `GAME_STATE`** — the old `c_*` alias reads are gone. (Its file-header comment still describes the old alias path and is **stale**.) The `&mut *(&raw mut ROBOT_THIS)` accessors carry `#[allow(clippy::deref_addrof)]` — see *Lints*. |
+| `robots.rs` | Port of `robots.c` — the guardians: per-room hostile sprites, the toilet, Maria, the two screen-crossing arrows. Robot state (`robotThis[8]`, the `curRobot` cursor) was file-static and is now Rust-private (no `#[repr(C)]`/`#[no_mangle]`); only the five `Robots_*` entry points keep their C ABI, since `game.rs`/`title.rs` still call them by name. Now reads shared state (`GAME_STATE.miner`, `level`, `mode`, `clock_ticks`) **directly from `GAME_STATE`** — the old `c_*` alias reads are gone. The `&mut *(&raw mut ROBOT_THIS)` accessors carry `#[allow(clippy::deref_addrof)]` — see *Lints*. |
 
 ### Migration status — Milestone 2 complete
 
@@ -109,9 +109,9 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### Lints
 
-`CONVENTIONS.md` asks for code to pass `cargo clippy -- -D warnings`; the crate does not yet (about 40 pre-existing errors, mostly `manual_c_str_literals` and `needless_range_loop`), so compare against a baseline rather than expecting a clean run. Beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build. The affected `robots.rs` functions carry `#[allow(clippy::deref_addrof)]` for this reason (`4e36bf1`); keep that pattern for any new `static mut` accessor.
+`CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. Beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build. The affected `robots.rs` functions carry `#[allow(clippy::deref_addrof)]` for this reason (`4e36bf1`); keep that pattern for any new `static mut` accessor.
 
-**Do not run `cargo fmt` yet.** The crate is not rustfmt-clean, and `cargo fmt -- <file>` still formats the *whole crate* (it rewrites `robots.rs`'s hand-aligned guardian data tables into thousands of lines). Formatting is planned as its own separate pass, with the data tables excluded (e.g. `#[rustfmt::skip]` or moving them to a data file).
+The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian graphics in `robots.rs`, music/SFX tables in `audio.rs`, and friends) are protected with `#[rustfmt::skip]`, so running `cargo fmt` is safe and will not rewrite them.
 
 ## Regression tests
 
@@ -119,13 +119,13 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 - **Inspect a frame:** `cargo run -- --replay tests/scenarios/play.txt --dump 301 /tmp/f.ppm` (any number of `--dump <frame> <file>`).
 - **Intentional output change:** `UPDATE_GOLDEN=1 cargo test --test replay`, and say in the commit why the frames changed. The goldens record current behaviour, bugs included: they detect *change*, not correctness.
-- **Script format** (documented at the top of `replay.rs`): `frames N`, optional `seed N`, then `<frame> <key> [<held frames>]` lines. A press sends the keydown through the same `map_keycode()` as live play *and* holds the key for `System_IsKey`.
+- **Script format** (documented at the top of `replay.rs`): `frames N`, optional `seed N`, then `<frame> <key> [<held frames>]` lines, plus `set` directives (`set item_count N`, `set level N`, `set mode normal|maria|running|toilet`, `set miner X Y`) to script arbitrary game state. A press sends the keydown through the same `map_keycode()` as live play *and* holds the key for `System_IsKey`.
 - **Why audio is in lockstep:** the loader and title screens advance on `audioMusicPlaying`, which the audio sequencer updates. Replay therefore generates exactly `SAMPLERATE / TICKRATE` samples per frame instead of using the audio thread. Live play still depends on audio-thread timing there.
-- **Replay-mode differences from live play:** no SDL at all, a fixed RNG seed, and the loader's version string pinned to `1.0.0 replay` (`build_version()`), since the real one carries the build date. Scenarios: `idle` (loader + code card), `title` (title screen + music), `play` (start a game, walk/jump/pick up an item, mute, pause, Top Landing, escape).
+- **Replay-mode differences from live play:** no SDL at all, a fixed RNG seed, and the loader's version string pinned to `1.0.0 replay` (`build_version()`), since the real one carries the build date. Scenarios: `idle` (loader + code card), `title` (title screen + music), `play` (start a game, walk/jump/pick up an item, mute, pause, Top Landing, escape), `victory` (last item → Maria mode → running Willy → toilet flush → back to title).
 
 ## Debugging
 
-Valgrind catches FFI memory mistakes at the remaining C-ABI boundary (the `#[no_mangle]` entry points and `extern "C"` call decls):
+No C is compiled, so the C-ABI shapes (the `#[unsafe(no_mangle)]` entry points and `extern "C"` call decls) are Rust-to-Rust and largely invisible to valgrind; it still guards the raw SDL sys calls:
 
 ```sh
 valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40
