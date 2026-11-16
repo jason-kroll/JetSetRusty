@@ -5162,8 +5162,8 @@ pub fn level_init() {
 
     video_pixel_fill(129 * WIDTH, 8 * WIDTH);
 
-    // TODO: "\x1\x0\x2\x6" contains a null byte - verify what video_write expects here,
-    // this may be a length-prefixed or special control sequence rather than a C string.
+    // Set paper=0, ink=6. The interior nul is the \x01 control code's argument,
+    // not a terminator; video_write skips control+argument pairs (as does the C original).
     video_write(0, b"\x01\x00\x02\x06\x00".as_ptr() as *const i8);
 
     let title = std::ffi::CString::new(level.title).unwrap();
