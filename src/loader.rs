@@ -3,7 +3,7 @@ use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
     System_Border, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
-use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_text_width};
+use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
 use crate::codes::Codes_Action;
 use crate::game_main::DoNothing;
@@ -44,7 +44,7 @@ fn do_loader_ticker() {
 }
 
 fn do_loader_drawer3() {
-    LOADER_TEXT.with(|t| Video_WriteLarge(6 * 8, 11 * 8, &t.borrow()[..]));
+    LOADER_TEXT.with(|t| video_write_large(6 * 8, 11 * 8, &t.borrow()[..]));
 }
 
 fn do_loader_drawer2() {
@@ -53,13 +53,13 @@ fn do_loader_drawer2() {
     }
 
     // First row of loading bar: set paper color then draw 22 block chars
-    Video_Write(
+    video_write(
             80 * WIDTH + 5 * 8,
             c"\x01\x06\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14".to_bytes_with_nul(),
         );
     // Three more identical rows
     for row in [88i32, 96, 104] {
-        Video_Write(
+        video_write(
                 row * WIDTH + 5 * 8,
                 c"\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14".to_bytes_with_nul(),
             );
@@ -74,10 +74,10 @@ fn do_loader_drawer2() {
 
 fn do_loader_drawer1() {
     System_Border(0x1);
-    Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1);
+    video_pixel_paper_fill(0, WIDTH * HEIGHT, 0x1);
 
     // "fawtytoo" (paper=1, ink=7)
-    Video_Write(
+    video_write(
         23 * 8 * WIDTH,
         c"\x01\x01\x02\x07fawtytoo".to_bytes_with_nul(),
     );
@@ -87,7 +87,7 @@ fn do_loader_drawer1() {
     let version = crate::game_main::build_version();
     let build = format!("{version}\0").into_bytes();
     let build_with_ink = format!("\x02\x00{version}\0").into_bytes();
-    Video_Write(
+    video_write(
         23 * 8 * WIDTH + WIDTH - video_text_width(&build[..]),
         &build_with_ink[..],
     );

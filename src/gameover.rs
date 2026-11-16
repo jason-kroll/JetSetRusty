@@ -8,7 +8,7 @@ use std::cell::{Cell, RefCell};
 
 // External functions
 use crate::title::Title_Action;
-use crate::video::{Video_DrawSprite, Video_PixelPaperFill, Video_WriteLarge};
+use crate::video::{video_draw_sprite, video_pixel_paper_fill, video_write_large};
 
 static PLINTH_SPRITE: [u16; 16] = [
     14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0,
@@ -52,16 +52,16 @@ fn set_text_over_byte(i: usize, v: u8) {
 fn gameover_drawer() {
     let ticks = boot_ticks();
     if ticks <= 96 {
-        Video_DrawSprite((ticks & 126) * WIDTH + 15 * 8, &BOOT_SPRITE, 0x0, 0x7);
-        Video_PixelPaperFill(0, 128 * WIDTH, ((ticks & 12) >> 2) as u8);
+        video_draw_sprite((ticks & 126) * WIDTH + 15 * 8, &BOOT_SPRITE, 0x0, 0x7);
+        video_pixel_paper_fill(0, 128 * WIDTH, ((ticks & 12) >> 2) as u8);
     }
 
     if ticks < 96 {
         return;
     }
 
-    TEXT_GAME.with(|t| Video_WriteLarge(7 * 8, 6 * 8, &t.borrow()[..]));
-    TEXT_OVER.with(|t| Video_WriteLarge(18 * 8, 6 * 8, &t.borrow()[..]));
+    TEXT_GAME.with(|t| video_write_large(7 * 8, 6 * 8, &t.borrow()[..]));
+    TEXT_OVER.with(|t| video_write_large(18 * 8, 6 * 8, &t.borrow()[..]));
 }
 
 fn gameover_ticker() {
@@ -95,8 +95,8 @@ fn gameover_ticker() {
 fn gameover_init() {
     System_Border(0x0);
     video_pixel_fill(0, 128 * WIDTH);
-    Video_DrawSprite(96 * WIDTH + 15 * 8, &MINER_SPRITE, 0x0, 0x7);
-    Video_DrawSprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
+    video_draw_sprite(96 * WIDTH + 15 * 8, &MINER_SPRITE, 0x0, 0x7);
+    video_draw_sprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
     set_boot_ticks(0);
 
     audio_play(MUS_STOP);

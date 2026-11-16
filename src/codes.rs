@@ -7,7 +7,7 @@ use crate::game_main::{
     System_Border, game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
 
-use crate::video::{video_draw_robot, video_pixel_fill, video_write, video_write_large};
+use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
 
 static CODES_STATE: Mutex<CodesState> = Mutex::new(CodesState::new());
@@ -173,13 +173,13 @@ impl CodesState {
             b"\x01\x00\x02\x05Enter Code at grid location     \x00",
         );
         video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".to_bytes_with_nul());
-        video_draw_robot(88 * WIDTH + 2 * 8, &CODES_SPRITE[0], 1);
+        video_draw_robot_i32(88 * WIDTH + 2 * 8, &CODES_SPRITE[0], 1);
         video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".to_bytes_with_nul());
-        video_draw_robot(88 * WIDTH + 5 * 8, &CODES_SPRITE[1], 2);
+        video_draw_robot_i32(88 * WIDTH + 5 * 8, &CODES_SPRITE[1], 2);
         video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".to_bytes_with_nul());
-        video_draw_robot(88 * WIDTH + 8 * 8, &CODES_SPRITE[2], 3);
+        video_draw_robot_i32(88 * WIDTH + 8 * 8, &CODES_SPRITE[2], 3);
         video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".to_bytes_with_nul());
-        video_draw_robot(88 * WIDTH + 11 * 8, &CODES_SPRITE[3], 4);
+        video_draw_robot_i32(88 * WIDTH + 11 * 8, &CODES_SPRITE[3], 4);
 
         self.get_code();
 

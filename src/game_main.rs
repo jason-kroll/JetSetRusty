@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::common::{Event, HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, Timer_Set, Timer_Update, VIDEO_COLOUR, Video_Viewport};
+use crate::misc::{Timer, Timer_Set, Timer_Update, VIDEO_COLOUR, video_viewport};
 use sdl2::EventPump;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event as SdlEvent;
@@ -388,7 +388,7 @@ pub fn run() {
     let mode = video.desktop_display_mode(0).expect("desktop display mode");
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let multiply = Video_Viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
+    let multiply = video_viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
     let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
 
     // Window and renderer -----------------------------------------------------

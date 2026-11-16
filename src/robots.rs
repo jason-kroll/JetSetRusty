@@ -15,7 +15,7 @@
 use crate::audio::{SFX_ARROW, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
-use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
+use crate::video::{video_draw_arrow, video_draw_robot, video_draw_sprite};
 use std::cell::RefCell;
 use std::sync::atomic::Ordering;
 
@@ -1201,7 +1201,7 @@ fn do_move_static(robot: &mut Robot) {
 
 // The arrows repurpose the fields: `max` counts down/up a 256-column cycle,
 // `min` is the derived pixel offset, and `speed` holds the arrow direction
-// passed to Video_DrawArrow.
+// passed to video_draw_arrow.
 
 fn do_move_arrow_left(robot: &mut Robot) {
     robot.max -= 1;
@@ -1249,7 +1249,7 @@ fn do_move_maria(robot: &mut Robot) {
 fn do_draw_robot(robot: &Robot) {
     // C would dereference a null gfx here; a data-table bug, so fail loudly.
     let gfx = robot.gfx.expect("do_draw_robot: robot has no gfx");
-    Video_DrawRobot(
+    video_draw_robot(
         robot.pos,
         &gfx[(robot.f_index & robot.f_mask) as usize],
         robot.ink,
@@ -1258,7 +1258,7 @@ fn do_draw_robot(robot: &Robot) {
 
 fn do_draw_toilet(robot: &Robot) {
     let gfx = robot.gfx.expect("do_draw_toilet: robot has no gfx");
-    Video_DrawSprite(
+    video_draw_sprite(
         robot.pos,
         &gfx[(robot.f_index & robot.f_mask) as usize],
         0x0,
@@ -1268,7 +1268,7 @@ fn do_draw_toilet(robot: &Robot) {
 
 fn do_draw_arrow(robot: &Robot) {
     if robot.max < 32 {
-        Video_DrawArrow(robot.pos + robot.min, robot.speed);
+        video_draw_arrow(robot.pos + robot.min, robot.speed);
     }
 }
 
@@ -1321,6 +1321,6 @@ pub fn Robots_Flush() {
 
 pub fn Robots_DrawCheat() {
     // Maria's two colour layers, drawn next to the lives in the status area.
-    Video_DrawRobot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[43][0], 0x7);
-    Video_DrawRobot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[44][0], 0x5);
+    video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[43][0], 0x7);
+    video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[44][0], 0x5);
 }

@@ -16,7 +16,7 @@ use crate::game::{
 use crate::game_main::{System_IsKey, set_action};
 use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
 use crate::misc::{Timer, Timer_Set, Timer_Update};
-use crate::video::{Video_DrawMiner, Video_DrawSprite};
+use crate::video::{video_draw_miner, video_draw_sprite};
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
 
@@ -146,7 +146,7 @@ pub fn Miner_IncSeq() {
 
 pub fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
     let row = MINER_SEQUENCE[miner_seq_index() as usize];
-    Video_DrawSprite(pos, &MINER_SPRITE[row], paper, ink);
+    video_draw_sprite(pos, &MINER_SPRITE[row], paper, ink);
 }
 
 // MINER_STORE is used for save/restore of miner state across room transitions.
@@ -523,7 +523,7 @@ pub fn Miner_Drawer() {
     }
 
     let row = miner_frame() + ((miner.dir << 2) | miner.frame) as usize;
-    if Video_DrawMiner(
+    if video_draw_miner(
         ((miner.y + offset) << 8) | miner.x,
         &MINER_SPRITE[row],
         GAME_STATE.miner_attr_split.load(Ordering::Relaxed),

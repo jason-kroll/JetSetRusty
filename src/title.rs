@@ -13,7 +13,7 @@ use std::sync::atomic::Ordering;
 
 use crate::game::GameMode;
 
-use crate::video::{Video_CycleColours, Video_Write, Video_WriteLarge};
+use crate::video::{video_cycle_colours, video_write, video_write_large};
 
 use crate::game_main::{DoNothing, DoQuit, System_Border};
 
@@ -127,18 +127,18 @@ fn do_title_drawer() {
     if audio_music_playing() != 0 {
         for &tile in TITLE_JSW.iter().take(100) {
             TEXT_JSW.with(|t| {
-                Video_Write(tile_2_pixel(tile), &t.borrow()[..]);
+                video_write(tile_2_pixel(tile), &t.borrow()[..]);
             });
         }
         return;
     }
 
     if colour_cycle() == 1 {
-        System_Border(Video_CycleColours());
+        System_Border(video_cycle_colours());
     }
 
-    Video_WriteLarge(0, 0, c"\x01\x01\x02\x07".to_bytes_with_nul());
-    Video_WriteLarge(
+    video_write_large(0, 0, c"\x01\x01\x02\x07".to_bytes_with_nul());
+    video_write_large(
         -(text_frame() & 6),
         19 * 8,
         &TEXT_TICKER[text_pos() as usize..],
@@ -158,62 +158,62 @@ fn do_title_init() {
     System_Border(0x0);
     video_pixel_fill(0, WIDTH * HEIGHT);
 
-    Video_Write(16 * WIDTH + 144, b"\x01\x00\x02\x05\x10\x11\x12\x13\0");
-    Video_Write(
+    video_write(16 * WIDTH + 144, b"\x01\x00\x02\x05\x10\x11\x12\x13\0");
+    video_write(
         24 * WIDTH + 128,
         c"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14".to_bytes_with_nul(),
     );
-    Video_Write(
+    video_write(
         32 * WIDTH + 112,
         b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\0",
     );
-    Video_Write(
+    video_write(
         40 * WIDTH + 96,
         b"\x01\x00\x02\x05\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x14\x14\0",
     );
-    Video_Write(
+    video_write(
             48 * WIDTH + 80,
             b"\x01\x00\x02\x05\x10\x11\x01\x05\x14\x14\x02\x09\x10\x11\x01\x09\x14\x14\x02\x01\x10\x14\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             56 * WIDTH + 64,
             b"\x01\x00\x02\x05\x14\x14\x01\x05\x14\x14\x02\x09\x10\x14\x01\x09\x14\x14\x02\x00\x10\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             64 * WIDTH + 64,
             b"\x01\x05\x02\x01\x12\x13\x14\x14\x01\x09\x02\x05\x12\x13\x02\x00\x10\x11\x01\x00\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             72 * WIDTH + 64,
             b"\x01\x01\x14\x14\x01\x05\x02\x01\x12\x13\x14\x14\x01\x00\x02\x05\x12\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             80 * WIDTH + 64,
             b"\x01\x01\x02\x00\x12\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x00\x02\x05\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             88 * WIDTH + 80,
             b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x14\x13\x14\x14\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
             96 * WIDTH + 96,
             b"\x01\x01\x02\x00\x14\x13\x14\x14\x01\x05\x02\x01\x12\x13\x01\x01\x14\x14\x01\x09\x14\x14\0",
         );
-    Video_Write(
+    video_write(
         104 * WIDTH + 112,
         b"\x01\x01\x02\x00\x14\x13\x14\x14\x14\x14\x01\x09\x14\x14\0",
     );
-    Video_Write(
+    video_write(
         112 * WIDTH + 128,
         c"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14".to_bytes_with_nul(),
     );
-    Video_Write(
+    video_write(
         120 * WIDTH + 144,
         c"\x01\x01\x12\x13\x01\x09\x10\x11".to_bytes_with_nul(),
     );
 
-    Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0");
-    Video_WriteLarge(0, 19 * 8, TEXT_TICKER);
+    video_write_large(0, 0, b"\x01\x00\x02\x04\0");
+    video_write_large(0, 19 * 8, TEXT_TICKER);
 
     set_text_pos(0);
     set_text_frame(-1);

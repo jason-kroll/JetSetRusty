@@ -7,7 +7,7 @@ use crate::levels::{Level_Dir, Level_Drawer, Level_Ticker};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
-    Video_CycleColours, Video_PixelInkFill, Video_PixelPaperFill, Video_WriteLarge,
+    video_cycle_colours, video_pixel_ink_fill, video_pixel_paper_fill, video_write_large,
 };
 
 use crate::common::{
@@ -243,7 +243,7 @@ pub fn game_pause(state: bool) {
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
         // Original: `if (cheatEnabled == 0)`. Redraw the status band on unpause
-        // when NOT cheating — DoPauseDrawer's Video_CycleColours has been
+        // when NOT cheating — DoPauseDrawer's video_cycle_colours has been
         // cycling the ink of every pixel in the buffer, and the level playfield
         // recovers because it's repainted every frame, but the status/lives band
         // is only painted here. Without this redraw it keeps the last cycled
@@ -333,7 +333,7 @@ pub fn do_draw_clock() {
         text[4] = (score_clock[1] / 10) + b'0';
     }
 
-    Video_WriteLarge(WIDTH - 60, STATUS as i32, &text[..]);
+    video_write_large(WIDTH - 60, STATUS as i32, &text[..]);
     set_do_clock_update(Some(DoNothing));
 }
 
@@ -355,7 +355,7 @@ pub fn DoPauseDrawer() {
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
         Level_SetBorder();
-        Video_CycleColours();
+        video_cycle_colours();
     }
 }
 
@@ -633,18 +633,18 @@ pub fn game_draw_lives() {
 pub fn game_draw_status() {
     let game = &*GAME_STATE;
 
-    // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
-    Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
+    // video_pixel_paper_fill(128 * WIDTH, 64 * WIDTH, 0x0);
+    video_pixel_paper_fill(128 * WIDTH, 64 * WIDTH, 0x0);
 
-    // Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
-    Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
+    // video_pixel_ink_fill(129 * WIDTH, 8 * WIDTH, 0x6);
+    video_pixel_ink_fill(129 * WIDTH, 8 * WIDTH, 0x6);
 
-    // Video_WriteLarge(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
+    // video_write_large(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
     // Using vec! for the byte string as requested
     let items_label: Vec<u8> = vec![
         0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0,
     ];
-    Video_WriteLarge(4, STATUS as i32, &items_label[..]);
+    video_write_large(4, STATUS as i32, &items_label[..]);
 
     // DrawItems() equivalent
     let score_items = *game.score_items.lock().unwrap();
@@ -655,7 +655,7 @@ pub fn game_draw_status() {
         items_text[4] = (score_items / 10) + b'0';
     }
 
-    Video_WriteLarge(6 * 8 + 4, STATUS as i32, &items_text[..]);
+    video_write_large(6 * 8 + 4, STATUS as i32, &items_text[..]);
 
     // DoDrawClock();
     do_draw_clock();

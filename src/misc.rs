@@ -132,7 +132,7 @@ pub fn Timer_Update(timer: &mut Timer) -> i32 {
 
 // External --------------------------------------------------------------------
 
-pub fn Video_Viewport(
+pub fn video_viewport(
     width: i32,
     height: i32,
     x: &mut i32,

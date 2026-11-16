@@ -4,7 +4,7 @@ use crate::audio::{SFX_DIE, audio_reduce_music_speed, audio_sfx, set_audio_pan_x
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, Game_Action, LIVES};
 use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
-use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
+use crate::video::{video_draw_sprite, video_pixel_ink_fill, video_pixel_paper_fill};
 use std::cell::Cell;
 use std::sync::atomic::Ordering;
 
@@ -25,7 +25,7 @@ fn set_die_level(v: i32) {
 }
 
 fn Die_Drawer() {
-    Video_PixelInkFill(0, 128 * WIDTH, (die_level() >> 1) as u8);
+    video_pixel_ink_fill(0, 128 * WIDTH, (die_level() >> 1) as u8);
 }
 
 fn Die_Ticker() {
@@ -39,7 +39,7 @@ fn Die_Ticker() {
         return;
     }
 
-    Video_DrawSprite(
+    video_draw_sprite(
         LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
         &DIE_BLANK,
         0x0,
@@ -54,7 +54,7 @@ fn Die_Init() {
     GAME_STATE.lives.fetch_sub(1, Ordering::Relaxed);
     set_die_level(15);
     System_Border(0x0);
-    Video_PixelPaperFill(0, 128 * WIDTH, 0x0);
+    video_pixel_paper_fill(0, 128 * WIDTH, 0x0);
     let miner = GAME_STATE.miner.lock().unwrap();
     set_audio_pan_x(miner.x);
     drop(miner);
