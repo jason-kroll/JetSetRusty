@@ -4,7 +4,7 @@ use crate::game_main::{
     DoNothing, System_Border, set_action, set_drawer, set_responder, set_ticker,
 };
 use crate::video::video_pixel_fill;
-use std::ptr::addr_of;
+use std::cell::{Cell, RefCell};
 
 // External functions
 use crate::title::Title_Action;
@@ -24,67 +24,79 @@ static MINER_SPRITE: [u16; 16] = [
     960, 960, 2016, 832, 992, 960, 384, 960, 2016, 2016, 3952, 4016, 960, 1888, 1760, 1904,
 ];
 
-static mut BOOT_TICKS: i32 = 0;
+thread_local! {
+    static BOOT_TICKS: Cell<i32> = const { Cell::new(0) };
+    static TEXT_GAME: RefCell<[i8; 18]> = const { RefCell::new([
+        0x1, 0x0, 0x2, 0x0, b'G' as i8, b' ' as i8, 0x2, 0x0, b'a' as i8, b' ' as i8, 0x2, 0x0,
+        b'm' as i8, b' ' as i8, 0x2, 0x0, b'e' as i8, 0,
+    ]) };
+    static TEXT_OVER: RefCell<[i8; 18]> = const { RefCell::new([
+        0x1, 0x0, 0x2, 0x0, b'O' as i8, b' ' as i8, 0x2, 0x0, b'v' as i8, b' ' as i8, 0x2, 0x0,
+        b'e' as i8, b' ' as i8, 0x2, 0x0, b'r' as i8, 0,
+    ]) };
+}
 
-static mut TEXT_GAME: [i8; 18] = [
-    0x1, 0x0, 0x2, 0x0, b'G' as i8, b' ' as i8, 0x2, 0x0, b'a' as i8, b' ' as i8, 0x2, 0x0,
-    b'm' as i8, b' ' as i8, 0x2, 0x0, b'e' as i8, 0,
-];
-
-static mut TEXT_OVER: [i8; 18] = [
-    0x1, 0x0, 0x2, 0x0, b'O' as i8, b' ' as i8, 0x2, 0x0, b'v' as i8, b' ' as i8, 0x2, 0x0,
-    b'e' as i8, b' ' as i8, 0x2, 0x0, b'r' as i8, 0,
-];
+fn boot_ticks() -> i32 {
+    BOOT_TICKS.with(Cell::get)
+}
+fn set_boot_ticks(v: i32) {
+    BOOT_TICKS.with(|c| c.set(v));
+}
+fn set_text_game_byte(i: usize, v: i8) {
+    TEXT_GAME.with(|t| t.borrow_mut()[i] = v);
+}
+fn set_text_over_byte(i: usize, v: i8) {
+    TEXT_OVER.with(|t| t.borrow_mut()[i] = v);
+}
 
 fn gameover_drawer() {
+    let ticks = boot_ticks();
     unsafe {
-        if BOOT_TICKS <= 96 {
+        if ticks <= 96 {
             Video_DrawSprite(
-                (BOOT_TICKS & 126) * WIDTH + 15 * 8,
+                (ticks & 126) * WIDTH + 15 * 8,
                 BOOT_SPRITE.as_ptr(),
                 0x0,
                 0x7,
             );
-            Video_PixelPaperFill(0, 128 * WIDTH, ((BOOT_TICKS & 12) >> 2) as u8);
+            Video_PixelPaperFill(0, 128 * WIDTH, ((ticks & 12) >> 2) as u8);
         }
 
-        if BOOT_TICKS < 96 {
+        if ticks < 96 {
             return;
         }
 
-        Video_WriteLarge(7 * 8, 6 * 8, addr_of!(TEXT_GAME).cast());
-        Video_WriteLarge(18 * 8, 6 * 8, addr_of!(TEXT_OVER).cast());
+        TEXT_GAME.with(|t| Video_WriteLarge(7 * 8, 6 * 8, t.borrow().as_ptr().cast()));
+        TEXT_OVER.with(|t| Video_WriteLarge(18 * 8, 6 * 8, t.borrow().as_ptr().cast()));
     }
 }
 
 fn gameover_ticker() {
-    unsafe {
-        let mut c = BOOT_TICKS >> 2;
+    let mut c = boot_ticks() >> 2;
 
-        TEXT_GAME[3] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_GAME[7] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_GAME[11] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_GAME[15] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_OVER[3] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_OVER[7] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_OVER[11] = (c & 0x7) as i8;
-        c += 1;
-        TEXT_OVER[15] = (c & 0x7) as i8;
+    set_text_game_byte(3, (c & 0x7) as i8);
+    c += 1;
+    set_text_game_byte(7, (c & 0x7) as i8);
+    c += 1;
+    set_text_game_byte(11, (c & 0x7) as i8);
+    c += 1;
+    set_text_game_byte(15, (c & 0x7) as i8);
+    c += 1;
+    set_text_over_byte(3, (c & 0x7) as i8);
+    c += 1;
+    set_text_over_byte(7, (c & 0x7) as i8);
+    c += 1;
+    set_text_over_byte(11, (c & 0x7) as i8);
+    c += 1;
+    set_text_over_byte(15, (c & 0x7) as i8);
 
-        BOOT_TICKS += 1;
+    set_boot_ticks(boot_ticks() + 1);
 
-        if BOOT_TICKS < 256 {
-            return;
-        }
-
-        set_action(Some(Title_Action));
+    if boot_ticks() < 256 {
+        return;
     }
+
+    set_action(Some(Title_Action));
 }
 
 fn gameover_init() {
@@ -93,7 +105,7 @@ fn gameover_init() {
         video_pixel_fill(0, 128 * WIDTH);
         Video_DrawSprite(96 * WIDTH + 15 * 8, MINER_SPRITE.as_ptr(), 0x0, 0x7);
         Video_DrawSprite(112 * WIDTH + 15 * 8, PLINTH_SPRITE.as_ptr(), 0x0, 0x2);
-        BOOT_TICKS = 0;
+        set_boot_ticks(0);
 
         Audio_Play(MUS_STOP);
         Audio_Sfx(SFX_GAMEOVER as i32);
