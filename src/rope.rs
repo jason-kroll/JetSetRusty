@@ -248,7 +248,7 @@ fn do_rope_drawer() {
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
             let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = unsafe { Level_Dir(R_ABOVE) };
+            let level_dir = Level_Dir(R_ABOVE as usize);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
@@ -322,6 +322,4 @@ pub extern "C" fn Rope_Init() {
 
 fn DoNothing() {}
 
-unsafe extern "C" {
-    fn Level_Dir(dir: i32) -> i32;
-}
+use crate::levels::Level_Dir;

@@ -4957,13 +4957,11 @@ fn game_level() -> usize {
     GAME_STATE.level.load(Ordering::Relaxed) as usize
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_Dir(dir: usize) -> i32 {
+pub fn Level_Dir(dir: usize) -> i32 {
     LEVEL_DATA[game_level()].map[dir]
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_ItemCount() -> i32 {
+pub fn Level_ItemCount() -> i32 {
     LEVEL_DATA.iter().map(|l| l.item_count).sum()
 }
 
@@ -4983,8 +4981,7 @@ fn restore_items() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_RestoreItems() {
+pub fn Level_RestoreItems() {
     restore_items();
 }
 
@@ -5001,8 +4998,7 @@ fn do_flash(tile: &mut Tile) {
     tile.ink[2] = tile.ink[video_flash() as usize];
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Level_EraseItem(tile: usize) {
+pub fn Level_EraseItem(tile: usize) {
     let level = game_level();
     unsafe {
         ACTIVE_LEVELS[level].data[tile] = 0;
@@ -5017,8 +5013,7 @@ pub extern "C" fn Level_EraseItem(tile: usize) {
     t.draw_mode = DrawMode::Tile;
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_GetTileRamp(tile: usize) -> TileType {
+pub fn Level_GetTileRamp(tile: usize) -> TileType {
     level_get_tile_ramp(tile)
 }
 
@@ -5033,8 +5028,7 @@ fn level_get_tile_ramp(tile: usize) -> TileType {
     }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_GetTileType(tile: usize) -> TileType {
+pub fn Level_GetTileType(tile: usize) -> TileType {
     level_get_tile_type(tile)
 }
 
@@ -5086,7 +5080,6 @@ fn level_ticker() {
 
 // game.c
 #[allow(non_snake_case)]
-#[unsafe(no_mangle)]
 pub fn Level_Ticker() {
     level_ticker()
 }
@@ -5113,8 +5106,7 @@ fn level_drawer() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_Drawer() {
+pub fn Level_Drawer() {
     level_drawer();
 }
 
@@ -5173,9 +5165,4 @@ pub fn level_init() {
         (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,
         title.as_ptr(),
     );
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_Init() {
-    level_init();
 }

@@ -191,11 +191,11 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
         return false;
     }
 
-    if unsafe { Level_GetTileType(tile as usize) } == TileType::Solid {
+    if Level_GetTileType(tile as usize) == TileType::Solid {
         return true;
     }
 
-    if unsafe { Level_GetTileType((tile + 32) as usize) } == TileType::Solid {
+    if Level_GetTileType((tile + 32) as usize) == TileType::Solid {
         return true;
     }
 
@@ -203,7 +203,7 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
         return false;
     }
 
-    if unsafe { Level_GetTileType((tile + 64) as usize) } != TileType::Solid {
+    if Level_GetTileType((tile + 64) as usize) != TileType::Solid {
         return false;
     }
 
@@ -239,10 +239,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if unsafe { Level_GetTileRamp((miner.tile + 64) as usize) } == TileType::RampL {
+            if Level_GetTileRamp((miner.tile + 64) as usize) == TileType::RampL {
                 y = 8;
                 offset = 32;
-            } else if unsafe { Level_GetTileRamp((miner.tile + 34) as usize) } == TileType::RampR {
+            } else if Level_GetTileRamp((miner.tile + 34) as usize) == TileType::RampR {
                 y = -8;
                 offset = -32;
             }
@@ -268,10 +268,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if unsafe { Level_GetTileRamp((miner.tile + 31) as usize) } == TileType::RampL {
+            if Level_GetTileRamp((miner.tile + 31) as usize) == TileType::RampL {
                 y = -8;
                 offset = -32;
-            } else if unsafe { Level_GetTileRamp((miner.tile + 65) as usize) } == TileType::RampR {
+            } else if Level_GetTileRamp((miner.tile + 65) as usize) == TileType::RampR {
                 y = 8;
                 offset = 32;
             }
@@ -374,8 +374,8 @@ fn do_miner_ticker() {
         }
 
         let tile = miner.tile + jump_info.tile;
-        if unsafe { Level_GetTileType(tile as usize) } == TileType::Solid
-            || unsafe { Level_GetTileType((tile + 1) as usize) } == TileType::Solid
+        if Level_GetTileType(tile as usize) == TileType::Solid
+            || Level_GetTileType((tile + 1) as usize) == TileType::Solid
         {
             // we need to re-align Willy
             miner.y = (y + 8) & 120;
@@ -420,8 +420,8 @@ fn do_miner_ticker() {
             return;
         }
 
-        let type0 = unsafe { Level_GetTileType(tile as usize) };
-        let type1 = unsafe { Level_GetTileType((tile + 1) as usize) };
+        let type0 = Level_GetTileType(tile as usize);
+        let type1 = Level_GetTileType((tile + 1) as usize);
         if type0 == TileType::Harm || type1 == TileType::Harm {
             if miner.air == 1
                 && (type0 as i32 <= TileType::Space as i32
@@ -509,10 +509,10 @@ pub extern "C" fn Miner_Drawer() {
     let mut align = miner.align;
 
     if miner.air == 0 {
-        if unsafe { Level_GetTileRamp((miner.tile + 64) as usize) } == TileType::RampL {
+        if Level_GetTileRamp((miner.tile + 64) as usize) == TileType::RampL {
             offset = miner.frame << 1;
             align = yalign(offset);
-        } else if unsafe { Level_GetTileRamp((miner.tile + 65) as usize) } == TileType::RampR {
+        } else if Level_GetTileRamp((miner.tile + 65) as usize) == TileType::RampR {
             offset = 6 - (miner.frame << 1);
             align = yalign(offset);
         }
@@ -534,7 +534,7 @@ pub extern "C" fn Miner_Drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if unsafe { Level_GetTileType(tile as usize) } == TileType::Harm {
+        if Level_GetTileType(tile as usize) == TileType::Harm {
             set_action(Some(Die_Action));
             return;
         }
@@ -545,7 +545,7 @@ pub extern "C" fn Miner_Drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if unsafe { Level_GetTileType(tile as usize) } == TileType::Item {
+        if Level_GetTileType(tile as usize) == TileType::Item {
             Level_EraseItem(tile as usize);
             Game_GotItem();
         }

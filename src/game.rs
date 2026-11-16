@@ -3,7 +3,7 @@ use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_I
 use crate::cheat::Cheat_Responder;
 use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
-use crate::levels::{self, Level_Dir, Level_Drawer};
+use crate::levels::{self, Level_Dir, Level_Drawer, Level_Ticker};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
@@ -60,7 +60,6 @@ pub static mut DO_CLOCK_UPDATE: Event = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
-    fn Level_Ticker();
     fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8);
     fn Miner_Drawer();
     fn Miner_IncSeq();
@@ -509,7 +508,7 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
     let game = &*GAME_STATE;
 
     // int level = Level_Dir(dir)
-    let level = unsafe { Level_Dir(dir as usize) };
+    let level = Level_Dir(dir as usize);
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
     if dir == Direction::Above as i32 {
