@@ -1,13 +1,9 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::common::{HEIGHT, WIDTH};
+use crate::game_main::{set_action, set_drawer, set_responder, set_ticker, video_flash};
 use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_text_width};
 
 unsafe extern "C" {
-    static mut Action: Option<unsafe extern "C" fn()>;
-    static mut Responder: Option<unsafe extern "C" fn()>;
-    static mut Ticker: Option<unsafe extern "C" fn()>;
-    static mut Drawer: Option<unsafe extern "C" fn()>;
-    static mut videoFlash: i32;
     fn DoNothing();
     fn System_Border(x: i32);
     fn Codes_Action();
@@ -22,14 +18,14 @@ static mut LOADER_TICKS: u32 = 0;
 static mut LOADER_TEXT: [u8; 25] = *b"\x01\x07\x02\x02JetSet Willy Loading\0";
 
 extern "C" fn do_loader_responder() {
-    unsafe { Action = Some(Title_Action) }
+    set_action(Some(Title_Action))
 }
 
 extern "C" fn do_loader_ticker() {
     unsafe {
         // Use raw pointers to avoid static_mut_refs lint (Rust 2024)
         let text = (&raw mut LOADER_TEXT).cast::<u8>();
-        if videoFlash != 0 {
+        if video_flash() != 0 {
             text.add(1).write(7);
             text.add(3).write(2);
         } else {
@@ -38,7 +34,7 @@ extern "C" fn do_loader_ticker() {
         }
         // Matches C's post-increment: transition when value was 256
         if LOADER_TICKS == 256 {
-            Action = Some(Codes_Action);
+            set_action(Some(Codes_Action));
         }
         LOADER_TICKS += 1;
     }
@@ -69,9 +65,9 @@ extern "C" fn do_loader_drawer2() {
 
         do_loader_drawer3();
 
-        Responder = Some(do_loader_responder);
-        Ticker = Some(do_loader_ticker);
-        Drawer = Some(do_loader_drawer3);
+        set_responder(Some(do_loader_responder));
+        set_ticker(Some(do_loader_ticker));
+        set_drawer(Some(do_loader_drawer3));
     }
 }
 
@@ -94,15 +90,13 @@ extern "C" fn do_loader_drawer1() {
         );
 
         Audio_Music(MUS_LOADER, MUS_PLAY);
-        Drawer = Some(do_loader_drawer2);
+        set_drawer(Some(do_loader_drawer2));
     }
 }
 
 // game_main.c initializes `Action = Loader_Action` by symbol name, so no_mangle is required.
 #[unsafe(no_mangle)]
 pub extern "C" fn Loader_Action() {
-    unsafe {
-        Drawer = Some(do_loader_drawer1);
-        Action = Some(DoNothing);
-    }
+    set_drawer(Some(do_loader_drawer1));
+    set_action(Some(DoNothing));
 }
