@@ -141,6 +141,11 @@ fn title() {
 }
 
 #[test]
+fn victory() {
+    check("victory");
+}
+
+#[test]
 fn play() {
     check("play");
 }

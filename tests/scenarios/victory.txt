@@ -1,0 +1,10 @@
+# Victory sequence: collect the last item (-> Maria mode), enter the Master
+# Bedroom, stand on the bed (-> Running), Willy auto-runs to The Bathroom,
+# toilet flush at x=224 (-> Toilet), 256 ticks later back to the title screen.
+frames 4000
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+320 set item_count 1
+360 right 40       # walk right; the Bathroom's item is at x=184 -> mode=Maria
+400 set level 35   # Master Bedroom (Willy placed at the left edge)
+410 set miner 40 88  # stand on the bed (bed top is row 12, floor row 13) -> mode=Running

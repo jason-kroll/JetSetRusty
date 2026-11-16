@@ -23,6 +23,9 @@
 //     seed 1             # RNG seed (optional, default 1)
 //     120 enter          # press Enter at frame 120 (held for 1 frame)
 //     200 right 45       # press Right at frame 200, held for 45 frames
+//     400 set mode toilet   # poke GAME_STATE at frame 400 (debug/testing):
+//                           #   set item_count N | set level N | set mode normal|maria|running|toilet
+//                           #   set miner X Y   (place Willy at pixel x,y, on the floor)
 //
 // A press both sends the keydown event (mapped exactly as in live play, so e.g.
 // `right` arrives as "any key") and holds the key for System_IsKey. Key names:
@@ -44,10 +47,18 @@ struct Press {
     duration: u32,
 }
 
+enum SetOp {
+    ItemCount(i32),
+    Level(i32),
+    Mode(u8),
+    Miner(i32, i32),
+}
+
 struct Script {
     frames: u32,
     seed: u32,
     presses: Vec<Press>,
+    sets: Vec<(u32, SetOp)>,
 }
 
 fn keycode(name: &str) -> Option<i32> {
@@ -79,6 +90,7 @@ fn parse_script(text: &str) -> Result<Script, String> {
     let mut frames = None;
     let mut seed = 1;
     let mut presses = Vec::new();
+    let mut sets = Vec::new();
     for (n, line) in text.lines().enumerate() {
         let line = line.split('#').next().unwrap().trim();
         if line.is_empty() {
@@ -90,6 +102,30 @@ fn parse_script(text: &str) -> Result<Script, String> {
         match words.as_slice() {
             ["frames", f] => frames = Some(num(f)?),
             ["seed", s] => seed = num(s)?,
+            [f, "set", field, val] => {
+                let op = match *field {
+                    "item_count" => SetOp::ItemCount(
+                        val.parse::<i32>().map_err(|_| err("expected an integer"))?,
+                    ),
+                    "level" => SetOp::Level(
+                        val.parse::<i32>().map_err(|_| err("expected an integer"))?,
+                    ),
+                    "mode" => SetOp::Mode(match *val {
+                        "normal" => 0,
+                        "maria" => 1,
+                        "running" => 2,
+                        "toilet" => 3,
+                        _ => return Err(err("mode must be normal|maria|running|toilet")),
+                    }),
+                    _ => return Err(err("unknown field (item_count|level|mode|miner)")),
+                };
+                sets.push((num(f)?, op));
+            }
+            [f, "set", "miner", x, y] => {
+                let px = x.parse::<i32>().map_err(|_| err("expected an integer"))?;
+                let py = y.parse::<i32>().map_err(|_| err("expected an integer"))?;
+                sets.push((num(f)?, SetOp::Miner(px, py)));
+            }
             [f, key] | [f, key, _] => presses.push(Press {
                 frame: num(f)?,
                 sym: keycode(key).ok_or_else(|| err("unknown key"))?,
@@ -102,6 +138,7 @@ fn parse_script(text: &str) -> Result<Script, String> {
         frames: frames.ok_or("script has no `frames` directive")?,
         seed,
         presses,
+        sets,
     })
 }
 
@@ -170,6 +207,35 @@ pub fn main(args: &[String]) -> i32 {
     for frame in 0..script.frames {
         if !game_running() {
             break;
+        }
+        for (f, op) in &script.sets {
+            if *f == frame {
+                use crate::game::GAME_STATE;
+                use std::sync::atomic::Ordering::Relaxed;
+                match op {
+                    SetOp::ItemCount(v) => GAME_STATE.item_count.store(*v, Relaxed),
+                    SetOp::Level(v) => {
+                        // Mimic entering the room from the left (Game_ChangeLevel
+                        // Right): Willy at the left edge, room re-inits next tick.
+                        {
+                            let mut miner = GAME_STATE.miner.lock().unwrap();
+                            miner.x = 0;
+                            miner.tile &= !31;
+                        }
+                        GAME_STATE.level.store(*v, Relaxed);
+                        unsafe { crate::game_main::Ticker = Some(crate::game::game_init_room) };
+                    }
+                    SetOp::Mode(m) => GAME_STATE.mode.store(*m, Relaxed),
+                    SetOp::Miner(x, y) => {
+                        let mut miner = GAME_STATE.miner.lock().unwrap();
+                        miner.x = *x;
+                        miner.y = *y;
+                        miner.tile = (y / 8) * 32 + (x / 8);
+                        miner.air = 0;
+                        miner.align = 4;
+                    }
+                }
+            }
         }
         let held: Vec<i32> = script
             .presses
