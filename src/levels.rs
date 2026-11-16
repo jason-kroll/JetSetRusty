@@ -1,6 +1,6 @@
 use crate::common::WIDTH;
 use crate::game::GAME_STATE;
-use crate::game_main::{System_Border, video_flash};
+use crate::game_main::{system_border, video_flash};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 use std::cell::RefCell;
 use std::sync::atomic::Ordering;
@@ -4941,7 +4941,7 @@ struct Tile {
 pub fn level_set_border() {
     LEVEL_TILE.with(|tiles| {
         let t = &mut tiles.borrow_mut()[0];
-        System_Border(t.ink[0].into());
+        system_border(t.ink[0].into());
         t.ink[0] = (t.ink[0] + 3) & 0xf;
     });
 }
@@ -4950,11 +4950,11 @@ fn game_level() -> usize {
     GAME_STATE.level.load(Ordering::Relaxed) as usize
 }
 
-pub fn Level_Dir(dir: usize) -> i32 {
+pub fn level_dir(dir: usize) -> i32 {
     LEVEL_DATA[game_level()].map[dir]
 }
 
-pub fn Level_ItemCount() -> i32 {
+pub fn level_item_count() -> i32 {
     LEVEL_DATA.iter().map(|l| l.item_count).sum()
 }
 
@@ -4971,7 +4971,7 @@ fn restore_items() {
     });
 }
 
-pub fn Level_RestoreItems() {
+pub fn level_restore_items() {
     restore_items();
 }
 
@@ -4988,7 +4988,7 @@ fn do_flash(tile: &mut Tile) {
     tile.ink[2] = tile.ink[video_flash() as usize];
 }
 
-pub fn Level_EraseItem(tile: usize) {
+pub fn level_erase_item(tile: usize) {
     let level = game_level();
     let attr = ACTIVE_LEVELS.with(|a| {
         let mut a = a.borrow_mut();
@@ -5005,11 +5005,7 @@ pub fn Level_EraseItem(tile: usize) {
     });
 }
 
-pub fn Level_GetTileRamp(tile: usize) -> TileType {
-    level_get_tile_ramp(tile)
-}
-
-fn level_get_tile_ramp(tile: usize) -> TileType {
+pub fn level_get_tile_ramp(tile: usize) -> TileType {
     if tile >= LEVEL_TILES {
         return TileType::Space;
     }
@@ -5020,11 +5016,7 @@ fn level_get_tile_ramp(tile: usize) -> TileType {
     }
 }
 
-pub fn Level_GetTileType(tile: usize) -> TileType {
-    level_get_tile_type(tile)
-}
-
-fn level_get_tile_type(tile: usize) -> TileType {
+pub fn level_get_tile_type(tile: usize) -> TileType {
     if tile >= LEVEL_TILES {
         return TileType::Space;
     }
@@ -5045,7 +5037,7 @@ fn level_get_tile_type(tile: usize) -> TileType {
     }
 }
 
-fn level_ticker() {
+pub fn level_ticker() {
     let (left_offset, right_offset) = CONVEY_ROTATE.with(|c| (c.borrow()[0], c.borrow()[1]));
     LEVEL_TILE.with(|tiles| {
         for t in tiles.borrow_mut().iter_mut() {
@@ -5063,12 +5055,7 @@ fn level_ticker() {
 }
 
 // game.c
-#[allow(non_snake_case)]
-pub fn Level_Ticker() {
-    level_ticker()
-}
-
-fn level_drawer() {
+pub fn level_drawer() {
     LEVEL_TILE.with(|tiles| {
         for (cell, t) in tiles.borrow_mut().iter_mut().enumerate() {
             match t.draw_mode {
@@ -5084,10 +5071,6 @@ fn level_drawer() {
             }
         }
     });
-}
-
-pub fn Level_Drawer() {
-    level_drawer();
 }
 
 // c"" literals forbid the interior nul bytes these control strings carry

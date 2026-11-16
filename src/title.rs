@@ -1,10 +1,10 @@
 use crate::audio::{MUS_PLAY, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
-use crate::game::{GAME_STATE, Game_Action, Game_DrawStatus, Game_GameReset};
+use crate::game::{GAME_STATE, game_action, game_draw_status, game_game_reset};
 use crate::game_main::{
     game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
-use crate::levels::{Level_ItemCount, Level_RestoreItems};
+use crate::levels::{level_item_count, level_restore_items};
 use crate::miner::miner_init;
 use crate::robots::robots_draw_cheat;
 use crate::video::{tile_2_pixel, video_pixel_fill};
@@ -15,7 +15,7 @@ use crate::game::GameMode;
 
 use crate::video::{video_cycle_colours, video_write, video_write_large};
 
-use crate::game_main::{DoNothing, DoQuit, System_Border};
+use crate::game_main::{do_nothing, do_quit, system_border};
 
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;
@@ -68,8 +68,8 @@ static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 fn game_start() {
     video_pixel_fill(128 * WIDTH, 64 * WIDTH);
 
-    Game_GameReset();
-    Game_DrawStatus();
+    game_game_reset();
+    game_draw_status();
 
     GAME_STATE.level.store(THEBATHROOM, Ordering::Relaxed);
     let debug_items = crate::game_main::DEBUG_ITEM_COUNT.load(Ordering::Relaxed);
@@ -78,9 +78,9 @@ fn game_start() {
     } else {
         GAME_STATE
             .item_count
-            .store(Level_ItemCount(), Ordering::Relaxed);
+            .store(level_item_count(), Ordering::Relaxed);
     }
-    Level_RestoreItems();
+    level_restore_items();
 
     miner_init();
 
@@ -93,7 +93,7 @@ fn game_start() {
         .store(GameMode::Normal as u8, Ordering::Relaxed);
     GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
-    Game_Action();
+    game_action();
 }
 
 fn do_title_ticker() {
@@ -134,7 +134,7 @@ fn do_title_drawer() {
     }
 
     if colour_cycle() == 1 {
-        System_Border(video_cycle_colours());
+        system_border(video_cycle_colours());
     }
 
     video_write_large(0, 0, c"\x01\x01\x02\x07".to_bytes_with_nul());
@@ -149,13 +149,13 @@ fn do_title_responder() {
     if game_input() == Key::Enter as i32 {
         set_action(Some(game_start));
     } else if game_input() == Key::Escape as i32 {
-        DoQuit();
+        do_quit();
     }
 }
 
 // b"" byte-string literals carry the interior nul bytes these control strings need
 fn do_title_init() {
-    System_Border(0x0);
+    system_border(0x0);
     video_pixel_fill(0, WIDTH * HEIGHT);
 
     video_write(16 * WIDTH + 144, b"\x01\x00\x02\x05\x10\x11\x12\x13\0");
@@ -228,5 +228,5 @@ pub fn Title_Action() {
     set_responder(Some(do_title_responder));
     set_ticker(Some(do_title_init));
     set_drawer(Some(do_title_drawer));
-    set_action(Some(DoNothing));
+    set_action(Some(do_nothing));
 }

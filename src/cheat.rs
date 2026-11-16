@@ -1,6 +1,6 @@
 use crate::common::{Event, Key};
-use crate::game::{GAME_STATE, Game_CheatEnabled, game_init_room, game_pause};
-use crate::game_main::{System_IsKey, game_input, set_action};
+use crate::game::{GAME_STATE, game_cheat_enabled, game_init_room, game_pause};
+use crate::game_main::{game_input, set_action, system_is_key};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -24,13 +24,13 @@ pub fn Cheat_Enabled() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
-        if System_IsKey(Key::K1 as i32 + i) != 0 {
+        if system_is_key(Key::K1 as i32 + i) != 0 {
             level = i + 1;
             break;
         }
     }
 
-    if System_IsKey(Key::Enter as i32) == 0 {
+    if system_is_key(Key::Enter as i32) == 0 {
         game_pause(false);
         return;
     }
@@ -39,7 +39,7 @@ pub fn Cheat_Enabled() {
         return;
     }
 
-    if System_IsKey(Key::LShift as i32) != 0 || System_IsKey(Key::RShift as i32) != 0 {
+    if system_is_key(Key::LShift as i32) != 0 || system_is_key(Key::RShift as i32) != 0 {
         level += 30;
     }
 
@@ -72,7 +72,7 @@ pub fn cheat_disabled() {
         return;
     }
 
-    Game_CheatEnabled();
+    game_cheat_enabled();
 
     set_cheat_responder(Some(Cheat_Enabled));
 }

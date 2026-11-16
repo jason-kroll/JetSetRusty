@@ -2,7 +2,7 @@
 // Maria, and the two screen-crossing arrows.
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
-// mid-frame inside DoGameTicker/do_game_drawer, reading shared state straight
+// mid-frame inside do_game_ticker/do_game_drawer, reading shared state straight
 // from GAME_STATE: Willy's position via the `miner` mutex, and `clock_ticks`,
 // `level`, and `mode` via plain atomic loads.
 //

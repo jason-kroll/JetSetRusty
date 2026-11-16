@@ -1,10 +1,10 @@
 // jetset willy
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
-use crate::common::{DoNothing, DoQuit, System_Rnd, Title_Action};
 use crate::common::{HEIGHT, WIDTH};
+use crate::common::{Title_Action, do_nothing, do_quit, system_rnd};
 use crate::game_main::{
-    System_Border, game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
+    game_input, set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
 };
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
@@ -20,15 +20,15 @@ pub const KEY_4: i32 = K4 as i32;
 pub const KEY_ENTER: i32 = Enter as i32;
 pub const KEY_ESCAPE: i32 = Escape as i32;
 
-pub fn DoCodesResponder() {
+pub fn do_codes_responder() {
     CODES_STATE.lock().unwrap().do_codes_responder();
 }
 
-pub fn DoCodesTicker() {
+pub fn do_codes_ticker() {
     CODES_STATE.lock().unwrap().do_codes_ticker();
 }
 
-pub fn DoCodesDrawer() {
+pub fn do_codes_drawer() {
     CODES_STATE.lock().unwrap().do_codes_drawer();
 }
 
@@ -66,7 +66,7 @@ impl CodesState {
     fn get_code(&mut self) {
         let mut location: [u8; 5] = [0x02, 0x07, b' ', b' ', 0x00];
 
-        self.needed = System_Rnd() % 180;
+        self.needed = system_rnd() % 180;
 
         location[2] = (self.needed % 18) as u8 + b'A';
         location[3] = (self.needed / 18) as u8 + b'0';
@@ -144,7 +144,7 @@ impl CodesState {
                 }
 
                 if self.attempt == 2 {
-                    DoQuit();
+                    do_quit();
                     return;
                 }
 
@@ -157,7 +157,7 @@ impl CodesState {
                 self.get_code();
             }
 
-            KEY_ESCAPE => DoQuit(),
+            KEY_ESCAPE => do_quit(),
 
             _ => {}
         }
@@ -165,7 +165,7 @@ impl CodesState {
 
     // b"" byte-string literals carry the interior nul bytes these control strings need
     fn codes_action(&mut self) {
-        System_Border(0);
+        system_border(0);
         video_pixel_fill(0, WIDTH * HEIGHT);
         video_write_large(
             0,
@@ -183,11 +183,11 @@ impl CodesState {
 
         self.get_code();
 
-        set_responder(Some(DoCodesResponder));
-        set_ticker(Some(DoCodesTicker));
-        set_drawer(Some(DoCodesDrawer));
+        set_responder(Some(do_codes_responder));
+        set_ticker(Some(do_codes_ticker));
+        set_drawer(Some(do_codes_drawer));
 
-        set_action(Some(DoNothing));
+        set_action(Some(do_nothing));
     }
 }
 

@@ -259,7 +259,7 @@ fn do_rope_drawer() {
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
             let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = Level_Dir(R_ABOVE as usize);
+            let level_dir = level_dir(R_ABOVE as usize);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
@@ -309,8 +309,8 @@ pub fn rope_init() {
         SWIMMINGPOOL => (16, 7),
         THEBEACH => (14, 5),
         _ => {
-            set_rope_ticker(Some(DoNothing));
-            set_rope_drawer(Some(DoNothing));
+            set_rope_ticker(Some(do_nothing));
+            set_rope_drawer(Some(do_nothing));
             return;
         }
     };
@@ -326,6 +326,6 @@ pub fn rope_init() {
     set_rope_drawer(Some(rope_drawer_fn));
 }
 
-fn DoNothing() {}
+fn do_nothing() {}
 
-use crate::levels::Level_Dir;
+use crate::levels::level_dir;

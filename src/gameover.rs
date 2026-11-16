@@ -1,7 +1,7 @@
 use crate::audio::{MUS_STOP, SFX_GAMEOVER, audio_play, audio_sfx};
 use crate::common::WIDTH;
 use crate::game_main::{
-    DoNothing, System_Border, set_action, set_drawer, set_responder, set_ticker,
+    do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
 };
 use crate::video::video_pixel_fill;
 use std::cell::{Cell, RefCell};
@@ -93,7 +93,7 @@ fn gameover_ticker() {
 }
 
 fn gameover_init() {
-    System_Border(0x0);
+    system_border(0x0);
     video_pixel_fill(0, 128 * WIDTH);
     video_draw_sprite(96 * WIDTH + 15 * 8, &MINER_SPRITE, 0x0, 0x7);
     video_draw_sprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
@@ -106,8 +106,8 @@ fn gameover_init() {
 }
 
 pub fn Gameover_Action() {
-    set_responder(Some(DoNothing));
+    set_responder(Some(do_nothing));
     set_ticker(Some(gameover_init));
     set_drawer(Some(gameover_drawer));
-    set_action(Some(DoNothing));
+    set_action(Some(do_nothing));
 }

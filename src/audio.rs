@@ -1,4 +1,4 @@
-use crate::misc::{Timer, Timer_Set, Timer_Update};
+use crate::misc::{Timer, timer_set, timer_update};
 use std::cell::Cell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -40,7 +40,7 @@ struct Channel {
     right: [i32; 3],
     phase: u32,
     frequency: u32,
-    // None = DoNothing (channel off); Some(do_phase_fn) = channel on (oscillator running)
+    // None = do_nothing (channel off); Some(do_phase_fn) = channel on (oscillator running)
     do_phase: Event,
 }
 
@@ -363,7 +363,7 @@ pub fn audio_reduce_music_speed() {
     s.music_pitch -= 1;
     s.music_tempo -= 6;
     let tempo = s.music_tempo;
-    Timer_Set(&mut s.timer_music, SAMPLERATE, tempo);
+    timer_set(&mut s.timer_music, SAMPLERATE, tempo);
 }
 
 pub fn audio_willy_sfx(note: i32, length: i32) {
@@ -436,7 +436,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
     let mut s = AUDIO_STATE.lock().unwrap();
 
     if s.samples_music == 0 {
-        s.samples_music = Timer_Update(&mut s.timer_music);
+        s.samples_music = timer_update(&mut s.timer_music);
 
         if audio_music_playing() != 0 {
             if s.music_delta == s.music_clock {
@@ -487,7 +487,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
     }
 
     if s.samples_sfx == 0 {
-        s.samples_sfx = Timer_Update(&mut s.timer_sfx);
+        s.samples_sfx = timer_update(&mut s.timer_sfx);
 
         for i in 0..NSFX {
             if s.sfx[i].clock == s.sfx_clock {
@@ -548,12 +548,12 @@ pub fn audio_music(music: i32, playing: i32) {
         s.sfx[2].do_sfx = None;
 
         s.samples_music = 0;
-        Timer_Set(&mut s.timer_music, SAMPLERATE, TICKRATE);
+        timer_set(&mut s.timer_music, SAMPLERATE, TICKRATE);
     }
     audio_play(playing);
 }
 
 pub fn audio_init() {
     let mut s = AUDIO_STATE.lock().unwrap();
-    Timer_Set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
+    timer_set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
 }

@@ -1,12 +1,12 @@
 use crate::audio::{MUS_PLAY, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    System_Border, set_action, set_drawer, set_responder, set_ticker, video_flash,
+    set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
 };
 use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
 use crate::codes::Codes_Action;
-use crate::game_main::DoNothing;
+use crate::game_main::do_nothing;
 use crate::title::Title_Action;
 use std::cell::{Cell, RefCell};
 
@@ -73,7 +73,7 @@ fn do_loader_drawer2() {
 }
 
 fn do_loader_drawer1() {
-    System_Border(0x1);
+    system_border(0x1);
     video_pixel_paper_fill(0, WIDTH * HEIGHT, 0x1);
 
     // "fawtytoo" (paper=1, ink=7)
@@ -98,5 +98,5 @@ fn do_loader_drawer1() {
 
 pub fn Loader_Action() {
     set_drawer(Some(do_loader_drawer1));
-    set_action(Some(DoNothing));
+    set_action(Some(do_nothing));
 }

@@ -1,7 +1,5 @@
-#![allow(non_snake_case)]
-
 use crate::common::{Event, HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, Timer_Set, Timer_Update, VIDEO_COLOUR, video_viewport};
+use crate::misc::{Timer, VIDEO_COLOUR, timer_set, timer_update, video_viewport};
 use sdl2::EventPump;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event as SdlEvent;
@@ -119,11 +117,11 @@ pub(crate) fn toggle_video_flash(bit: i32) {
 
 // ---- Module-private state ---------------------------------------------------
 
-// The event pump is owned by run() but stored here so System_IsKey and
+// The event pump is owned by run() but stored here so system_is_key and
 // system_get_event can reach it from deep in the game code. Main thread only.
 //
 // FRAMEBUFFER is everything the game has drawn: one palette index (0-15) per
-// pixel, written by System_SetPixel. It persists across frames, because the
+// pixel, written by system_set_pixel. It persists across frames, because the
 // game only redraws pixels that change, and present_frame() copies all of it
 // to the SDL texture once per frame. Keeping it in our own buffer, not a
 // locked SDL surface, makes the game's output independent of SDL.
@@ -131,7 +129,7 @@ thread_local! {
     static EVENT_PUMP:  RefCell<Option<EventPump>>               = const { RefCell::new(None) };
     static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
     // In replay mode, the SDL keycodes the script is holding down this frame;
-    // System_IsKey reads this instead of SDL's keyboard state. None = live play.
+    // system_is_key reads this instead of SDL's keyboard state. None = live play.
     static REPLAY_HELD: RefCell<Option<Vec<i32>>> = const { RefCell::new(None) };
 }
 
@@ -145,20 +143,20 @@ pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
 // ---- Exported C-facing functions --------------------------------------------
 
-pub fn DoNothing() {}
+pub fn do_nothing() {}
 
-pub fn DoQuit() {
+pub fn do_quit() {
     GAME_RUNNING.store(false, Relaxed);
-    // Setting these to None is equivalent to DoNothing — fire() is a no-op on None.
+    // Setting these to None is equivalent to do_nothing — fire() is a no-op on None.
     set_drawer(None);
     set_ticker(None);
 }
 
-pub fn System_Rnd() -> i32 {
+pub fn system_rnd() -> i32 {
     crate::rng::rand()
 }
 
-pub fn System_IsKey(key: i32) -> i32 {
+pub fn system_is_key(key: i32) -> i32 {
     let sym = SDL_KEYS[key as usize];
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
         return held as i32;
@@ -168,18 +166,18 @@ pub fn System_IsKey(key: i32) -> i32 {
         let pump = p.borrow();
         let pump = pump
             .as_ref()
-            .expect("System_IsKey called before run() initialised SDL");
+            .expect("system_is_key called before run() initialised SDL");
         let keycode = Keycode::from_i32(sym).expect("unknown SDL keycode");
         let scancode = Scancode::from_keycode(keycode).expect("keycode without scancode");
         pump.keyboard_state().is_scancode_pressed(scancode) as i32
     })
 }
 
-pub fn System_SetPixel(pos: i32, index: i32) {
+pub fn system_set_pixel(pos: i32, index: i32) {
     FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos as usize] = index as u8);
 }
 
-pub fn System_Border(index: i32) {
+pub fn system_border(index: i32) {
     BORDER_INDEX.store(index as usize, Relaxed);
 }
 
@@ -245,7 +243,7 @@ pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -
     set_game_input(Key::None as i32);
     fire(ticker());
     fire(drawer());
-    toggle_video_flash(Timer_Update(timer_flash));
+    toggle_video_flash(timer_update(timer_flash));
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,
@@ -296,7 +294,7 @@ fn system_get_event() -> bool {
         match pump.poll_event() {
             None => false,
             Some(SdlEvent::Quit { .. }) => {
-                DoQuit();
+                do_quit();
                 true
             }
             Some(SdlEvent::KeyDown {
@@ -472,8 +470,8 @@ pub fn run() {
     // tear-free output, but vsync must not be relied on for pacing: several
     // drivers and compositors silently ignore PRESENTVSYNC, which lets the
     // loop spin unthrottled and the game run many times too fast.
-    Timer_Set(&mut timer_frame, TICKRATE, TICKRATE);
-    Timer_Set(&mut timer_flash, 25, TICKRATE * 8);
+    timer_set(&mut timer_frame, TICKRATE, TICKRATE);
+    timer_set(&mut timer_flash, 25, TICKRATE * 8);
 
     // Main loop ---------------------------------------------------------------
     // Wall-clock pacer: frame_time is set to now+1000 per rendered frame, while
@@ -492,7 +490,7 @@ pub fn run() {
         }
         frame_time = clock.now(timer.ticks()) * TICKRATE as u64 + 1000;
 
-        let frame = Timer_Update(&mut timer_frame);
+        let frame = timer_update(&mut timer_frame);
 
         for _ in 0..frame {
             game_frame(&mut timer_flash, || {

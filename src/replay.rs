@@ -28,7 +28,7 @@
 //                           #   set miner X Y   (place Willy at pixel x,y, on the floor)
 //
 // A press both sends the keydown event (mapped exactly as in live play, so e.g.
-// `right` arrives as "any key") and holds the key for System_IsKey. Key names:
+// `right` arrives as "any key") and holds the key for system_is_key. Key names:
 // a-z, 0-9, left, right, space, enter, lshift, rshift, escape, tab, pause,
 // lalt, ralt.
 
@@ -38,7 +38,7 @@ use crate::game_main::{
     SAMPLERATE, TICKRATE, border_index, game_frame, game_running, map_keycode, seed_rng,
     set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
-use crate::misc::{Timer, Timer_Set, VIDEO_COLOUR};
+use crate::misc::{Timer, VIDEO_COLOUR, timer_set};
 use sdl2::sys::SDL_KeyCode as K;
 use std::io::Write;
 
@@ -198,7 +198,7 @@ pub fn main(args: &[String]) -> i32 {
     seed_rng(script.seed);
     audio_init();
     let mut timer_flash = Timer::default();
-    Timer_Set(&mut timer_flash, 25, TICKRATE * 8);
+    timer_set(&mut timer_flash, 25, TICKRATE * 8);
 
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
@@ -216,7 +216,7 @@ pub fn main(args: &[String]) -> i32 {
                 match op {
                     SetOp::ItemCount(v) => GAME_STATE.item_count.store(*v, Relaxed),
                     SetOp::Level(v) => {
-                        // Mimic entering the room from the left (Game_ChangeLevel
+                        // Mimic entering the room from the left (game_change_level
                         // Right): Willy at the left edge, room re-inits next tick.
                         {
                             let mut miner = GAME_STATE.miner.lock().unwrap();

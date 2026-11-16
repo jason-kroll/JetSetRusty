@@ -114,14 +114,14 @@ impl std::fmt::Debug for Timer {
     }
 }
 
-pub fn Timer_Set(timer: &mut Timer, numerator: i32, divisor: i32) {
+pub fn timer_set(timer: &mut Timer, numerator: i32, divisor: i32) {
     timer.acc = 0;
     timer.rate = numerator / divisor;
     timer.remainder = numerator - timer.rate * divisor;
     timer.divisor = divisor;
 }
 
-pub fn Timer_Update(timer: &mut Timer) -> i32 {
+pub fn timer_update(timer: &mut Timer) -> i32 {
     timer.acc += timer.remainder;
     if timer.acc < timer.divisor {
         return timer.rate;

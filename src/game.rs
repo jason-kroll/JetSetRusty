@@ -3,7 +3,7 @@ use crate::audio::{MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_play, audio_
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
-use crate::levels::{Level_Dir, Level_Drawer, Level_Ticker};
+use crate::levels::{level_dir, level_drawer, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
@@ -14,21 +14,20 @@ use crate::common::{
     // Types
     Event,
     Key,
-    // C functions
-    Level_SetBorder,
-
     // Constant(s)
     WIDTH,
+    // C functions
+    level_set_border,
 };
 
 use crate::game_main::{
-    DoNothing, System_Border, TICKRATE, set_action, set_drawer, set_responder, set_ticker,
+    TICKRATE, do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
 };
 use crate::levels::level_init;
 use crate::miner::{
     miner_draw_seq_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
 };
-use crate::misc::{Timer_Set, Timer_Update};
+use crate::misc::{timer_set, timer_update};
 use crate::robots::{robots_draw_cheat, robots_drawer, robots_flush, robots_init, robots_ticker};
 use crate::rope::rope_init;
 use crate::title::Title_Action;
@@ -121,7 +120,7 @@ pub struct GameState {
     // miner.rs via GAME_STATE.
     pub miner_attr_split: AtomicI32,
     pub miner_willy_rope: AtomicI32,
-    // Atomic caches for Level_GetTileType to avoid deadlocks
+    // Atomic caches for level_get_tile_type to avoid deadlocks
     pub miner_air: AtomicI32,
     pub miner_jump: AtomicI32,
     pub mode: AtomicU8,
@@ -175,9 +174,9 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 
 // Game functions
 //
-// Installed as the `Ticker` by Game_Action and runs exactly once: it sets up the
-// room, then swaps `Ticker` to DoGameTicker and `Action` to DoNothing — that
-// DoNothing handoff is what stops the title's `game_start` from re-firing (and
+// Installed as the `Ticker` by game_action and runs exactly once: it sets up the
+// room, then swaps `Ticker` to do_game_ticker and `Action` to do_nothing — that
+// do_nothing handoff is what stops the title's `game_start` from re-firing (and
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
 pub fn game_init_room() {
     level_init();
@@ -187,9 +186,9 @@ pub fn game_init_room() {
     let game = &*GAME_STATE;
     let current_level = game.level.load(Ordering::Relaxed);
 
-    // System_Border(levelBorder[gameLevel])
+    // system_border(levelBorder[gameLevel])
     let border_value = game.level_border.lock().unwrap()[current_level as usize];
-    System_Border(border_value);
+    system_border(border_value);
 
     miner_save();
 
@@ -200,19 +199,19 @@ pub fn game_init_room() {
     }
 
     // Timer
-    Timer_Set(&mut game.timer.lock().unwrap(), 12, TICKRATE);
+    timer_set(&mut game.timer.lock().unwrap(), 12, TICKRATE);
     game.frame.store(1, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
     // Ticker, Drawer, Action: the Event function-pointer globals
     if game.game_paused.load(Ordering::Relaxed) != 0 {
-        set_ticker(Some(DoNothing));
-        set_drawer(Some(DoDrawOnce));
+        set_ticker(Some(do_nothing));
+        set_drawer(Some(do_draw_once));
     } else {
-        set_ticker(Some(DoGameTicker));
+        set_ticker(Some(do_game_ticker));
     }
-    set_action(Some(DoNothing));
+    set_action(Some(do_nothing));
 }
 
 pub fn game_pause(state: bool) {
@@ -229,21 +228,21 @@ pub fn game_pause(state: bool) {
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         if game.cheat_enabled.load(Ordering::Relaxed) {
-            set_ticker(Some(DoNothing));
-            set_drawer(Some(DoNothing));
+            set_ticker(Some(do_nothing));
+            set_drawer(Some(do_nothing));
         } else {
-            set_ticker(Some(DoPauseTicker));
-            set_drawer(Some(DoPauseDrawer));
+            set_ticker(Some(do_pause_ticker));
+            set_drawer(Some(do_pause_drawer));
         }
         audio_play(MUS_STOP);
     } else {
-        set_ticker(Some(DoGameTicker));
+        set_ticker(Some(do_game_ticker));
         set_drawer(Some(do_game_drawer));
         audio_play(game.music.load(Ordering::Relaxed) as i32);
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
         // Original: `if (cheatEnabled == 0)`. Redraw the status band on unpause
-        // when NOT cheating — DoPauseDrawer's video_cycle_colours has been
+        // when NOT cheating — do_pause_drawer's video_cycle_colours has been
         // cycling the ink of every pixel in the buffer, and the level playfield
         // recovers because it's repainted every frame, but the status/lives band
         // is only painted here. Without this redraw it keeps the last cycled
@@ -252,7 +251,7 @@ pub fn game_pause(state: bool) {
             game_draw_status();
             let level = game.level.load(Ordering::Relaxed);
             let border_value = game.level_border.lock().unwrap()[level as usize];
-            System_Border(border_value);
+            system_border(border_value);
         }
     }
 }
@@ -294,7 +293,7 @@ pub fn do_game_drawer() {
     // Matches the C original's DoGameDrawer order: level and robots (including
     // the flushing toilet) are drawn in GM_TOILET mode; only miner/rope/clock
     // are skipped, so Willy visibly disappears into the toilet during the flush.
-    Level_Drawer();
+    level_drawer();
     robots_drawer();
 
     if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
@@ -334,14 +333,10 @@ pub fn do_draw_clock() {
     }
 
     video_write_large(WIDTH - 60, STATUS as i32, &text[..]);
-    set_do_clock_update(Some(DoNothing));
+    set_do_clock_update(Some(do_nothing));
 }
 
-pub fn DoDrawClock() {
-    do_draw_clock();
-}
-
-pub fn DoPauseTicker() {
+pub fn do_pause_ticker() {
     let game = &*GAME_STATE;
 
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
@@ -350,16 +345,16 @@ pub fn DoPauseTicker() {
     }
 }
 
-pub fn DoPauseDrawer() {
+pub fn do_pause_drawer() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
-        Level_SetBorder();
+        level_set_border();
         video_cycle_colours();
     }
 }
 
-pub fn Game_GameReset() {
+pub fn game_game_reset() {
     let game = &*GAME_STATE;
 
     // gameScoreItems = 0
@@ -368,8 +363,8 @@ pub fn Game_GameReset() {
     // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
     *game.score_clock.lock().unwrap() = [0, 7, 0];
 
-    // DoClockUpdate = DoDrawClock
-    set_do_clock_update(Some(DoDrawClock));
+    // DoClockUpdate = do_draw_clock
+    set_do_clock_update(Some(do_draw_clock));
 
     // gameClockTicks = 0
     game.clock_ticks.store(0, Ordering::Relaxed);
@@ -388,21 +383,21 @@ pub fn Game_GameReset() {
     audio_music(MUS_GAME, music as i32);
 }
 
-pub fn Game_CheatEnabled() {
+pub fn game_cheat_enabled() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         // gameFrame = 1
         game.frame.store(1, Ordering::Relaxed);
 
-        // Ticker = DoNothing; Drawer = DoNothing;
-        set_ticker(Some(DoNothing));
-        set_drawer(Some(DoNothing));
+        // Ticker = do_nothing; Drawer = do_nothing;
+        set_ticker(Some(do_nothing));
+        set_drawer(Some(do_nothing));
 
-        // Game_DrawStatus(); System_Border(levelBorder[gameLevel])
+        // game_draw_status(); system_border(levelBorder[gameLevel])
         game_draw_status();
         let level = game.level.load(Ordering::Relaxed);
-        System_Border(game.level_border.lock().unwrap()[level as usize]);
+        system_border(game.level_border.lock().unwrap()[level as usize]);
     }
 
     // cheatEnabled = 1
@@ -412,11 +407,11 @@ pub fn Game_CheatEnabled() {
     robots_draw_cheat();
 }
 
-pub fn Game_ChangeLevel(dir: i32) {
+pub fn game_change_level(dir: i32) {
     let game = &*GAME_STATE;
 
-    // int level = Level_Dir(dir)
-    let level = Level_Dir(dir as usize);
+    // int level = level_dir(dir)
+    let level = level_dir(dir as usize);
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
     if dir == Direction::Above as i32 {
@@ -480,13 +475,13 @@ pub fn Game_ChangeLevel(dir: i32) {
     game_init_room();
 }
 
-pub fn DoDrawOnce() {
+pub fn do_draw_once() {
     do_game_drawer();
 
-    set_drawer(Some(DoNothing));
+    set_drawer(Some(do_nothing));
 }
 
-pub fn DoGameTicker() {
+pub fn do_game_ticker() {
     let game = &*GAME_STATE;
 
     // Inactivity check: pause after 5 minutes when music stopped
@@ -506,7 +501,7 @@ pub fn DoGameTicker() {
     // Update game frame
     let frame = {
         let mut timer = game.timer.lock().unwrap();
-        Timer_Update(&mut timer)
+        timer_update(&mut timer)
     };
     game.frame.store(frame, Ordering::Relaxed);
     if frame == 0 {
@@ -514,7 +509,7 @@ pub fn DoGameTicker() {
     }
 
     // Tick level and robots
-    Level_Ticker();
+    level_ticker();
     robots_ticker();
 
     // GM_TOILET mode: return to title after timeout
@@ -563,13 +558,13 @@ pub fn DoGameTicker() {
     clock_ticker();
 }
 
-pub fn Game_GotItem() {
+pub fn game_got_item() {
     let game = &*GAME_STATE;
 
     // gameScoreItems++
     *game.score_items.lock().unwrap() += 1;
 
-    // Game_DrawStatus()
+    // game_draw_status()
     game_draw_status();
 
     // if (--itemCount == 0) { gameMode = GM_MARIA; }
@@ -586,7 +581,7 @@ pub fn Game_GotItem() {
     audio_sfx(SFX_ITEM as i32);
 }
 
-// Port of C's ClockTicker; called once per game frame from DoGameTicker.
+// Port of C's ClockTicker; called once per game frame from do_game_ticker.
 pub fn clock_ticker() {
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
@@ -617,7 +612,7 @@ pub fn clock_ticker() {
         }
     }
 
-    set_do_clock_update(Some(DoDrawClock));
+    set_do_clock_update(Some(do_draw_clock));
 }
 
 pub fn game_draw_lives() {
@@ -657,22 +652,17 @@ pub fn game_draw_status() {
 
     video_write_large(6 * 8 + 4, STATUS as i32, &items_text[..]);
 
-    // DoDrawClock();
+    // do_draw_clock();
     do_draw_clock();
 
     // C: GameDrawLives();
     game_draw_lives();
 }
 
-pub fn Game_DrawStatus() {
-    game_draw_status();
-}
-
-#[allow(non_snake_case)]
-pub fn Game_Action() {
+pub fn game_action() {
     set_responder(Some(do_game_responder));
-    // Runs once next frame, inits the room, then installs DoGameTicker and
-    // sets Action = DoNothing. Matches C's `Ticker = Game_InitRoom`.
+    // Runs once next frame, inits the room, then installs do_game_ticker and
+    // sets Action = do_nothing. Matches C's `Ticker = Game_InitRoom`.
     set_ticker(Some(game_init_room));
     set_drawer(Some(do_game_drawer));
 }

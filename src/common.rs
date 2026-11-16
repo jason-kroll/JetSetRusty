@@ -1,5 +1,3 @@
-use crate::levels;
-
 // Screen dimensions, i32 as per original C
 pub const WIDTH: i32 = 256;
 pub const HEIGHT: i32 = 192;
@@ -33,15 +31,8 @@ pub enum Key {
 }
 
 // Globals defined in game_main.rs, re-exported here for convenience
-pub use crate::game_main::{DoNothing, DoQuit, System_Rnd, System_SetPixel};
+pub use crate::game_main::{do_nothing, do_quit, system_rnd, system_set_pixel};
 
 // The screen-state Action entry points, defined in their own modules
+pub use crate::levels::level_set_border;
 pub use crate::title::Title_Action;
-
-pub fn Level_SetBorder() {
-    levels::level_set_border();
-}
-
-pub fn system_set_pixel(pos: i32, ink: i32) {
-    System_SetPixel(pos, ink)
-}

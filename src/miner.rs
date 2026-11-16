@@ -11,11 +11,11 @@ use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
 use crate::die::Die_Action;
 use crate::game::{
-    Direction, GAME_STATE, Game_ChangeLevel, Game_GotItem, GameMode, Miner, NIGHTMAREROOM,
+    Direction, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
 };
-use crate::game_main::{System_IsKey, set_action};
-use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
-use crate::misc::{Timer, Timer_Set, Timer_Update};
+use crate::game_main::{set_action, system_is_key};
+use crate::levels::{TileType, level_erase_item, level_get_tile_ramp, level_get_tile_type};
+use crate::misc::{Timer, timer_set, timer_update};
 use crate::video::{video_draw_miner, video_draw_sprite};
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
@@ -135,12 +135,12 @@ const fn yalign(y: i32) -> i32 {
 }
 
 pub fn miner_set_seq(index: i32, speed: i32) {
-    MINER_TIMER.with(|t| Timer_Set(&mut t.borrow_mut(), 1, speed));
+    MINER_TIMER.with(|t| timer_set(&mut t.borrow_mut(), 1, speed));
     set_miner_seq_index(index as u8);
 }
 
 pub fn miner_inc_seq() {
-    let next = MINER_TIMER.with(|t| Timer_Update(&mut t.borrow_mut())) as u8;
+    let next = MINER_TIMER.with(|t| timer_update(&mut t.borrow_mut())) as u8;
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
@@ -201,11 +201,11 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
         return false;
     }
 
-    if Level_GetTileType(tile as usize) == TileType::Solid {
+    if level_get_tile_type(tile as usize) == TileType::Solid {
         return true;
     }
 
-    if Level_GetTileType((tile + 32) as usize) == TileType::Solid {
+    if level_get_tile_type((tile + 32) as usize) == TileType::Solid {
         return true;
     }
 
@@ -213,7 +213,7 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
         return false;
     }
 
-    if Level_GetTileType((tile + 64) as usize) != TileType::Solid {
+    if level_get_tile_type((tile + 64) as usize) != TileType::Solid {
         return false;
     }
 
@@ -249,10 +249,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if Level_GetTileRamp((miner.tile + 64) as usize) == TileType::RampL {
+            if level_get_tile_ramp((miner.tile + 64) as usize) == TileType::RampL {
                 y = 8;
                 offset = 32;
-            } else if Level_GetTileRamp((miner.tile + 34) as usize) == TileType::RampR {
+            } else if level_get_tile_ramp((miner.tile + 34) as usize) == TileType::RampR {
                 y = -8;
                 offset = -32;
             }
@@ -260,7 +260,7 @@ fn move_left_right() {
 
         if miner.x == 30 * 8 {
             drop(miner);
-            Game_ChangeLevel(Direction::Right as i32);
+            game_change_level(Direction::Right as i32);
             return;
         }
 
@@ -278,10 +278,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if Level_GetTileRamp((miner.tile + 31) as usize) == TileType::RampL {
+            if level_get_tile_ramp((miner.tile + 31) as usize) == TileType::RampL {
                 y = -8;
                 offset = -32;
-            } else if Level_GetTileRamp((miner.tile + 65) as usize) == TileType::RampR {
+            } else if level_get_tile_ramp((miner.tile + 65) as usize) == TileType::RampR {
                 y = 8;
                 offset = 32;
             }
@@ -289,7 +289,7 @@ fn move_left_right() {
 
         if miner.x == 0 {
             drop(miner);
-            Game_ChangeLevel(Direction::Left as i32);
+            game_change_level(Direction::Left as i32);
             return;
         }
 
@@ -305,7 +305,7 @@ fn move_left_right() {
     // Apply vertical movement from ramps
     if miner.y + y < 0 {
         drop(miner);
-        Game_ChangeLevel(Direction::Above as i32);
+        game_change_level(Direction::Above as i32);
         return;
     }
     miner.y += y;
@@ -316,13 +316,13 @@ fn update_dir(convey_dir: i32) {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut dir = 0;
 
-    if (System_IsKey(Key::Left as i32) != 0 || convey_dir == C_LEFT)
+    if (system_is_key(Key::Left as i32) != 0 || convey_dir == C_LEFT)
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         dir += 1;
     }
 
-    if System_IsKey(Key::Right as i32) != 0
+    if system_is_key(Key::Right as i32) != 0
         || convey_dir == C_RIGHT
         || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
     {
@@ -347,7 +347,7 @@ fn update_dir(convey_dir: i32) {
         }
     }
 
-    if System_IsKey(Key::Jump as i32) != 0
+    if system_is_key(Key::Jump as i32) != 0
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         miner.air = 1;
@@ -379,13 +379,13 @@ fn do_miner_ticker() {
 
         if y < 0 {
             drop(miner);
-            Game_ChangeLevel(Direction::Above as i32);
+            game_change_level(Direction::Above as i32);
             return;
         }
 
         let tile = miner.tile + jump_info.tile;
-        if Level_GetTileType(tile as usize) == TileType::Solid
-            || Level_GetTileType((tile + 1) as usize) == TileType::Solid
+        if level_get_tile_type(tile as usize) == TileType::Solid
+            || level_get_tile_type((tile + 1) as usize) == TileType::Solid
         {
             // we need to re-align Willy
             miner.y = (y + 8) & 120;
@@ -424,12 +424,12 @@ fn do_miner_ticker() {
         let tile = miner.tile + 64;
         if tile & 512 != 0 {
             drop(miner);
-            Game_ChangeLevel(Direction::Below as i32);
+            game_change_level(Direction::Below as i32);
             return;
         }
 
-        let type0 = Level_GetTileType(tile as usize);
-        let type1 = Level_GetTileType((tile + 1) as usize);
+        let type0 = level_get_tile_type(tile as usize);
+        let type1 = level_get_tile_type((tile + 1) as usize);
         if type0 == TileType::Harm || type1 == TileType::Harm {
             if miner.air == 1
                 && (type0 as i32 <= TileType::Space as i32
@@ -503,7 +503,7 @@ pub fn miner_ticker() {
     let miner = GAME_STATE.miner.lock().unwrap();
     if miner.y < 0 {
         drop(miner);
-        Game_ChangeLevel(Direction::Above as i32);
+        game_change_level(Direction::Above as i32);
     }
 }
 
@@ -513,10 +513,10 @@ pub fn miner_drawer() {
     let mut align = miner.align;
 
     if miner.air == 0 {
-        if Level_GetTileRamp((miner.tile + 64) as usize) == TileType::RampL {
+        if level_get_tile_ramp((miner.tile + 64) as usize) == TileType::RampL {
             offset = miner.frame << 1;
             align = yalign(offset);
-        } else if Level_GetTileRamp((miner.tile + 65) as usize) == TileType::RampR {
+        } else if level_get_tile_ramp((miner.tile + 65) as usize) == TileType::RampR {
             offset = 6 - (miner.frame << 1);
             align = yalign(offset);
         }
@@ -536,7 +536,7 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if Level_GetTileType(tile as usize) == TileType::Harm {
+        if level_get_tile_type(tile as usize) == TileType::Harm {
             set_action(Some(Die_Action));
             return;
         }
@@ -547,9 +547,9 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if Level_GetTileType(tile as usize) == TileType::Item {
-            Level_EraseItem(tile as usize);
-            Game_GotItem();
+        if level_get_tile_type(tile as usize) == TileType::Item {
+            level_erase_item(tile as usize);
+            game_got_item();
         }
         tile += adj;
         adj ^= 30;
