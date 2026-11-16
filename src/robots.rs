@@ -1274,7 +1274,7 @@ fn do_draw_arrow(robot: &Robot) {
 
 // --- Entry points (called from game.rs / title.rs) ---------------------------
 
-pub fn Robots_Ticker() {
+pub fn robots_ticker() {
     ROBOT_THIS.with(|robots| {
         for robot in robots.borrow_mut().iter_mut() {
             let do_move = robot.do_move;
@@ -1283,7 +1283,7 @@ pub fn Robots_Ticker() {
     });
 }
 
-pub fn Robots_Drawer() {
+pub fn robots_drawer() {
     ROBOT_THIS.with(|robots| {
         for robot in robots.borrow().iter() {
             (robot.do_draw)(robot);
@@ -1291,7 +1291,7 @@ pub fn Robots_Drawer() {
     });
 }
 
-pub fn Robots_Init() {
+pub fn robots_init() {
     ROBOT_THIS.with(|robots| {
         let mut robots = robots.borrow_mut();
         *robots = ROBOT_START[GAME_STATE.level.load(Ordering::Relaxed) as usize];
@@ -1309,7 +1309,7 @@ pub fn Robots_Init() {
     });
 }
 
-pub fn Robots_Flush() {
+pub fn robots_flush() {
     // The Bathroom's toilet (slot 1) switches to its running frames (2 & 3).
     ROBOT_THIS.with(|robots| {
         let robots = &mut robots.borrow_mut()[1];
@@ -1319,7 +1319,7 @@ pub fn Robots_Flush() {
     });
 }
 
-pub fn Robots_DrawCheat() {
+pub fn robots_draw_cheat() {
     // Maria's two colour layers, drawn next to the lives in the status area.
     video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[43][0], 0x7);
     video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[44][0], 0x5);

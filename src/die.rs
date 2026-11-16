@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 
 use crate::game_main::{DoNothing, System_Border};
 use crate::gameover::Gameover_Action;
-use crate::miner::Miner_Restore;
+use crate::miner::miner_restore;
 
 static DIE_BLANK: [u16; 16] = [0; 16];
 thread_local! {
@@ -45,7 +45,7 @@ fn Die_Ticker() {
         0x0,
         0x0,
     );
-    Miner_Restore();
+    miner_restore();
     audio_reduce_music_speed();
     set_action(Some(Game_Action));
 }

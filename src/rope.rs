@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 /// rope.rs - Modernized version with proper FFI safety
 use crate::common::{Event, WIDTH};
 use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
@@ -302,7 +300,7 @@ fn rope_drawer_fn() {
     do_rope_drawer();
 }
 
-pub fn Rope_Init() {
+pub fn rope_init() {
     let level = GAME_STATE.level.load(Ordering::Relaxed);
     let (x, ink) = match level {
         QUIRKAFLEEG => (16, 6),

@@ -26,11 +26,11 @@ use crate::game_main::{
 };
 use crate::levels::level_init;
 use crate::miner::{
-    Miner_DrawSeqSprite, Miner_Drawer, Miner_IncSeq, Miner_Save, Miner_SetSeq, Miner_Ticker,
+    miner_draw_seq_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
 };
 use crate::misc::{Timer_Set, Timer_Update};
-use crate::robots::{Robots_DrawCheat, Robots_Drawer, Robots_Flush, Robots_Init, Robots_Ticker};
-use crate::rope::Rope_Init;
+use crate::robots::{robots_draw_cheat, robots_drawer, robots_flush, robots_init, robots_ticker};
+use crate::rope::rope_init;
 use crate::title::Title_Action;
 
 use std::cell::Cell;
@@ -181,8 +181,8 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
 pub fn game_init_room() {
     level_init();
-    Robots_Init();
-    Rope_Init();
+    robots_init();
+    rope_init();
 
     let game = &*GAME_STATE;
     let current_level = game.level.load(Ordering::Relaxed);
@@ -191,7 +191,7 @@ pub fn game_init_room() {
     let border_value = game.level_border.lock().unwrap()[current_level as usize];
     System_Border(border_value);
 
-    Miner_Save();
+    miner_save();
 
     // Write to GAME_STATE
     game.miner_attr_split.store(6, Ordering::Relaxed);
@@ -295,7 +295,7 @@ pub fn do_game_drawer() {
     // the flushing toilet) are drawn in GM_TOILET mode; only miner/rope/clock
     // are skipped, so Willy visibly disappears into the toilet during the flush.
     Level_Drawer();
-    Robots_Drawer();
+    robots_drawer();
 
     if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
         game_draw_lives();
@@ -305,7 +305,7 @@ pub fn do_game_drawer() {
         return;
     }
 
-    Miner_Drawer();
+    miner_drawer();
 
     if let Some(func) = rope::rope_drawer() {
         func();
@@ -377,8 +377,8 @@ pub fn Game_GameReset() {
     // gamePaused = 0
     game.game_paused.store(0, Ordering::Relaxed);
 
-    // Miner_SetSeq(0, 20)
-    Miner_SetSeq(0, 20);
+    // miner_set_seq(0, 20)
+    miner_set_seq(0, 20);
 
     // gameLives = 7
     game.lives.store(7, Ordering::Relaxed);
@@ -408,8 +408,8 @@ pub fn Game_CheatEnabled() {
     // cheatEnabled = 1
     game.cheat_enabled.store(true, Ordering::Relaxed);
 
-    // Robots_DrawCheat()
-    Robots_DrawCheat();
+    // robots_draw_cheat()
+    robots_draw_cheat();
 }
 
 pub fn Game_ChangeLevel(dir: i32) {
@@ -434,7 +434,7 @@ pub fn Game_ChangeLevel(dir: i32) {
     game.level.store(level, Ordering::Relaxed);
 
     // Update minerWilly based on direction
-    // Scoped so the miner guard drops before game_init_room() (Miner_Save
+    // Scoped so the miner guard drops before game_init_room() (miner_save
     // locks GAME_STATE.miner itself).
     {
         let mut miner = game.miner.lock().unwrap();
@@ -500,7 +500,7 @@ pub fn DoGameTicker() {
 
     // Miner animation
     if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
-        Miner_IncSeq();
+        miner_inc_seq();
     }
 
     // Update game frame
@@ -515,7 +515,7 @@ pub fn DoGameTicker() {
 
     // Tick level and robots
     Level_Ticker();
-    Robots_Ticker();
+    robots_ticker();
 
     // GM_TOILET mode: return to title after timeout
     if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
@@ -527,7 +527,7 @@ pub fn DoGameTicker() {
     }
 
     // Tick miner
-    Miner_Ticker();
+    miner_ticker();
 
     // GM_RUNNING mode
     if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
@@ -537,7 +537,7 @@ pub fn DoGameTicker() {
         if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
             drop(miner);
             game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
-            Robots_Flush();
+            robots_flush();
             game.clock_ticks.store(0, Ordering::Relaxed);
         }
         return;
@@ -626,7 +626,7 @@ pub fn game_draw_lives() {
 
     for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;
-        Miner_DrawSeqSprite(pos as i32, 0x0, ink);
+        miner_draw_seq_sprite(pos as i32, 0x0, ink);
     }
 }
 

@@ -5,8 +5,8 @@ use crate::game_main::{
     game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
 use crate::levels::{Level_ItemCount, Level_RestoreItems};
-use crate::miner::Miner_Init;
-use crate::robots::Robots_DrawCheat;
+use crate::miner::miner_init;
+use crate::robots::robots_draw_cheat;
 use crate::video::{tile_2_pixel, video_pixel_fill};
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
@@ -82,10 +82,10 @@ fn game_start() {
     }
     Level_RestoreItems();
 
-    Miner_Init();
+    miner_init();
 
     if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
-        Robots_DrawCheat();
+        robots_draw_cheat();
     }
 
     GAME_STATE

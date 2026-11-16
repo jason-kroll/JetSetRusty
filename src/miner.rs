@@ -134,17 +134,17 @@ const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
-pub fn Miner_SetSeq(index: i32, speed: i32) {
+pub fn miner_set_seq(index: i32, speed: i32) {
     MINER_TIMER.with(|t| Timer_Set(&mut t.borrow_mut(), 1, speed));
     set_miner_seq_index(index as u8);
 }
 
-pub fn Miner_IncSeq() {
+pub fn miner_inc_seq() {
     let next = MINER_TIMER.with(|t| Timer_Update(&mut t.borrow_mut())) as u8;
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
-pub fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
+pub fn miner_draw_seq_sprite(pos: i32, paper: u8, ink: u8) {
     let row = MINER_SEQUENCE[miner_seq_index() as usize];
     video_draw_sprite(pos, &MINER_SPRITE[row], paper, ink);
 }
@@ -154,7 +154,7 @@ thread_local! {
     static MINER_STORE: RefCell<Miner> = const { RefCell::new(MINER_ZERO) };
 }
 
-pub fn Miner_Restore() {
+pub fn miner_restore() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     MINER_STORE.with(|s| {
         let s = s.borrow();
@@ -172,7 +172,7 @@ pub fn Miner_Restore() {
     GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 }
 
-pub fn Miner_Save() {
+pub fn miner_save() {
     let miner = GAME_STATE.miner.lock().unwrap();
     MINER_STORE.with(|s| {
         let mut s = s.borrow_mut();
@@ -497,7 +497,7 @@ fn do_miner_ticker() {
     }
 }
 
-pub fn Miner_Ticker() {
+pub fn miner_ticker() {
     do_miner_ticker();
 
     let miner = GAME_STATE.miner.lock().unwrap();
@@ -507,7 +507,7 @@ pub fn Miner_Ticker() {
     }
 }
 
-pub fn Miner_Drawer() {
+pub fn miner_drawer() {
     let miner = GAME_STATE.miner.lock().unwrap();
     let mut offset = 0;
     let mut align = miner.align;
@@ -556,7 +556,7 @@ pub fn Miner_Drawer() {
     }
 }
 
-pub fn Miner_Init() {
+pub fn miner_init() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     miner.x = 20 * 8;
     miner.y = 13 * 8;
@@ -567,5 +567,5 @@ pub fn Miner_Init() {
     GAME_STATE.miner_air.store(0, Ordering::Relaxed);
     drop(miner);
 
-    Miner_Save();
+    miner_save();
 }
