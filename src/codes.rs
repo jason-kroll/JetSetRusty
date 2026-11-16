@@ -26,23 +26,19 @@ pub const KEY_4: i32 = K4 as i32;
 pub const KEY_ENTER: i32 = Enter as i32;
 pub const KEY_ESCAPE: i32 = Escape as i32;
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn DoCodesResponder() {
+pub fn DoCodesResponder() {
     CODES_STATE.lock().unwrap().do_codes_responder();
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn DoCodesTicker() {
+pub fn DoCodesTicker() {
     CODES_STATE.lock().unwrap().do_codes_ticker();
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn DoCodesDrawer() {
+pub fn DoCodesDrawer() {
     CODES_STATE.lock().unwrap().do_codes_drawer();
 }
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Codes_Action() {
+pub fn Codes_Action() {
     CODES_STATE.lock().unwrap().codes_action();
 }
 

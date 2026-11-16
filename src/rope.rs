@@ -281,11 +281,11 @@ fn do_rope_ticker() {
     }
 }
 
-unsafe extern "C" fn rope_ticker_fn() {
+fn rope_ticker_fn() {
     do_rope_ticker();
 }
 
-unsafe extern "C" fn rope_drawer_fn() {
+fn rope_drawer_fn() {
     do_rope_drawer();
 }
 
@@ -320,7 +320,7 @@ pub extern "C" fn Rope_Init() {
     }
 }
 
-extern "C" fn DoNothing() {}
+fn DoNothing() {}
 
 unsafe extern "C" {
     fn Level_Dir(dir: i32) -> i32;

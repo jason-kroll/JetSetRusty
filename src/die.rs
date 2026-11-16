@@ -7,10 +7,11 @@ use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 use std::sync::atomic::Ordering;
 
+use crate::game_main::DoNothing;
+use crate::gameover::Gameover_Action;
+
 unsafe extern "C" {
     static mut audioPanX: i32;
-    fn Gameover_Action();
-    fn DoNothing();
     fn Miner_Restore();
     fn System_Border(colour: i32);
 }
@@ -18,13 +19,11 @@ unsafe extern "C" {
 static dieBlank: [u16; 16] = [0; 16];
 static mut dieLevel: i32 = 0;
 
-#[unsafe(no_mangle)]
-extern "C" fn Die_Drawer() {
+fn Die_Drawer() {
     Video_PixelInkFill(0, 128 * WIDTH, unsafe { dieLevel >> 1 } as u8);
 }
 
-#[unsafe(no_mangle)]
-extern "C" fn Die_Ticker() {
+fn Die_Ticker() {
     unsafe {
         dieLevel -= 1;
         if dieLevel > 0 {
@@ -48,8 +47,7 @@ extern "C" fn Die_Ticker() {
     }
 }
 
-#[unsafe(no_mangle)]
-extern "C" fn Die_Init() {
+fn Die_Init() {
     unsafe {
         GAME_STATE.lives.fetch_sub(1, Ordering::Relaxed);
         dieLevel = 15;
@@ -63,8 +61,7 @@ extern "C" fn Die_Init() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Die_Action() {
+pub fn Die_Action() {
     set_responder(Some(DoNothing));
     set_ticker(Some(Die_Init));
     set_drawer(Some(Die_Drawer));

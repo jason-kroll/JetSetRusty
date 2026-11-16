@@ -49,8 +49,9 @@ const SDL_KEYS: [sdl::SDL_Keycode; 36] = [
     sdl::SDL_KeyCode::SDLK_t as i32,
 ];
 
+use crate::loader::Loader_Action;
+
 unsafe extern "C" {
-    fn Loader_Action();
     fn Audio_Output(output: *mut i16);
     fn Audio_Init();
     fn rand() -> i32;
@@ -137,11 +138,9 @@ pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
 // ---- Exported C-facing functions --------------------------------------------
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoNothing() {}
+pub fn DoNothing() {}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoQuit() {
+pub fn DoQuit() {
     GAME_RUNNING.store(false, Relaxed);
     // Setting these to None is equivalent to DoNothing — fire() is a no-op on None.
     set_drawer(None);
@@ -216,7 +215,7 @@ fn present_frame(surface: &sdl::SDL_Surface) {
 // Call an Event's function pointer if it is set.
 fn fire(event: Event) {
     if let Some(f) = event {
-        unsafe { f() };
+        f();
     }
 }
 

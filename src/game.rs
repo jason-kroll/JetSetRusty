@@ -56,7 +56,7 @@ pub const THEBEACH: i32 = 57;
 const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
 // Static callback variable(s)
-pub static mut DO_CLOCK_UPDATE: Option<unsafe extern "C" fn() -> ()> = None;
+pub static mut DO_CLOCK_UPDATE: Event = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {
@@ -240,8 +240,7 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // room, then swaps `Ticker` to DoGameTicker and `Action` to DoNothing — that
 // DoNothing handoff is what stops the title's `game_start` from re-firing (and
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
-#[unsafe(no_mangle)]
-pub extern "C" fn game_init_room() {
+pub fn game_init_room() {
     level_init();
     unsafe {
         Robots_Init();
@@ -327,8 +326,7 @@ pub fn game_pause(state: bool) {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn do_game_responder() {
+pub fn do_game_responder() {
     let game = &*GAME_STATE;
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -357,8 +355,7 @@ pub extern "C" fn do_game_responder() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn do_game_drawer() {
+pub fn do_game_drawer() {
     let game = &*GAME_STATE;
 
     if (game.frame.load(Ordering::Relaxed) == 0) {
@@ -419,13 +416,11 @@ pub fn do_draw_clock() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoDrawClock() {
+pub fn DoDrawClock() {
     do_draw_clock();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoPauseTicker() {
+pub fn DoPauseTicker() {
     let game = &*GAME_STATE;
 
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
@@ -434,8 +429,7 @@ pub extern "C" fn DoPauseTicker() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoPauseDrawer() {
+pub fn DoPauseDrawer() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
@@ -580,15 +574,13 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
     game_init_room();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoDrawOnce() {
+pub fn DoDrawOnce() {
     do_game_drawer();
 
     set_drawer(Some(DoNothing));
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn DoGameTicker() {
+pub fn DoGameTicker() {
     let game = &*GAME_STATE;
 
     // Inactivity check: pause after 5 minutes when music stopped
@@ -805,8 +797,7 @@ pub extern "C" fn Game_DrawStatus() {
 }
 
 #[allow(non_snake_case)]
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_Action() {
+pub fn Game_Action() {
     let game = &*GAME_STATE;
     set_responder(Some(do_game_responder));
     // Runs once next frame, inits the room, then installs DoGameTicker and

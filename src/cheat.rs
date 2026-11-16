@@ -16,8 +16,7 @@ static CHEAT_CODE: &[u8] = b"writetyper";
 #[allow(non_upper_case_globals)]
 pub static mut Cheat_Responder: Event = Some(cheat_disabled);
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Cheat_Enabled() {
+pub fn Cheat_Enabled() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
@@ -52,7 +51,7 @@ pub extern "C" fn Cheat_Enabled() {
     set_action(Some(game_init_room));
 }
 
-pub extern "C" fn cheat_disabled() {
+pub fn cheat_disabled() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 
     let miner = GAME_STATE.miner.lock().unwrap();

@@ -5,12 +5,13 @@ use crate::video::video_pixel_fill;
 use std::ptr::addr_of;
 
 // External functions
+use crate::title::Title_Action;
+
 unsafe extern "C" {
     fn System_Border(index: i32);
     fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u8);
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
     fn Video_PixelPaperFill(pos: i32, size: i32, ink: u8);
-    fn Title_Action();
 }
 
 static PLINTH_SPRITE: [u16; 16] = [
@@ -39,7 +40,7 @@ static mut TEXT_OVER: [i8; 18] = [
     b'e' as i8, b' ' as i8, 0x2, 0x0, b'r' as i8, 0,
 ];
 
-unsafe extern "C" fn gameover_drawer() {
+fn gameover_drawer() {
     unsafe {
         if BOOT_TICKS <= 96 {
             Video_DrawSprite(
@@ -60,7 +61,7 @@ unsafe extern "C" fn gameover_drawer() {
     }
 }
 
-unsafe extern "C" fn gameover_ticker() {
+fn gameover_ticker() {
     unsafe {
         let mut c = BOOT_TICKS >> 2;
 
@@ -90,7 +91,7 @@ unsafe extern "C" fn gameover_ticker() {
     }
 }
 
-unsafe extern "C" fn gameover_init() {
+fn gameover_init() {
     unsafe {
         System_Border(0x0);
         video_pixel_fill(0, 128 * WIDTH);
@@ -105,8 +106,7 @@ unsafe extern "C" fn gameover_init() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Gameover_Action() {
+pub fn Gameover_Action() {
     set_responder(Some(DoNothing));
     set_ticker(Some(gameover_init));
     set_drawer(Some(gameover_drawer));

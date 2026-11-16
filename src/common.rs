@@ -7,7 +7,7 @@ pub const WIDTH: i32 = 256;
 pub const HEIGHT: i32 = 192;
 
 // Function pointer type — equivalent to typedef void (*EVENT)(void)
-pub type Event = Option<unsafe extern "C" fn()>;
+pub type Event = Option<fn()>;
 
 // Key codes enum
 #[repr(i32)]
@@ -66,13 +66,8 @@ pub enum Key {
 // Globals defined in game_main.rs, re-exported here for convenience
 pub use crate::game_main::{DoNothing, DoQuit, System_Rnd, System_SetPixel};
 
-// Forward declarations of remaining C functions
-unsafe extern "C" {
-    pub fn Codes_Action();
-    pub fn Title_Action();
-    pub fn Die_Action();
-    pub fn Gameover_Action();
-}
+// The screen-state Action entry points, defined in their own modules
+pub use crate::title::Title_Action;
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Level_SetBorder() {

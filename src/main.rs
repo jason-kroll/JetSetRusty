@@ -1,3 +1,5 @@
+#![allow(non_snake_case)] // C-style names are kept deliberately to match the C original
+
 mod audio;
 mod cheat;
 mod codes;

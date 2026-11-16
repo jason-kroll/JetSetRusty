@@ -20,9 +20,9 @@ unsafe extern "C" {
     fn System_Border(index: i32);
     fn Video_CycleColours() -> i32;
     fn Video_WriteLarge(x: i32, y: i32, text: *const i8);
-    fn DoQuit();
-    fn DoNothing();
 }
+
+use crate::game_main::{DoNothing, DoQuit};
 
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;
@@ -48,7 +48,7 @@ static mut COLOUR_CYCLE: u8 = 0;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
-unsafe extern "C" fn game_start() {
+fn game_start() {
     unsafe {
         video_pixel_fill(128 * WIDTH, 64 * WIDTH);
 
@@ -81,7 +81,7 @@ unsafe extern "C" fn game_start() {
     }
 }
 
-unsafe extern "C" fn do_title_ticker() {
+fn do_title_ticker() {
     unsafe {
         if audioMusicPlaying != 0 {
             if video_flash() != 0 {
@@ -110,7 +110,7 @@ unsafe extern "C" fn do_title_ticker() {
     }
 }
 
-unsafe extern "C" fn do_title_drawer() {
+fn do_title_drawer() {
     unsafe {
         if audioMusicPlaying != 0 {
             for &tile in TITLE_JSW.iter().take(100) {
@@ -132,19 +132,17 @@ unsafe extern "C" fn do_title_drawer() {
     }
 }
 
-unsafe extern "C" fn do_title_responder() {
-    unsafe {
-        if game_input() == Key::Enter as i32 {
-            set_action(Some(game_start));
-        } else if game_input() == Key::Escape as i32 {
-            DoQuit();
-        }
+fn do_title_responder() {
+    if game_input() == Key::Enter as i32 {
+        set_action(Some(game_start));
+    } else if game_input() == Key::Escape as i32 {
+        DoQuit();
     }
 }
 
 // c"" literals forbid the interior nul bytes these control strings carry
 #[allow(clippy::manual_c_str_literals)]
-unsafe extern "C" fn do_title_init() {
+fn do_title_init() {
     unsafe {
         System_Border(0x0);
         video_pixel_fill(0, WIDTH * HEIGHT);
@@ -228,8 +226,7 @@ unsafe extern "C" fn do_title_init() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Title_Action() {
+pub fn Title_Action() {
     set_responder(Some(do_title_responder));
     set_ticker(Some(do_title_init));
     set_drawer(Some(do_title_drawer));

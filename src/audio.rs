@@ -287,15 +287,15 @@ static mut timerMusic: Timer = Timer {
 };
 
 // ---- trampoline functions ---------------------------------------------------
-// These have the `unsafe extern "C" fn()` signature required by Event.
+// Trampolines stored in Event slots (plain fn pointers).
 // CUR_SFX must be set before calling them.
 
 // Sentinel: stored in Channel.do_phase to mark channel as "on".
 // The actual oscillator logic is inlined in Audio_Output's mixing loop.
 
-unsafe extern "C" fn do_phase_fn() {}
+fn do_phase_fn() {}
 
-unsafe extern "C" fn sfx_off_trampoline() {
+fn sfx_off_trampoline() {
     let i = unsafe { CUR_SFX };
     unsafe {
         AUDIO_SFX[i].do_sfx = None;
@@ -306,7 +306,7 @@ unsafe extern "C" fn sfx_off_trampoline() {
     }
 }
 
-unsafe extern "C" fn sfx_play_trampoline() {
+fn sfx_play_trampoline() {
     let i = unsafe { CUR_SFX };
     unsafe {
         let pitch = SFX_PITCH[AUDIO_SFX[i].pitch_table][AUDIO_SFX[i].pitch_idx] as usize;
@@ -322,7 +322,7 @@ unsafe extern "C" fn sfx_play_trampoline() {
     }
 }
 
-unsafe extern "C" fn sfx_willy_trampoline() {
+fn sfx_willy_trampoline() {
     let i = unsafe { CUR_SFX };
     unsafe {
         let ch = AUDIO_SFX[i].channel;
@@ -333,7 +333,7 @@ unsafe extern "C" fn sfx_willy_trampoline() {
     }
 }
 
-unsafe extern "C" fn sfx_on_trampoline() {
+fn sfx_on_trampoline() {
     let i = unsafe { CUR_SFX };
     unsafe {
         let ch = AUDIO_SFX[i].channel;

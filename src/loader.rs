@@ -3,11 +3,12 @@ use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{set_action, set_drawer, set_responder, set_ticker, video_flash};
 use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_text_width};
 
+use crate::codes::Codes_Action;
+use crate::game_main::DoNothing;
+use crate::title::Title_Action;
+
 unsafe extern "C" {
-    fn DoNothing();
     fn System_Border(x: i32);
-    fn Codes_Action();
-    fn Title_Action();
 }
 
 // MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2 (from audio.h enum order)
@@ -17,11 +18,11 @@ static mut LOADER_TICKS: u32 = 0;
 // \x01\x07 = set paper 7, \x02\x02 = set ink 2 (colors flip with videoFlash)
 static mut LOADER_TEXT: [u8; 25] = *b"\x01\x07\x02\x02JetSet Willy Loading\0";
 
-extern "C" fn do_loader_responder() {
+fn do_loader_responder() {
     set_action(Some(Title_Action))
 }
 
-extern "C" fn do_loader_ticker() {
+fn do_loader_ticker() {
     unsafe {
         // Use raw pointers to avoid static_mut_refs lint (Rust 2024)
         let text = (&raw mut LOADER_TEXT).cast::<u8>();
@@ -40,11 +41,11 @@ extern "C" fn do_loader_ticker() {
     }
 }
 
-extern "C" fn do_loader_drawer3() {
+fn do_loader_drawer3() {
     Video_WriteLarge(6 * 8, 11 * 8, (&raw const LOADER_TEXT).cast::<i8>());
 }
 
-extern "C" fn do_loader_drawer2() {
+fn do_loader_drawer2() {
     unsafe {
         if audioMusicPlaying != 0 {
             return;
@@ -71,7 +72,7 @@ extern "C" fn do_loader_drawer2() {
     }
 }
 
-extern "C" fn do_loader_drawer1() {
+fn do_loader_drawer1() {
     unsafe {
         System_Border(0x1);
         Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1);
@@ -94,9 +95,7 @@ extern "C" fn do_loader_drawer1() {
     }
 }
 
-// game_main.c initializes `Action = Loader_Action` by symbol name, so no_mangle is required.
-#[unsafe(no_mangle)]
-pub extern "C" fn Loader_Action() {
+pub fn Loader_Action() {
     set_drawer(Some(do_loader_drawer1));
     set_action(Some(DoNothing));
 }
