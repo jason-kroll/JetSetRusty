@@ -57,8 +57,6 @@ const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
 // Static callback variable(s)
 pub static mut DO_CLOCK_UPDATE: Option<unsafe extern "C" fn() -> ()> = None;
-pub static mut ROPE_DRAWER: Option<extern "C" fn() -> ()> = None;
-pub static mut ROPE_TICKER: Option<extern "C" fn() -> ()> = None;
 
 // Probably a lot of functions go here!
 unsafe extern "C" {

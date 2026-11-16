@@ -58,81 +58,55 @@ unsafe extern "C" {
     fn time(t: *mut i64) -> i64;
 }
 
-// ---- Exported globals -------------------------------------------------------
+// ---- Dispatcher state -------------------------------------------------------
+// The four Event slots plus gameInput/videoFlash. All are main-thread only
+// (the SDL audio callback never touches them), so thread-local Cells are
+// sound and need no unsafe. This replaces the old #[no_mangle] static mut
+// globals from the C port.
+thread_local! {
+    static ACTION: Cell<Event> = const { Cell::new(Some(Loader_Action)) };
+    static RESPONDER: Cell<Event> = const { Cell::new(None) };
+    static TICKER: Cell<Event> = const { Cell::new(None) };
+    static DRAWER: Cell<Event> = const { Cell::new(None) };
+    static GAME_INPUT: Cell<i32> = const { Cell::new(Key::None as i32) };
+    static VIDEO_FLASH: Cell<i32> = const { Cell::new(0) };
+}
 
-#[unsafe(no_mangle)]
-pub static mut Action: Event = Some(Loader_Action);
-
-#[unsafe(no_mangle)]
-pub static mut Responder: Event = None;
-
-#[unsafe(no_mangle)]
-pub static mut Ticker: Event = None;
-
-#[unsafe(no_mangle)]
-pub static mut Drawer: Event = None;
-
-#[unsafe(no_mangle)]
-pub static mut DoClockUpdate: Event = None;
-
-#[unsafe(no_mangle)]
-pub static mut gameInput: i32 = Key::None as i32;
-
-#[unsafe(no_mangle)]
-pub static mut videoFlash: i32 = 0;
-
-// Safe accessors for the dispatcher globals. Storage is still `static mut`
-// for now; phase 1 of the C-ABI shed migrates all callers to these accessors,
-// then the final step swaps the storage to thread-local Cells and deletes
-// the statics (removing these allows). The allows are only for the commits
-// in between, before every caller has migrated.
-#[allow(dead_code)]
 pub(crate) fn set_action(f: Event) {
-    unsafe { Action = f };
+    ACTION.with(|c| c.set(f));
 }
-#[allow(dead_code)]
 pub(crate) fn action() -> Event {
-    unsafe { Action }
+    ACTION.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn set_responder(f: Event) {
-    unsafe { Responder = f };
+    RESPONDER.with(|c| c.set(f));
 }
-#[allow(dead_code)]
 pub(crate) fn responder() -> Event {
-    unsafe { Responder }
+    RESPONDER.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn set_ticker(f: Event) {
-    unsafe { Ticker = f };
+    TICKER.with(|c| c.set(f));
 }
-#[allow(dead_code)]
 pub(crate) fn ticker() -> Event {
-    unsafe { Ticker }
+    TICKER.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn set_drawer(f: Event) {
-    unsafe { Drawer = f };
+    DRAWER.with(|c| c.set(f));
 }
-#[allow(dead_code)]
 pub(crate) fn drawer() -> Event {
-    unsafe { Drawer }
+    DRAWER.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn set_game_input(key: i32) {
-    unsafe { gameInput = key };
+    GAME_INPUT.with(|c| c.set(key));
 }
-#[allow(dead_code)]
 pub(crate) fn game_input() -> i32 {
-    unsafe { gameInput }
+    GAME_INPUT.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn video_flash() -> i32 {
-    unsafe { videoFlash }
+    VIDEO_FLASH.with(Cell::get)
 }
-#[allow(dead_code)]
 pub(crate) fn toggle_video_flash(bit: i32) {
-    unsafe { videoFlash ^= bit };
+    VIDEO_FLASH.with(|c| c.set(c.get() ^ bit));
 }
 
 // ---- Module-private state ---------------------------------------------------
@@ -533,7 +507,7 @@ pub fn run() {
         for _ in 0..frame {
             game_frame(&mut timer_flash, || {
                 if system_get_event() {
-                    Some(unsafe { gameInput })
+                    Some(game_input())
                 } else {
                     None
                 }

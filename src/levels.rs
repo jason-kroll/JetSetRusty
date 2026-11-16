@@ -1,5 +1,6 @@
-use crate::common::{WIDTH, videoFlash};
+use crate::common::WIDTH;
 use crate::game::GAME_STATE;
+use crate::game_main::video_flash;
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 use std::sync::atomic::Ordering;
 
@@ -4996,8 +4997,8 @@ fn do_item(tile: &mut Tile) {
 }
 
 fn do_flash(tile: &mut Tile) {
-    tile.paper[2] = tile.paper[unsafe { videoFlash } as usize];
-    tile.ink[2] = tile.ink[unsafe { videoFlash } as usize];
+    tile.paper[2] = tile.paper[video_flash() as usize];
+    tile.ink[2] = tile.ink[video_flash() as usize];
 }
 
 #[unsafe(no_mangle)]
