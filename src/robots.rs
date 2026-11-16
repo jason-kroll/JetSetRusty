@@ -16,6 +16,7 @@ use crate::audio::{Audio_Sfx, SFX_ARROW, audioPanX};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
 use crate::video::{Video_DrawArrow, Video_DrawRobot, Video_DrawSprite};
+use std::cell::RefCell;
 use std::sync::atomic::Ordering;
 
 // C `POS(x, y)`: tile column x, pixel row y → videoPixel buffer offset.
@@ -1130,7 +1131,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
 // Live robot state for the current room (C `robotThis[8]`). Private to this
 // module; the C `curRobot` cursor has no equivalent — handlers receive their
 // robot as a parameter instead.
-static mut ROBOT_THIS: [Robot; 8] = [NOROBOT; 8];
+thread_local! {
+    static ROBOT_THIS: RefCell<[Robot; 8]> = const { RefCell::new([NOROBOT; 8]) };
+}
 
 // --- Movement handlers ------------------------------------------------------
 // Horizontal walkers animate through fIndex 0..=3 (facing left) or 4..=7
@@ -1277,37 +1280,28 @@ fn do_draw_arrow(robot: &Robot) {
     }
 }
 
-// --- C-ABI entry points (called from game.c / game.rs / title.rs) ------------
+// --- Entry points (called from game.rs / title.rs) ---------------------------
 
-// `&mut *(&raw mut ROBOT_THIS)` is the Rust-2024 workaround for taking
-// references to a `static mut`. clippy::deref_addrof wants to "simplify" it to
-// `&mut ROBOT_THIS`, which the deny-by-default `static_mut_refs` lint rejects —
-// and `cargo clippy --fix` will happily apply it and break the build. The
-// pattern is deliberate; do not let clippy touch it.
-
-#[allow(clippy::deref_addrof)]
 pub fn Robots_Ticker() {
-    unsafe {
-        for robot in &mut *(&raw mut ROBOT_THIS) {
+    ROBOT_THIS.with(|robots| {
+        for robot in robots.borrow_mut().iter_mut() {
             let do_move = robot.do_move;
             do_move(robot);
         }
-    }
+    });
 }
 
-#[allow(clippy::deref_addrof)]
 pub fn Robots_Drawer() {
-    unsafe {
-        for robot in &*(&raw const ROBOT_THIS) {
+    ROBOT_THIS.with(|robots| {
+        for robot in robots.borrow().iter() {
             (robot.do_draw)(robot);
         }
-    }
+    });
 }
 
-#[allow(clippy::deref_addrof)]
 pub fn Robots_Init() {
-    unsafe {
-        let robots = &mut *(&raw mut ROBOT_THIS);
+    ROBOT_THIS.with(|robots| {
+        let mut robots = robots.borrow_mut();
         *robots = ROBOT_START[GAME_STATE.level.load(Ordering::Relaxed) as usize];
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
@@ -1320,18 +1314,17 @@ pub fn Robots_Init() {
                 robot.do_draw = do_draw_nothing;
             }
         }
-    }
+    });
 }
 
-#[allow(clippy::deref_addrof)]
 pub fn Robots_Flush() {
     // The Bathroom's toilet (slot 1) switches to its running frames (2 & 3).
-    unsafe {
-        let robots = &mut *(&raw mut ROBOT_THIS);
-        robots[1].f_mask = 0b011;
-        robots[1].f_index = 2;
-        robots[1].f_update = 0; // slow down the animation
-    }
+    ROBOT_THIS.with(|robots| {
+        let robots = &mut robots.borrow_mut()[1];
+        robots.f_mask = 0b011;
+        robots.f_index = 2;
+        robots.f_update = 0; // slow down the animation
+    });
 }
 
 pub fn Robots_DrawCheat() {
