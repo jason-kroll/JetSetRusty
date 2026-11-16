@@ -35,7 +35,7 @@
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
     SAMPLERATE, TICKRATE, audio_init, audio_output, border_index, game_frame, game_running,
-    map_keycode, seed_rng, set_replay_held, set_replay_mode, with_framebuffer,
+    map_keycode, seed_rng, set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
 use crate::misc::{Timer, Timer_Set, videoColour};
 use sdl2::sys::SDL_KeyCode as K;
@@ -223,7 +223,7 @@ pub fn main(args: &[String]) -> i32 {
                             miner.tile &= !31;
                         }
                         GAME_STATE.level.store(*v, Relaxed);
-                        unsafe { crate::game_main::Ticker = Some(crate::game::game_init_room) };
+                        set_ticker(Some(crate::game::game_init_room));
                     }
                     SetOp::Mode(m) => GAME_STATE.mode.store(*m, Relaxed),
                     SetOp::Miner(x, y) => {
