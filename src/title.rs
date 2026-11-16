@@ -120,7 +120,7 @@ fn do_title_ticker() {
         return;
     }
 
-    set_action(Some(Title_Action));
+    set_action(Some(title_action));
 }
 
 fn do_title_drawer() {
@@ -224,7 +224,7 @@ fn do_title_init() {
     set_ticker(Some(do_title_ticker));
 }
 
-pub fn Title_Action() {
+pub fn title_action() {
     set_responder(Some(do_title_responder));
     set_ticker(Some(do_title_init));
     set_drawer(Some(do_title_drawer));

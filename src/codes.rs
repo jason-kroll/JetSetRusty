@@ -2,7 +2,7 @@
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{HEIGHT, WIDTH};
-use crate::common::{Title_Action, do_nothing, do_quit, system_rnd};
+use crate::common::{do_nothing, do_quit, system_rnd, title_action};
 use crate::game_main::{
     game_input, set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
 };
@@ -32,7 +32,7 @@ pub fn do_codes_drawer() {
     CODES_STATE.lock().unwrap().do_codes_drawer();
 }
 
-pub fn Codes_Action() {
+pub fn codes_action() {
     CODES_STATE.lock().unwrap().codes_action();
 }
 
@@ -139,7 +139,7 @@ impl CodesState {
                     | self.code_val(3, 0);
 
                 if entered == self.needed {
-                    set_action(Some(Title_Action));
+                    set_action(Some(title_action));
                     return;
                 }
 

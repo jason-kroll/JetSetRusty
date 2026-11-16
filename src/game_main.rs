@@ -58,7 +58,7 @@ static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
 });
 
 use crate::audio::{audio_init, audio_output};
-use crate::loader::Loader_Action;
+use crate::loader::loader_action;
 
 // libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
 // generator, pinned to libc's exact sequence by tests there), so no libc FFI
@@ -70,7 +70,7 @@ use crate::loader::Loader_Action;
 // sound and need no unsafe. This replaces the old #[no_mangle] static mut
 // globals from the C port.
 thread_local! {
-    static ACTION: Cell<Event> = const { Cell::new(Some(Loader_Action)) };
+    static ACTION: Cell<Event> = const { Cell::new(Some(loader_action)) };
     static RESPONDER: Cell<Event> = const { Cell::new(None) };
     static TICKER: Cell<Event> = const { Cell::new(None) };
     static DRAWER: Cell<Event> = const { Cell::new(None) };

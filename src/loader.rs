@@ -5,9 +5,9 @@ use crate::game_main::{
 };
 use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
-use crate::codes::Codes_Action;
+use crate::codes::codes_action;
 use crate::game_main::do_nothing;
-use crate::title::Title_Action;
+use crate::title::title_action;
 use std::cell::{Cell, RefCell};
 
 // MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2 (from audio.h enum order)
@@ -21,7 +21,7 @@ thread_local! {
 }
 
 fn do_loader_responder() {
-    set_action(Some(Title_Action))
+    set_action(Some(title_action))
 }
 
 fn do_loader_ticker() {
@@ -38,7 +38,7 @@ fn do_loader_ticker() {
     // Matches C's post-increment: transition when value was 256
     let ticks = LOADER_TICKS.with(Cell::get);
     if ticks == 256 {
-        set_action(Some(Codes_Action));
+        set_action(Some(codes_action));
     }
     LOADER_TICKS.with(|c| c.set(ticks + 1));
 }
@@ -96,7 +96,7 @@ fn do_loader_drawer1() {
     set_drawer(Some(do_loader_drawer2));
 }
 
-pub fn Loader_Action() {
+pub fn loader_action() {
     set_drawer(Some(do_loader_drawer1));
     set_action(Some(do_nothing));
 }

@@ -20,7 +20,7 @@ fn set_cheat_responder(f: Event) {
     CHEAT_RESPONDER.with(|c| c.set(f));
 }
 
-pub fn Cheat_Enabled() {
+pub fn cheat_enabled() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
@@ -74,5 +74,5 @@ pub fn cheat_disabled() {
 
     game_cheat_enabled();
 
-    set_cheat_responder(Some(Cheat_Enabled));
+    set_cheat_responder(Some(cheat_enabled));
 }

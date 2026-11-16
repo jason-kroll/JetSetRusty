@@ -9,7 +9,7 @@
 
 use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
-use crate::die::Die_Action;
+use crate::die::die_action;
 use crate::game::{
     Direction, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
 };
@@ -438,14 +438,14 @@ fn do_miner_ticker() {
                 drop(miner);
                 move_left_right();
             } else {
-                set_action(Some(Die_Action));
+                set_action(Some(die_action));
             }
             return;
         }
 
         if type0 as i32 > TileType::Space as i32 || type1 as i32 > TileType::Space as i32 {
             if miner.air >= 12 {
-                set_action(Some(Die_Action));
+                set_action(Some(die_action));
                 return;
             }
 
@@ -529,7 +529,7 @@ pub fn miner_drawer() {
         GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
     ) != 0
     {
-        set_action(Some(Die_Action));
+        set_action(Some(die_action));
         return;
     }
 
@@ -537,7 +537,7 @@ pub fn miner_drawer() {
     let mut adj = 1;
     for _ in 0..align {
         if level_get_tile_type(tile as usize) == TileType::Harm {
-            set_action(Some(Die_Action));
+            set_action(Some(die_action));
             return;
         }
         tile += adj;

@@ -7,7 +7,7 @@ use crate::video::video_pixel_fill;
 use std::cell::{Cell, RefCell};
 
 // External functions
-use crate::title::Title_Action;
+use crate::title::title_action;
 use crate::video::{video_draw_sprite, video_pixel_paper_fill, video_write_large};
 
 static PLINTH_SPRITE: [u16; 16] = [
@@ -89,7 +89,7 @@ fn gameover_ticker() {
         return;
     }
 
-    set_action(Some(Title_Action));
+    set_action(Some(title_action));
 }
 
 fn gameover_init() {
@@ -105,7 +105,7 @@ fn gameover_init() {
     set_ticker(Some(gameover_ticker));
 }
 
-pub fn Gameover_Action() {
+pub fn gameover_action() {
     set_responder(Some(do_nothing));
     set_ticker(Some(gameover_init));
     set_drawer(Some(gameover_drawer));

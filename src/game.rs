@@ -2,7 +2,7 @@
 use crate::audio::{MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_play, audio_sfx};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
-use crate::gameover::Gameover_Action;
+use crate::gameover::gameover_action;
 use crate::levels::{level_dir, level_drawer, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
@@ -30,7 +30,7 @@ use crate::miner::{
 use crate::misc::{timer_set, timer_update};
 use crate::robots::{robots_draw_cheat, robots_drawer, robots_flush, robots_init, robots_ticker};
 use crate::rope::rope_init;
-use crate::title::Title_Action;
+use crate::title::title_action;
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
@@ -274,7 +274,7 @@ pub fn do_game_responder() {
             game.music.store(new_music, Ordering::Relaxed);
             audio_play(new_music as i32);
         }
-        x if x == Key::Escape as i32 => set_action(Some(Title_Action)),
+        x if x == Key::Escape as i32 => set_action(Some(title_action)),
         _ => {
             if let Some(handler) = cheat_responder() {
                 handler();
@@ -516,7 +516,7 @@ pub fn do_game_ticker() {
     if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
         let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
         if old_ticks == 256 {
-            set_action(Some(Title_Action));
+            set_action(Some(title_action));
         }
         return;
     }
@@ -605,7 +605,7 @@ pub fn clock_ticker() {
         if clock[1] == 12 {
             clock[2] = 1 - clock[2];
             if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
-                set_action(Some(Gameover_Action));
+                set_action(Some(gameover_action));
             }
         } else if clock[1] == 13 {
             clock[1] = 1;
