@@ -21,7 +21,9 @@ use crate::common::{
     WIDTH,
 };
 
-use crate::game_main::{DoNothing, TICKRATE, set_action, set_drawer, set_responder, set_ticker};
+use crate::game_main::{
+    DoNothing, System_Border, TICKRATE, set_action, set_drawer, set_responder, set_ticker,
+};
 use crate::levels::level_init;
 use crate::miner::{
     Miner_DrawSeqSprite, Miner_Drawer, Miner_IncSeq, Miner_Save, Miner_SetSeq, Miner_Ticker,
@@ -63,11 +65,6 @@ const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 pub static mut DO_CLOCK_UPDATE: Event = None;
 
 // Probably a lot of functions go here!
-unsafe extern "C" {
-
-    fn System_Border(x: i32);
-}
-
 // Enums (from game.h)
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq)]

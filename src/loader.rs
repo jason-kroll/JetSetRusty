@@ -1,15 +1,13 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::common::{HEIGHT, WIDTH};
-use crate::game_main::{set_action, set_drawer, set_responder, set_ticker, video_flash};
+use crate::game_main::{
+    System_Border, set_action, set_drawer, set_responder, set_ticker, video_flash,
+};
 use crate::video::{Video_PixelPaperFill, Video_Write, Video_WriteLarge, video_text_width};
 
 use crate::codes::Codes_Action;
 use crate::game_main::DoNothing;
 use crate::title::Title_Action;
-
-unsafe extern "C" {
-    fn System_Border(x: i32);
-}
 
 // MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2 (from audio.h enum order)
 const MUS_LOADER: i32 = 2;

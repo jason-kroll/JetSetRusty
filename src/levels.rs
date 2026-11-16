@@ -1,12 +1,8 @@
 use crate::common::WIDTH;
 use crate::game::GAME_STATE;
-use crate::game_main::video_flash;
+use crate::game_main::{System_Border, video_flash};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 use std::sync::atomic::Ordering;
-
-unsafe extern "C" {
-    fn System_Border(colour_index: i32); // We'll honour the pondish spelling
-}
 
 const LEVEL_W: usize = 32;
 const LEVEL_HEIGHT: usize = 16;

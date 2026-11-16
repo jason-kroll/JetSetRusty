@@ -146,13 +146,11 @@ pub fn DoQuit() {
     set_ticker(None);
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn System_Rnd() -> i32 {
+pub fn System_Rnd() -> i32 {
     unsafe { rand() }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn System_IsKey(key: i32) -> i32 {
+pub fn System_IsKey(key: i32) -> i32 {
     let sym = SDL_KEYS[key as usize];
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
         return held as i32;
@@ -164,13 +162,11 @@ pub extern "C" fn System_IsKey(key: i32) -> i32 {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn System_SetPixel(pos: i32, index: i32) {
+pub fn System_SetPixel(pos: i32, index: i32) {
     FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos as usize] = index as u8);
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn System_Border(index: i32) {
+pub fn System_Border(index: i32) {
     BORDER_INDEX.store(index as usize, Relaxed);
 }
 

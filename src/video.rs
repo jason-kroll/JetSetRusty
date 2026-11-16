@@ -5,10 +5,6 @@ use crate::common::{HEIGHT, WIDTH, system_set_pixel};
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
-unsafe extern "C" {
-    pub fn System_SetPixel(point: i32, index: i32);
-}
-
 ///////////////
 // From video.h
 

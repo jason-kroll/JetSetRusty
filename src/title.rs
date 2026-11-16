@@ -15,11 +15,7 @@ use crate::game::GameMode;
 
 use crate::video::{Video_CycleColours, Video_Write, Video_WriteLarge};
 
-unsafe extern "C" {
-    fn System_Border(index: i32);
-}
-
-use crate::game_main::{DoNothing, DoQuit};
+use crate::game_main::{DoNothing, DoQuit, System_Border};
 
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;

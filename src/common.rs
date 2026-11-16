@@ -69,8 +69,7 @@ pub use crate::game_main::{DoNothing, DoQuit, System_Rnd, System_SetPixel};
 // The screen-state Action entry points, defined in their own modules
 pub use crate::title::Title_Action;
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn Level_SetBorder() {
+pub fn Level_SetBorder() {
     levels::level_set_border();
 }
 

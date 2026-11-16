@@ -6,15 +6,11 @@ use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{DoNothing, DoQuit, System_Rnd, Title_Action};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
+    System_Border, game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
 
 use crate::video::{video_draw_robot, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
-
-unsafe extern "C" {
-    fn System_Border(index: i32);
-}
 
 static CODES_STATE: Mutex<CodesState> = Mutex::new(CodesState::new());
 
@@ -184,31 +180,29 @@ impl CodesState {
     // c"" literals forbid the interior nul bytes these control strings carry
     #[allow(clippy::manual_c_str_literals)]
     fn codes_action(&mut self) {
-        unsafe {
-            System_Border(0);
-            video_pixel_fill(0, WIDTH * HEIGHT);
-            video_write_large(
-                0,
-                8 * 8,
-                b"\x01\x00\x02\x05Enter Code at grid location     \x00".as_ptr() as *const i8,
-            );
-            video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".as_ptr());
-            video_draw_robot(88 * WIDTH + 2 * 8, CODES_SPRITE[0], 1);
-            video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".as_ptr());
-            video_draw_robot(88 * WIDTH + 5 * 8, CODES_SPRITE[1], 2);
-            video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".as_ptr());
-            video_draw_robot(88 * WIDTH + 8 * 8, CODES_SPRITE[2], 3);
-            video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".as_ptr());
-            video_draw_robot(88 * WIDTH + 11 * 8, CODES_SPRITE[3], 4);
+        System_Border(0);
+        video_pixel_fill(0, WIDTH * HEIGHT);
+        video_write_large(
+            0,
+            8 * 8,
+            b"\x01\x00\x02\x05Enter Code at grid location     \x00".as_ptr() as *const i8,
+        );
+        video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".as_ptr());
+        video_draw_robot(88 * WIDTH + 2 * 8, CODES_SPRITE[0], 1);
+        video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".as_ptr());
+        video_draw_robot(88 * WIDTH + 5 * 8, CODES_SPRITE[1], 2);
+        video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".as_ptr());
+        video_draw_robot(88 * WIDTH + 8 * 8, CODES_SPRITE[2], 3);
+        video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".as_ptr());
+        video_draw_robot(88 * WIDTH + 11 * 8, CODES_SPRITE[3], 4);
 
-            self.get_code();
+        self.get_code();
 
-            set_responder(Some(DoCodesResponder));
-            set_ticker(Some(DoCodesTicker));
-            set_drawer(Some(DoCodesDrawer));
+        set_responder(Some(DoCodesResponder));
+        set_ticker(Some(DoCodesTicker));
+        set_drawer(Some(DoCodesDrawer));
 
-            set_action(Some(DoNothing));
-        }
+        set_action(Some(DoNothing));
     }
 }
 

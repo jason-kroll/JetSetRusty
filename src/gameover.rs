@@ -1,16 +1,14 @@
 use crate::audio::{Audio_Play, Audio_Sfx, MUS_STOP, SFX_GAMEOVER};
 use crate::common::WIDTH;
-use crate::game_main::{DoNothing, set_action, set_drawer, set_responder, set_ticker};
+use crate::game_main::{
+    DoNothing, System_Border, set_action, set_drawer, set_responder, set_ticker,
+};
 use crate::video::video_pixel_fill;
 use std::ptr::addr_of;
 
 // External functions
 use crate::title::Title_Action;
 use crate::video::{Video_DrawSprite, Video_PixelPaperFill, Video_WriteLarge};
-
-unsafe extern "C" {
-    fn System_Border(index: i32);
-}
 
 static PLINTH_SPRITE: [u16; 16] = [
     14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0,

@@ -7,13 +7,12 @@ use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 use std::sync::atomic::Ordering;
 
-use crate::game_main::DoNothing;
+use crate::game_main::{DoNothing, System_Border};
 use crate::gameover::Gameover_Action;
 use crate::miner::Miner_Restore;
 
 unsafe extern "C" {
     static mut audioPanX: i32;
-    fn System_Border(colour: i32);
 }
 
 static dieBlank: [u16; 16] = [0; 16];

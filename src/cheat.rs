@@ -1,13 +1,9 @@
 use crate::common::{Event, Key};
 use crate::game::{GAME_STATE, Game_CheatEnabled, game_init_room, game_pause};
-use crate::game_main::{game_input, set_action};
+use crate::game_main::{System_IsKey, game_input, set_action};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // These will move to game.rs when we port that
-unsafe extern "C" {
-    fn System_IsKey(key: i32) -> i32;
-}
-
 const FIRSTLANDING: i32 = 28;
 
 static CHEAT_CODE: &[u8] = b"writetyper";
@@ -20,13 +16,13 @@ pub fn Cheat_Enabled() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
-        if unsafe { System_IsKey(Key::K1 as i32 + i) } != 0 {
+        if System_IsKey(Key::K1 as i32 + i) != 0 {
             level = i + 1;
             break;
         }
     }
 
-    if unsafe { System_IsKey(Key::Enter as i32) } == 0 {
+    if System_IsKey(Key::Enter as i32) == 0 {
         game_pause(false);
         return;
     }
@@ -35,9 +31,7 @@ pub fn Cheat_Enabled() {
         return;
     }
 
-    if unsafe { System_IsKey(Key::LShift as i32) } != 0
-        || unsafe { System_IsKey(Key::RShift as i32) } != 0
-    {
+    if System_IsKey(Key::LShift as i32) != 0 || System_IsKey(Key::RShift as i32) != 0 {
         level += 30;
     }
 
