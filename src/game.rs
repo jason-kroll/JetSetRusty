@@ -431,8 +431,7 @@ pub fn DoPauseDrawer() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_GameReset() {
+pub fn Game_GameReset() {
     let game = &*GAME_STATE;
 
     // gameScoreItems = 0
@@ -467,8 +466,7 @@ pub extern "C" fn Game_GameReset() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_CheatEnabled() {
+pub fn Game_CheatEnabled() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
@@ -496,8 +494,7 @@ pub extern "C" fn Game_CheatEnabled() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_ChangeLevel(dir: i32) {
+pub fn Game_ChangeLevel(dir: i32) {
     let game = &*GAME_STATE;
 
     // int level = Level_Dir(dir)
@@ -658,8 +655,7 @@ pub fn DoGameTicker() {
     clock_ticker();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_GotItem() {
+pub fn Game_GotItem() {
     let game = &*GAME_STATE;
 
     // gameScoreItems++
@@ -687,8 +683,7 @@ pub extern "C" fn Game_GotItem() {
 }
 
 // Port of C's ClockTicker; called once per game frame from DoGameTicker.
-#[unsafe(no_mangle)]
-pub extern "C" fn clock_ticker() {
+pub fn clock_ticker() {
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -735,8 +730,7 @@ pub fn game_draw_lives() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn GameDrawLives() {
+pub fn GameDrawLives() {
     game_draw_lives();
 }
 
@@ -782,8 +776,7 @@ pub fn game_draw_status() {
     game_draw_lives();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Game_DrawStatus() {
+pub fn Game_DrawStatus() {
     game_draw_status();
 }
 

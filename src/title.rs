@@ -1,6 +1,6 @@
 use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
 use crate::common::{HEIGHT, Key, WIDTH};
-use crate::game::{GAME_STATE, Game_Action};
+use crate::game::{GAME_STATE, Game_Action, Game_DrawStatus, Game_GameReset};
 use crate::game_main::{
     game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
 };
@@ -16,8 +16,6 @@ use crate::game::GameMode;
 use crate::video::{Video_CycleColours, Video_Write, Video_WriteLarge};
 
 unsafe extern "C" {
-    fn Game_GameReset();
-    fn Game_DrawStatus();
     fn System_Border(index: i32);
 }
 
@@ -48,36 +46,34 @@ static mut COLOUR_CYCLE: u8 = 0;
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
 fn game_start() {
-    unsafe {
-        video_pixel_fill(128 * WIDTH, 64 * WIDTH);
+    video_pixel_fill(128 * WIDTH, 64 * WIDTH);
 
-        Game_GameReset();
-        Game_DrawStatus();
+    Game_GameReset();
+    Game_DrawStatus();
 
-        GAME_STATE.level.store(THEBATHROOM, Ordering::Relaxed);
-        let debug_items = crate::game_main::DEBUG_ITEM_COUNT.load(Ordering::Relaxed);
-        if debug_items >= 0 {
-            GAME_STATE.item_count.store(debug_items, Ordering::Relaxed);
-        } else {
-            GAME_STATE
-                .item_count
-                .store(Level_ItemCount(), Ordering::Relaxed);
-        }
-        Level_RestoreItems();
-
-        Miner_Init();
-
-        if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
-            Robots_DrawCheat();
-        }
-
+    GAME_STATE.level.store(THEBATHROOM, Ordering::Relaxed);
+    let debug_items = crate::game_main::DEBUG_ITEM_COUNT.load(Ordering::Relaxed);
+    if debug_items >= 0 {
+        GAME_STATE.item_count.store(debug_items, Ordering::Relaxed);
+    } else {
         GAME_STATE
-            .mode
-            .store(GameMode::Normal as u8, Ordering::Relaxed);
-        GAME_STATE.game_paused.store(0, Ordering::Relaxed);
-
-        Game_Action();
+            .item_count
+            .store(Level_ItemCount(), Ordering::Relaxed);
     }
+    Level_RestoreItems();
+
+    Miner_Init();
+
+    if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
+        Robots_DrawCheat();
+    }
+
+    GAME_STATE
+        .mode
+        .store(GameMode::Normal as u8, Ordering::Relaxed);
+    GAME_STATE.game_paused.store(0, Ordering::Relaxed);
+
+    Game_Action();
 }
 
 fn do_title_ticker() {
