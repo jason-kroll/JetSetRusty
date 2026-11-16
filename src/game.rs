@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![warn(unused_unsafe)]
 use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
@@ -235,9 +236,7 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // restarting the music) every frame. Must be `extern "C"` to fit `Event`.
 pub fn game_init_room() {
     level_init();
-    unsafe {
-        Robots_Init();
-    }
+    Robots_Init();
     Rope_Init();
 
     let game = &*GAME_STATE;
@@ -245,13 +244,9 @@ pub fn game_init_room() {
 
     // System_Border(levelBorder[gameLevel])
     let border_value = game.level_border.lock().unwrap()[current_level as usize];
-    unsafe {
-        System_Border(border_value);
-    }
+    System_Border(border_value);
 
-    unsafe {
-        Miner_Save();
-    }
+    Miner_Save();
 
     // Write to GAME_STATE
     game.miner_attr_split.store(6, Ordering::Relaxed);
@@ -312,9 +307,7 @@ pub fn game_pause(state: bool) {
             game_draw_status();
             let level = game.level.load(Ordering::Relaxed);
             let border_value = game.level_border.lock().unwrap()[level as usize];
-            unsafe {
-                System_Border(border_value);
-            }
+            System_Border(border_value);
         }
     }
 }
@@ -335,14 +328,12 @@ pub fn do_game_responder() {
                 0
             };
             game.music.store(new_music, Ordering::Relaxed);
-            unsafe {
-                Audio_Play(new_music as i32);
-            }
+            Audio_Play(new_music as i32);
         }
         x if x == Key::Escape as i32 => set_action(Some(Title_Action)),
         _ => {
             if let Some(handler) = cheat_responder() {
-                unsafe { handler() };
+                handler();
             }
         }
     }
@@ -358,10 +349,8 @@ pub fn do_game_drawer() {
     // Matches the C original's DoGameDrawer order: level and robots (including
     // the flushing toilet) are drawn in GM_TOILET mode; only miner/rope/clock
     // are skipped, so Willy visibly disappears into the toilet during the flush.
-    unsafe {
-        Level_Drawer();
-        Robots_Drawer();
-    }
+    Level_Drawer();
+    Robots_Drawer();
 
     if (game.music.load(Ordering::Relaxed) == MUS_PLAY as u8) {
         game_draw_lives();
@@ -371,17 +360,13 @@ pub fn do_game_drawer() {
         return;
     }
 
-    unsafe {
-        Miner_Drawer();
+    Miner_Drawer();
 
-        // Remember we've got function-pointer globals, so let's remember this
-        // pattern and not accidentally jump into the variable's storage
-        if let Some(func) = rope::rope_drawer() {
-            func();
-        }
-        if let Some(func) = do_clock_update() {
-            func();
-        }
+    if let Some(func) = rope::rope_drawer() {
+        func();
+    }
+    if let Some(func) = do_clock_update() {
+        func();
     }
 }
 
@@ -424,10 +409,8 @@ pub fn DoPauseDrawer() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
-        unsafe {
-            Level_SetBorder();
-            Video_CycleColours();
-        }
+        Level_SetBorder();
+        Video_CycleColours();
     }
 }
 
@@ -441,9 +424,7 @@ pub fn Game_GameReset() {
     *game.score_clock.lock().unwrap() = [0, 7, 0];
 
     // DoClockUpdate = DoDrawClock
-    unsafe {
-        set_do_clock_update(Some(DoDrawClock));
-    }
+    set_do_clock_update(Some(DoDrawClock));
 
     // gameClockTicks = 0
     game.clock_ticks.store(0, Ordering::Relaxed);
@@ -452,18 +433,14 @@ pub fn Game_GameReset() {
     game.game_paused.store(0, Ordering::Relaxed);
 
     // Miner_SetSeq(0, 20)
-    unsafe {
-        Miner_SetSeq(0, 20);
-    }
+    Miner_SetSeq(0, 20);
 
     // gameLives = 7
     game.lives.store(7, Ordering::Relaxed);
 
     // Audio_Music(MUS_GAME, gameMusic)
     let music = game.music.load(Ordering::Relaxed);
-    unsafe {
-        Audio_Music(MUS_GAME, music as i32);
-    }
+    Audio_Music(MUS_GAME, music as i32);
 }
 
 pub fn Game_CheatEnabled() {
@@ -480,18 +457,14 @@ pub fn Game_CheatEnabled() {
         // Game_DrawStatus(); System_Border(levelBorder[gameLevel])
         game_draw_status();
         let level = game.level.load(Ordering::Relaxed);
-        unsafe {
-            System_Border(game.level_border.lock().unwrap()[level as usize]);
-        }
+        System_Border(game.level_border.lock().unwrap()[level as usize]);
     }
 
     // cheatEnabled = 1
     game.cheat_enabled.store(true, Ordering::Relaxed);
 
     // Robots_DrawCheat()
-    unsafe {
-        Robots_DrawCheat();
-    }
+    Robots_DrawCheat();
 }
 
 pub fn Game_ChangeLevel(dir: i32) {
@@ -582,9 +555,7 @@ pub fn DoGameTicker() {
 
     // Miner animation
     if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
-        unsafe {
-            Miner_IncSeq();
-        }
+        Miner_IncSeq();
     }
 
     // Update game frame
@@ -598,10 +569,8 @@ pub fn DoGameTicker() {
     }
 
     // Tick level and robots
-    unsafe {
-        Level_Ticker();
-        Robots_Ticker();
-    }
+    Level_Ticker();
+    Robots_Ticker();
 
     // GM_TOILET mode: return to title after timeout
     if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
@@ -613,9 +582,7 @@ pub fn DoGameTicker() {
     }
 
     // Tick miner
-    unsafe {
-        Miner_Ticker();
-    }
+    Miner_Ticker();
 
     // GM_RUNNING mode
     if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
@@ -625,9 +592,7 @@ pub fn DoGameTicker() {
         if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
             drop(miner);
             game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
-            unsafe {
-                Robots_Flush();
-            }
+            Robots_Flush();
             game.clock_ticks.store(0, Ordering::Relaxed);
         }
         return;
@@ -645,10 +610,8 @@ pub fn DoGameTicker() {
     }
 
     // Tick rope
-    unsafe {
-        if let Some(f) = rope::rope_ticker() {
-            f();
-        }
+    if let Some(f) = rope::rope_ticker() {
+        f();
     }
 
     // Tick clock
@@ -709,9 +672,7 @@ pub fn clock_ticker() {
         }
     }
 
-    unsafe {
-        set_do_clock_update(Some(DoDrawClock));
-    }
+    set_do_clock_update(Some(DoDrawClock));
 }
 
 pub fn game_draw_lives() {
@@ -720,9 +681,7 @@ pub fn game_draw_lives() {
 
     for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;
-        unsafe {
-            Miner_DrawSeqSprite(pos as i32, 0x0, ink);
-        }
+        Miner_DrawSeqSprite(pos as i32, 0x0, ink);
     }
 }
 
@@ -734,14 +693,10 @@ pub fn game_draw_status() {
     let game = &*GAME_STATE;
 
     // Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
-    unsafe {
-        Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
-    }
+    Video_PixelPaperFill(128 * WIDTH, 64 * WIDTH, 0x0);
 
     // Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
-    unsafe {
-        Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
-    }
+    Video_PixelInkFill(129 * WIDTH, 8 * WIDTH, 0x6);
 
     // Video_WriteLarge(4, STATUS, "\x1\x0\x2\x1" "I" "\x2\x2" "t" "\x2\x3" "e" "\x2\x4" "m" "\x2\x5" "s");
     // Using vec! for the byte string as requested
