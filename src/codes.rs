@@ -65,16 +65,6 @@ impl CodesState {
         (self.code[p] - 1) << s
     }
 
-    // fn draw_cursor(&self, pos: i32) {
-    //     let pixel = 88 * WIDTH + 16 * 8;
-    //     // let mut cell = self.cell;
-    //     cell[1] = self.code[pos as usize] as u8;
-    //     unsafe {
-    //         video_write(pixel + pos * 24, cell.as_ptr() as *const i8);
-    //         video_write(pixel + 8 * WIDTH + pos * 24, cell.as_ptr() as *const i8);
-    //     }
-    // }
-
     fn get_code(&mut self) {
         let mut location: [u8; 5] = [0x02, 0x07, b' ', b' ', 0x00];
 
