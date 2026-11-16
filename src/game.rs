@@ -1,7 +1,7 @@
 #![allow(unused)]
 use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
 use crate::cheat::Cheat_Responder;
-use crate::game_main::gameInput;
+use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
 use crate::levels::{self, Level_Dir, Level_Drawer};
 use crate::misc::Timer;
@@ -21,7 +21,7 @@ use crate::common::{
     WIDTH,
 };
 
-use crate::game_main::{Action, DoNothing, Drawer, Responder, TICKRATE, Ticker};
+use crate::game_main::{DoNothing, TICKRATE, set_action, set_drawer, set_responder, set_ticker};
 use crate::levels::level_init;
 use crate::misc::Timer_Set;
 use crate::rope::Rope_Init;
@@ -276,15 +276,13 @@ pub extern "C" fn game_init_room() {
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
     // Ticker, Drawer, Action: the Event function-pointer globals
-    unsafe {
-        if game.game_paused.load(Ordering::Relaxed) != 0 {
-            Ticker = Some(DoNothing);
-            Drawer = Some(DoDrawOnce);
-        } else {
-            Ticker = Some(DoGameTicker);
-        }
-        Action = Some(DoNothing);
+    if game.game_paused.load(Ordering::Relaxed) != 0 {
+        set_ticker(Some(DoNothing));
+        set_drawer(Some(DoDrawOnce));
+    } else {
+        set_ticker(Some(DoGameTicker));
     }
+    set_action(Some(DoNothing));
 }
 
 pub fn game_pause(state: bool) {
@@ -301,16 +299,16 @@ pub fn game_pause(state: bool) {
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         if (game.cheat_enabled.load(Ordering::Relaxed)) {
-            unsafe { Ticker = Some(DoNothing) };
-            unsafe { Drawer = Some(DoNothing) };
+            set_ticker(Some(DoNothing));
+            set_drawer(Some(DoNothing));
         } else {
-            unsafe { Ticker = Some(DoPauseTicker) };
-            unsafe { Drawer = Some(DoPauseDrawer) };
+            set_ticker(Some(DoPauseTicker));
+            set_drawer(Some(DoPauseDrawer));
         }
         Audio_Play(MUS_STOP);
     } else {
-        unsafe { Ticker = Some(DoGameTicker) };
-        unsafe { Drawer = Some(do_game_drawer) };
+        set_ticker(Some(DoGameTicker));
+        set_drawer(Some(do_game_drawer));
         Audio_Play(game.music.load(Ordering::Relaxed) as i32);
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -337,7 +335,7 @@ pub extern "C" fn do_game_responder() {
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
 
-    let input = unsafe { gameInput };
+    let input = game_input();
 
     match input {
         x if x == Key::Pause as i32 => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
@@ -352,7 +350,7 @@ pub extern "C" fn do_game_responder() {
                 Audio_Play(new_music as i32);
             }
         }
-        x if x == Key::Escape as i32 => unsafe { Action = Some(Title_Action) },
+        x if x == Key::Escape as i32 => set_action(Some(Title_Action)),
         _ => {
             if let Some(handler) = unsafe { Cheat_Responder } {
                 unsafe { handler() };
@@ -495,10 +493,8 @@ pub extern "C" fn Game_CheatEnabled() {
         game.frame.store(1, Ordering::Relaxed);
 
         // Ticker = DoNothing; Drawer = DoNothing;
-        unsafe {
-            Ticker = Some(DoNothing);
-            Drawer = Some(DoNothing);
-        }
+        set_ticker(Some(DoNothing));
+        set_drawer(Some(DoNothing));
 
         // Game_DrawStatus(); System_Border(levelBorder[gameLevel])
         game_draw_status();
@@ -590,9 +586,7 @@ pub extern "C" fn Game_ChangeLevel(dir: i32) {
 pub extern "C" fn DoDrawOnce() {
     do_game_drawer();
 
-    unsafe {
-        Drawer = Some(DoNothing);
-    }
+    set_drawer(Some(DoNothing));
 }
 
 #[unsafe(no_mangle)]
@@ -635,9 +629,7 @@ pub extern "C" fn DoGameTicker() {
     if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
         let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
         if old_ticks == 256 {
-            unsafe {
-                Action = Some(Title_Action);
-            }
+            set_action(Some(Title_Action));
         }
         return;
     }
@@ -738,9 +730,7 @@ pub extern "C" fn clock_ticker() {
         if (clock[1] == 12) {
             clock[2] = 1 - clock[2];
             if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
-                unsafe {
-                    Action = Some(Gameover_Action);
-                }
+                set_action(Some(Gameover_Action));
             }
         } else if (clock[1] == 13) {
             clock[1] = 1;
@@ -820,11 +810,9 @@ pub extern "C" fn Game_DrawStatus() {
 #[unsafe(no_mangle)]
 pub extern "C" fn Game_Action() {
     let game = &*GAME_STATE;
-    unsafe {
-        Responder = Some(do_game_responder);
-        // Runs once next frame, inits the room, then installs DoGameTicker and
-        // sets Action = DoNothing. Matches C's `Ticker = Game_InitRoom`.
-        Ticker = Some(game_init_room);
-        Drawer = Some(do_game_drawer);
-    }
+    set_responder(Some(do_game_responder));
+    // Runs once next frame, inits the room, then installs DoGameTicker and
+    // sets Action = DoNothing. Matches C's `Ticker = Game_InitRoom`.
+    set_ticker(Some(game_init_room));
+    set_drawer(Some(do_game_drawer));
 }
