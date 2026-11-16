@@ -17,6 +17,7 @@ use crate::game_main::{System_IsKey, set_action};
 use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
 use crate::misc::{Timer, Timer_Set, Timer_Update};
 use crate::video::{Video_DrawMiner, Video_DrawSprite};
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
 
 const D_RIGHT: i32 = 0;
@@ -103,15 +104,30 @@ const MINER_ZERO: Miner = Miner {
     jump: 0,
 };
 
-// File-static miner state (private; no C ABI needed).
-static mut MINER_FRAME: usize = 0; // base row into MINER_SPRITE (0 or 8)
-static mut MINER_SEQ_INDEX: u8 = 0;
-static mut MINER_TIMER: Timer = Timer {
-    rate: 0,
-    acc: 0,
-    remainder: 0,
-    divisor: 0,
-};
+// File-local miner state (private; thread-local, no static mut needed).
+thread_local! {
+    static MINER_FRAME: Cell<usize> = const { Cell::new(0) }; // base row into MINER_SPRITE (0 or 8)
+    static MINER_SEQ_INDEX: Cell<u8> = const { Cell::new(0) };
+    static MINER_TIMER: RefCell<Timer> = const { RefCell::new(Timer {
+        rate: 0,
+        acc: 0,
+        remainder: 0,
+        divisor: 0,
+    }) };
+}
+
+fn miner_frame() -> usize {
+    MINER_FRAME.with(Cell::get)
+}
+fn set_miner_frame(v: usize) {
+    MINER_FRAME.with(|c| c.set(v));
+}
+fn miner_seq_index() -> u8 {
+    MINER_SEQ_INDEX.with(Cell::get)
+}
+fn set_miner_seq_index(v: u8) {
+    MINER_SEQ_INDEX.with(|c| c.set(v));
+}
 
 // YALIGN macro from video.h.
 const fn yalign(y: i32) -> i32 {
@@ -119,66 +135,67 @@ const fn yalign(y: i32) -> i32 {
 }
 
 pub fn Miner_SetSeq(index: i32, speed: i32) {
-    unsafe {
-        Timer_Set(&raw mut MINER_TIMER, 1, speed);
-        MINER_SEQ_INDEX = index as u8;
-    }
+    MINER_TIMER.with(|t| unsafe { Timer_Set(&mut *t.borrow_mut(), 1, speed) });
+    set_miner_seq_index(index as u8);
 }
 
 pub fn Miner_IncSeq() {
-    unsafe {
-        MINER_SEQ_INDEX =
-            MINER_SEQ_INDEX.wrapping_add(Timer_Update(&raw mut MINER_TIMER) as u8) & 7;
-    }
+    let next = MINER_TIMER.with(|t| unsafe { Timer_Update(&mut *t.borrow_mut()) } as u8);
+    set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
 pub fn Miner_DrawSeqSprite(pos: i32, paper: u8, ink: u8) {
+    let row = MINER_SEQUENCE[miner_seq_index() as usize];
     unsafe {
-        let row = MINER_SEQUENCE[MINER_SEQ_INDEX as usize];
         Video_DrawSprite(pos, MINER_SPRITE[row].as_ptr(), paper, ink);
     }
 }
 
 // MINER_STORE is used for save/restore of miner state across room transitions.
-// It's file-static and doesn't need C ABI.
-static mut MINER_STORE: Miner = MINER_ZERO;
+thread_local! {
+    static MINER_STORE: RefCell<Miner> = const { RefCell::new(MINER_ZERO) };
+}
 
 pub fn Miner_Restore() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
-    miner.x = unsafe { MINER_STORE.x };
-    miner.y = unsafe { MINER_STORE.y };
-    miner.tile = unsafe { MINER_STORE.tile };
-    miner.align = unsafe { MINER_STORE.align };
-    miner.frame = unsafe { MINER_STORE.frame };
-    miner.dir = unsafe { MINER_STORE.dir };
-    miner.move_ = unsafe { MINER_STORE.move_ };
-    miner.air = unsafe { MINER_STORE.air };
-    miner.jump = unsafe { MINER_STORE.jump };
+    MINER_STORE.with(|s| {
+        let s = s.borrow();
+        miner.x = s.x;
+        miner.y = s.y;
+        miner.tile = s.tile;
+        miner.align = s.align;
+        miner.frame = s.frame;
+        miner.dir = s.dir;
+        miner.move_ = s.move_;
+        miner.air = s.air;
+        miner.jump = s.jump;
+    });
     GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
     GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 }
 
 pub fn Miner_Save() {
     let miner = GAME_STATE.miner.lock().unwrap();
-    unsafe {
-        MINER_STORE.x = miner.x;
-        MINER_STORE.y = miner.y;
-        MINER_STORE.tile = miner.tile;
-        MINER_STORE.align = miner.align;
-        MINER_STORE.frame = miner.frame;
-        MINER_STORE.dir = miner.dir;
-        MINER_STORE.move_ = miner.move_;
-        MINER_STORE.air = miner.air;
-        MINER_STORE.jump = miner.jump;
-    }
+    MINER_STORE.with(|s| {
+        let mut s = s.borrow_mut();
+        s.x = miner.x;
+        s.y = miner.y;
+        s.tile = miner.tile;
+        s.align = miner.align;
+        s.frame = miner.frame;
+        s.dir = miner.dir;
+        s.move_ = miner.move_;
+        s.air = miner.air;
+        s.jump = miner.jump;
+    });
 
-    unsafe {
-        MINER_FRAME = if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM {
+    set_miner_frame(
+        if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM {
             8
         } else {
             0
-        };
-    }
+        },
+    );
 }
 
 fn is_solid(tile: i32, miner: &mut Miner) -> bool {
@@ -511,7 +528,7 @@ pub fn Miner_Drawer() {
         }
     }
 
-    let row = unsafe { MINER_FRAME } + ((miner.dir << 2) | miner.frame) as usize;
+    let row = miner_frame() + ((miner.dir << 2) | miner.frame) as usize;
     if unsafe {
         Video_DrawMiner(
             ((miner.y + offset) << 8) | miner.x,
