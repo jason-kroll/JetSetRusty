@@ -1,4 +1,4 @@
-use crate::audio::{Audio_Music, MUS_PLAY, audioMusicPlaying};
+use crate::audio::{MUS_PLAY, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::game::{GAME_STATE, Game_Action, Game_DrawStatus, Game_GameReset};
 use crate::game_main::{
@@ -97,7 +97,7 @@ fn game_start() {
 }
 
 fn do_title_ticker() {
-    if audioMusicPlaying() != 0 {
+    if audio_music_playing() != 0 {
         if video_flash() != 0 {
             set_text_jsw_byte(1, b'\x0b');
             set_text_jsw_byte(3, b'\x02');
@@ -124,7 +124,7 @@ fn do_title_ticker() {
 }
 
 fn do_title_drawer() {
-    if audioMusicPlaying() != 0 {
+    if audio_music_playing() != 0 {
         for &tile in TITLE_JSW.iter().take(100) {
             TEXT_JSW.with(|t| {
                 Video_Write(tile_2_pixel(tile), &t.borrow()[..]);
@@ -219,7 +219,7 @@ fn do_title_init() {
     set_text_frame(-1);
     set_colour_cycle(1);
 
-    Audio_Music(MUS_TITLE, MUS_PLAY);
+    audio_music(MUS_TITLE, MUS_PLAY);
 
     set_ticker(Some(do_title_ticker));
 }

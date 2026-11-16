@@ -7,7 +7,7 @@
 // Other modules (robots.rs, levels.rs, die.rs, rope.rs, cheat.rs) read miner
 // state through GAME_STATE as well.
 
-use crate::audio::{Audio_WillySfx, set_audioPanX};
+use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
 use crate::die::Die_Action;
 use crate::game::{
@@ -398,8 +398,8 @@ fn do_miner_ticker() {
             return;
         }
 
-        set_audioPanX(miner.x);
-        Audio_WillySfx(jump_info.pitch, jump_info.length);
+        set_audio_pan_x(miner.x);
+        audio_willy_sfx(jump_info.pitch, jump_info.length);
 
         miner.y = y;
         miner.tile = tile;
@@ -486,8 +486,8 @@ fn do_miner_ticker() {
         GAME_STATE.miner_air.store(12, Ordering::Relaxed);
     }
 
-    set_audioPanX(miner.x);
-    Audio_WillySfx(78 - miner.air, 4);
+    set_audio_pan_x(miner.x);
+    audio_willy_sfx(78 - miner.air, 4);
     miner.y += 4;
     miner.align = 4;
     if miner.y & 7 != 0 {

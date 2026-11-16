@@ -1,4 +1,4 @@
-use crate::audio::{Audio_Play, Audio_Sfx, MUS_STOP, SFX_GAMEOVER};
+use crate::audio::{MUS_STOP, SFX_GAMEOVER, audio_play, audio_sfx};
 use crate::common::WIDTH;
 use crate::game_main::{
     DoNothing, System_Border, set_action, set_drawer, set_responder, set_ticker,
@@ -99,8 +99,8 @@ fn gameover_init() {
     Video_DrawSprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
     set_boot_ticks(0);
 
-    Audio_Play(MUS_STOP);
-    Audio_Sfx(SFX_GAMEOVER as i32);
+    audio_play(MUS_STOP);
+    audio_sfx(SFX_GAMEOVER as i32);
 
     set_ticker(Some(gameover_ticker));
 }

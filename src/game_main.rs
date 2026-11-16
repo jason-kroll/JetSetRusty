@@ -59,7 +59,7 @@ static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
     ]
 });
 
-use crate::audio::{Audio_Init, Audio_Output};
+use crate::audio::{audio_init, audio_output};
 use crate::loader::Loader_Action;
 
 // libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
@@ -195,7 +195,7 @@ impl AudioCallback for SdlAudioCallback {
 
     fn callback(&mut self, out: &mut [i16]) {
         for frame in out.as_chunks_mut::<2>().0 {
-            Audio_Output(frame);
+            audio_output(frame);
         }
     }
 }
@@ -282,14 +282,6 @@ pub(crate) fn seed_rng(seed: u32) {
 
 pub(crate) fn game_running() -> bool {
     GAME_RUNNING.load(Relaxed)
-}
-
-pub(crate) fn audio_init() {
-    Audio_Init();
-}
-
-pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
-    Audio_Output(stereo_frame);
 }
 
 // Poll one SDL event, update gameInput, return false when the queue is empty.
@@ -459,7 +451,7 @@ pub fn run() {
         .unwrap_or(0);
     crate::rng::srand(now as u32);
 
-    Audio_Init();
+    audio_init();
 
     // Timers ------------------------------------------------------------------
     let mut timer_frame = Timer {

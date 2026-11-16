@@ -5,7 +5,7 @@
 // Runs the game with no SDL at all: no window, no audio device, no wall-clock
 // pacing. Input comes from the script, the RNG gets a fixed seed, and audio is
 // generated in lockstep (exactly one frame's worth of samples per frame), which
-// matters because the loader and title screens advance on `audioMusicPlaying`.
+// matters because the loader and title screens advance on `audio_music_playing`.
 // The same inputs therefore always produce the same frames.
 //
 // Each frame prints one line to stdout:
@@ -32,10 +32,11 @@
 // a-z, 0-9, left, right, space, enter, lshift, rshift, escape, tab, pause,
 // lalt, ralt.
 
+use crate::audio::{audio_init, audio_output};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    SAMPLERATE, TICKRATE, audio_init, audio_output, border_index, game_frame, game_running,
-    map_keycode, seed_rng, set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
+    SAMPLERATE, TICKRATE, border_index, game_frame, game_running, map_keycode, seed_rng,
+    set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
 use crate::misc::{Timer, Timer_Set, VIDEO_COLOUR};
 use sdl2::sys::SDL_KeyCode as K;

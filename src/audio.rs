@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use crate::misc::{Timer, Timer_Set, Timer_Update};
 use std::cell::Cell;
 use std::sync::Mutex;
@@ -54,7 +52,7 @@ struct SfxInfo {
     length: i32,
     clock: i32,
     // Trampolines take the locked AudioState as their argument, so
-    // Audio_Output can call them while holding the single AUDIO_STATE guard
+    // audio_output can call them while holding the single AUDIO_STATE guard
     // (std Mutex is not reentrant) — no global CUR_SFX handoff needed beyond
     // the cur_sfx slot index.
     do_sfx: Option<fn(&mut AudioState)>,
@@ -167,13 +165,13 @@ static SFX_PITCH: [&[i32]; 6] = [
 ];
 
 // ---- mutable state ----------------------------------------------------------
-// Audio_Output runs on SDL's audio callback thread, while Audio_Sfx /
-// Audio_Music / Audio_Play / Audio_Init run on the main thread, so the mixer
+// audio_output runs on SDL's audio callback thread, while audio_sfx /
+// audio_music / audio_play / audio_init run on the main thread, so the mixer
 // state lives behind one mutex. Every critical section is a handful of field
 // writes, so the audio thread never blocks for long. In replay mode both run
 // lockstep on the main thread, so locking is uncontended there and the output
-// stays deterministic. audioMusicPlaying is also polled by the loader/title
-// screens on the main thread, so it stays a plain atomic; audioPanX is only
+// stays deterministic. audio_music_playing is also polled by the loader/title
+// screens on the main thread, so it stays a plain atomic; audio_pan_x is only
 // ever touched on the main thread, so it is a thread-local Cell.
 
 static AUDIO_MUSIC_PLAYING: AtomicI32 = AtomicI32::new(MUS_STOP);
@@ -182,15 +180,15 @@ thread_local! {
     static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
 }
 
-pub fn audioMusicPlaying() -> i32 {
+pub fn audio_music_playing() -> i32 {
     AUDIO_MUSIC_PLAYING.load(Ordering::Relaxed)
 }
 
-pub fn audioPanX() -> i32 {
+pub fn audio_pan_x() -> i32 {
     AUDIO_PAN_X.with(Cell::get)
 }
 
-pub fn set_audioPanX(pan: i32) {
+pub fn set_audio_pan_x(pan: i32) {
     AUDIO_PAN_X.with(|c| c.set(pan));
 }
 
@@ -283,7 +281,7 @@ impl AudioState {
 // selects the slot they operate on.
 
 // Sentinel: stored in Channel.do_phase to mark channel as "on".
-// The actual oscillator logic is inlined in Audio_Output's mixing loop.
+// The actual oscillator logic is inlined in audio_output's mixing loop.
 fn do_phase_fn() {}
 
 fn sfx_off_trampoline(s: &mut AudioState) {
@@ -360,7 +358,7 @@ fn music_reset(s: &mut AudioState) {
 
 // ---- public API -------------------------------------------------------------
 
-pub fn Audio_ReduceMusicSpeed() {
+pub fn audio_reduce_music_speed() {
     let mut s = AUDIO_STATE.lock().unwrap();
     s.music_pitch -= 1;
     s.music_tempo -= 6;
@@ -368,20 +366,20 @@ pub fn Audio_ReduceMusicSpeed() {
     Timer_Set(&mut s.timer_music, SAMPLERATE, tempo);
 }
 
-pub fn Audio_WillySfx(note: i32, length: i32) {
+pub fn audio_willy_sfx(note: i32, length: i32) {
     let mut s = AUDIO_STATE.lock().unwrap();
     let ch = s.sfx[0].channel;
     s.channels[ch].frequency = FREQUENCY_TABLE[note as usize];
     s.sfx[0].clock = s.sfx_clock;
-    channel_pan(&mut s.channels[ch], audioPanX() as usize);
+    channel_pan(&mut s.channels[ch], audio_pan_x() as usize);
     s.sfx[0].length = length;
     s.sfx[0].do_sfx = Some(sfx_willy_trampoline);
 }
 
-pub fn Audio_Sfx(sfx: i32) {
+pub fn audio_sfx(sfx: i32) {
     let mut s = AUDIO_STATE.lock().unwrap();
     let sfx = sfx as usize;
-    let pan = audioPanX();
+    let pan = audio_pan_x();
 
     let target_slot = if sfx == SFX_GAMEOVER || sfx == SFX_DIE {
         // Schedule channels 0 and 1 to stop; don't call immediately.
@@ -434,13 +432,13 @@ pub fn Audio_Sfx(sfx: i32) {
     s.sfx[target_slot].clock = s.sfx_clock;
 }
 
-pub fn Audio_Output(output: &mut [i16; 2]) {
+pub fn audio_output(output: &mut [i16; 2]) {
     let mut s = AUDIO_STATE.lock().unwrap();
 
     if s.samples_music == 0 {
         s.samples_music = Timer_Update(&mut s.timer_music);
 
-        if audioMusicPlaying() != 0 {
+        if audio_music_playing() != 0 {
             if s.music_delta == s.music_clock {
                 // Process all events due this tick (time==0 events chain immediately).
                 loop {
@@ -531,13 +529,13 @@ pub fn Audio_Output(output: &mut [i16; 2]) {
     s.samples_sfx -= 1;
 }
 
-pub fn Audio_Play(playing: i32) {
+pub fn audio_play(playing: i32) {
     AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
     let mut s = AUDIO_STATE.lock().unwrap();
     s.music_channels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
 }
 
-pub fn Audio_Music(music: i32, playing: i32) {
+pub fn audio_music(music: i32, playing: i32) {
     {
         let mut s = AUDIO_STATE.lock().unwrap();
         s.music_index = music as usize;
@@ -552,10 +550,10 @@ pub fn Audio_Music(music: i32, playing: i32) {
         s.samples_music = 0;
         Timer_Set(&mut s.timer_music, SAMPLERATE, TICKRATE);
     }
-    Audio_Play(playing);
+    audio_play(playing);
 }
 
-pub fn Audio_Init() {
+pub fn audio_init() {
     let mut s = AUDIO_STATE.lock().unwrap();
     Timer_Set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
 }

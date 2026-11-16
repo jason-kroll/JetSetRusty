@@ -1,5 +1,5 @@
 #![warn(unused_unsafe)]
-use crate::audio::{Audio_Music, Audio_Play, Audio_Sfx, MUS_PLAY, MUS_STOP, SFX_ITEM};
+use crate::audio::{MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_play, audio_sfx};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::Gameover_Action;
@@ -235,11 +235,11 @@ pub fn game_pause(state: bool) {
             set_ticker(Some(DoPauseTicker));
             set_drawer(Some(DoPauseDrawer));
         }
-        Audio_Play(MUS_STOP);
+        audio_play(MUS_STOP);
     } else {
         set_ticker(Some(DoGameTicker));
         set_drawer(Some(do_game_drawer));
-        Audio_Play(game.music.load(Ordering::Relaxed) as i32);
+        audio_play(game.music.load(Ordering::Relaxed) as i32);
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
         // Original: `if (cheatEnabled == 0)`. Redraw the status band on unpause
@@ -273,7 +273,7 @@ pub fn do_game_responder() {
                 0
             };
             game.music.store(new_music, Ordering::Relaxed);
-            Audio_Play(new_music as i32);
+            audio_play(new_music as i32);
         }
         x if x == Key::Escape as i32 => set_action(Some(Title_Action)),
         _ => {
@@ -383,9 +383,9 @@ pub fn Game_GameReset() {
     // gameLives = 7
     game.lives.store(7, Ordering::Relaxed);
 
-    // Audio_Music(MUS_GAME, gameMusic)
+    // audio_music(MUS_GAME, gameMusic)
     let music = game.music.load(Ordering::Relaxed);
-    Audio_Music(MUS_GAME, music as i32);
+    audio_music(MUS_GAME, music as i32);
 }
 
 pub fn Game_CheatEnabled() {
@@ -577,13 +577,13 @@ pub fn Game_GotItem() {
         game.mode.store(GameMode::Maria as u8, Ordering::Relaxed);
     }
 
-    // audioPanX = minerWilly.x
+    // audio_pan_x = minerWilly.x
     // Use try_lock to avoid deadlock if we already hold the miner lock
     if let Ok(miner_guard) = game.miner.try_lock() {
-        crate::audio::set_audioPanX(miner_guard.x);
+        crate::audio::set_audio_pan_x(miner_guard.x);
     }
 
-    Audio_Sfx(SFX_ITEM as i32);
+    audio_sfx(SFX_ITEM as i32);
 }
 
 // Port of C's ClockTicker; called once per game frame from DoGameTicker.

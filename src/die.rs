@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::audio::{Audio_ReduceMusicSpeed, Audio_Sfx, SFX_DIE, set_audioPanX};
+use crate::audio::{SFX_DIE, audio_reduce_music_speed, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, Game_Action, LIVES};
 use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
@@ -46,7 +46,7 @@ fn Die_Ticker() {
         0x0,
     );
     Miner_Restore();
-    Audio_ReduceMusicSpeed();
+    audio_reduce_music_speed();
     set_action(Some(Game_Action));
 }
 
@@ -56,9 +56,9 @@ fn Die_Init() {
     System_Border(0x0);
     Video_PixelPaperFill(0, 128 * WIDTH, 0x0);
     let miner = GAME_STATE.miner.lock().unwrap();
-    set_audioPanX(miner.x);
+    set_audio_pan_x(miner.x);
     drop(miner);
-    Audio_Sfx(SFX_DIE as i32);
+    audio_sfx(SFX_DIE as i32);
     set_ticker(Some(Die_Ticker));
 }
 
