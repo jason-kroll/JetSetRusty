@@ -3,15 +3,12 @@
 use crate::audio::{Audio_ReduceMusicSpeed, Audio_Sfx, SFX_DIE};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, Game_Action, LIVES};
+use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
 use std::sync::atomic::Ordering;
 
 unsafe extern "C" {
     static mut audioPanX: i32;
-    static mut Action: Option<unsafe extern "C" fn()>;
-    static mut Ticker: Option<unsafe extern "C" fn()>;
-    static mut Drawer: Option<unsafe extern "C" fn()>;
-    static mut Responder: Option<unsafe extern "C" fn()>;
     fn Gameover_Action();
     fn DoNothing();
     fn Miner_Restore();
@@ -35,7 +32,7 @@ extern "C" fn Die_Ticker() {
         }
 
         if GAME_STATE.lives.load(Ordering::Relaxed) < 0 {
-            Action = Some(Gameover_Action);
+            set_action(Some(Gameover_Action));
             return;
         }
 
@@ -47,7 +44,7 @@ extern "C" fn Die_Ticker() {
         );
         Miner_Restore();
         Audio_ReduceMusicSpeed();
-        Action = Some(Game_Action);
+        set_action(Some(Game_Action));
     }
 }
 
@@ -62,16 +59,14 @@ extern "C" fn Die_Init() {
         audioPanX = miner.x;
         drop(miner);
         Audio_Sfx(SFX_DIE as i32);
-        Ticker = Some(Die_Ticker);
+        set_ticker(Some(Die_Ticker));
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Die_Action() {
-    unsafe {
-        Responder = Some(DoNothing);
-        Ticker = Some(Die_Init);
-        Drawer = Some(Die_Drawer);
-        Action = Some(DoNothing);
-    }
+    set_responder(Some(DoNothing));
+    set_ticker(Some(Die_Init));
+    set_drawer(Some(Die_Drawer));
+    set_action(Some(DoNothing));
 }
