@@ -81,10 +81,7 @@ extern "C" fn do_loader_drawer1() {
         Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1);
 
         // "fawtytoo" (paper=1, ink=7)
-        Video_Write(
-            23 * 8 * WIDTH,
-            c"\x01\x01\x02\x07fawtytoo".as_ptr(),
-        );
+        Video_Write(23 * 8 * WIDTH, c"\x01\x01\x02\x07fawtytoo".as_ptr());
 
         // BUILD string right-aligned on the same row
         // \x02\x00 = set ink to 0 (black); the embedded null is the ink arg, not a terminator

@@ -197,10 +197,7 @@ impl CodesState {
                 8 * 8,
                 b"\x01\x00\x02\x05Enter Code at grid location     \x00".as_ptr() as *const i8,
             );
-            video_write(
-                88 * WIDTH + 3 * 8 - 1,
-                c"\x02\x07\x15".as_ptr(),
-            );
+            video_write(88 * WIDTH + 3 * 8 - 1, c"\x02\x07\x15".as_ptr());
             video_draw_robot(88 * WIDTH + 2 * 8, CODES_SPRITE[0], 1);
             video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".as_ptr());
             video_draw_robot(88 * WIDTH + 5 * 8, CODES_SPRITE[1], 2);

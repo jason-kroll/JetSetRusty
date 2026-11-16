@@ -5092,7 +5092,10 @@ pub fn Level_Ticker() {
 
 fn level_drawer() {
     let level_tile = unsafe {
-        std::slice::from_raw_parts_mut(std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(), LEVEL_TILES)
+        std::slice::from_raw_parts_mut(
+            std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(),
+            LEVEL_TILES,
+        )
     };
     for (cell, t) in level_tile.iter_mut().enumerate() {
         match t.draw_mode {
