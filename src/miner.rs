@@ -13,7 +13,7 @@ use crate::die::Die_Action;
 use crate::game::{
     Direction, GAME_STATE, Game_ChangeLevel, Game_GotItem, GameMode, Miner, NIGHTMAREROOM,
 };
-use crate::game_main::{Action, System_IsKey};
+use crate::game_main::{System_IsKey, set_action};
 use crate::levels::{Level_EraseItem, Level_GetTileRamp, Level_GetTileType, TileType};
 use crate::misc::{Timer, Timer_Set, Timer_Update};
 use crate::video::{Video_DrawMiner, Video_DrawSprite};
@@ -430,18 +430,14 @@ fn do_miner_ticker() {
                 drop(miner);
                 move_left_right();
             } else {
-                unsafe {
-                    Action = Some(Die_Action);
-                }
+                set_action(Some(Die_Action));
             }
             return;
         }
 
         if type0 as i32 > TileType::Space as i32 || type1 as i32 > TileType::Space as i32 {
             if miner.air >= 12 {
-                unsafe {
-                    Action = Some(Die_Action);
-                }
+                set_action(Some(Die_Action));
                 return;
             }
 
@@ -529,9 +525,7 @@ pub extern "C" fn Miner_Drawer() {
         GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
     ) != 0
     {
-        unsafe {
-            Action = Some(Die_Action);
-        }
+        set_action(Some(Die_Action));
         return;
     }
 
@@ -539,9 +533,7 @@ pub extern "C" fn Miner_Drawer() {
     let mut adj = 1;
     for _ in 0..align {
         if unsafe { Level_GetTileType(tile as usize) } == TileType::Harm {
-            unsafe {
-                Action = Some(Die_Action);
-            }
+            set_action(Some(Die_Action));
             return;
         }
         tile += adj;
