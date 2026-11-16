@@ -49,11 +49,10 @@ const SDL_KEYS: [sdl::SDL_Keycode; 36] = [
     sdl::SDL_KeyCode::SDLK_t as i32,
 ];
 
+use crate::audio::{Audio_Init, Audio_Output};
 use crate::loader::Loader_Action;
 
 unsafe extern "C" {
-    fn Audio_Output(output: *mut i16);
-    fn Audio_Init();
     fn rand() -> i32;
     fn srand(seed: u32);
     fn time(t: *mut i64) -> i64;
@@ -276,7 +275,7 @@ pub(crate) fn game_running() -> bool {
 }
 
 pub(crate) fn audio_init() {
-    unsafe { Audio_Init() };
+    Audio_Init();
 }
 
 pub(crate) fn audio_output(stereo_frame: &mut [i16; 2]) {
@@ -468,7 +467,7 @@ pub fn run() {
     });
     unsafe { srand(time(std::ptr::null_mut::<i64>()) as u32) };
 
-    unsafe { Audio_Init() };
+    Audio_Init();
 
     // Timers ------------------------------------------------------------------
     let mut timer_frame = Timer {

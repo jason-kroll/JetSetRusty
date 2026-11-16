@@ -381,8 +381,7 @@ unsafe fn music_reset() {
 
 // ---- public API -------------------------------------------------------------
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_ReduceMusicSpeed() {
+pub fn Audio_ReduceMusicSpeed() {
     unsafe {
         musicPitch -= 1;
         musicTempo -= 6;
@@ -390,8 +389,7 @@ pub extern "C" fn Audio_ReduceMusicSpeed() {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_WillySfx(note: i32, length: i32) {
+pub fn Audio_WillySfx(note: i32, length: i32) {
     unsafe {
         let ch = AUDIO_SFX[0].channel;
         AUDIO_CHANNEL[ch].frequency = FREQUENCY_TABLE[note as usize];
@@ -402,8 +400,7 @@ pub extern "C" fn Audio_WillySfx(note: i32, length: i32) {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_Sfx(sfx: i32) {
+pub fn Audio_Sfx(sfx: i32) {
     unsafe {
         let sfx = sfx as usize;
 
@@ -456,8 +453,7 @@ pub extern "C" fn Audio_Sfx(sfx: i32) {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_Output(output: *mut i16) {
+pub unsafe fn Audio_Output(output: *mut i16) {
     unsafe {
         if samplesMusic == 0 {
             samplesMusic = Timer_Update(&raw mut timerMusic);
@@ -557,16 +553,14 @@ pub extern "C" fn Audio_Output(output: *mut i16) {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_Play(playing: i32) {
+pub fn Audio_Play(playing: i32) {
     unsafe {
         audioMusicPlaying = playing;
         musicChannels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_Music(music: i32, playing: i32) {
+pub fn Audio_Music(music: i32, playing: i32) {
     unsafe {
         musicIndex = music as usize;
         music_reset();
@@ -583,7 +577,6 @@ pub extern "C" fn Audio_Music(music: i32, playing: i32) {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Audio_Init() {
+pub fn Audio_Init() {
     unsafe { Timer_Set(&raw mut timerSfx, SAMPLERATE, TICKRATE) };
 }
