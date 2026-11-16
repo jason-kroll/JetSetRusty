@@ -8,7 +8,7 @@ use crate::levels::{Level_ItemCount, Level_RestoreItems};
 use crate::miner::Miner_Init;
 use crate::robots::Robots_DrawCheat;
 use crate::video::{tile_2_pixel, video_pixel_fill};
-use std::ptr::addr_of_mut;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
 
 use crate::game::GameMode;
@@ -29,15 +29,39 @@ static TITLE_JSW: [i32; 100] = [
     464, 466, 467, 468, 471,
 ];
 
-static mut TEXT_JSW: [u8; 6] = [b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0];
+thread_local! {
+    static TEXT_JSW: RefCell<[u8; 6]> =
+        const { RefCell::new([b'\x01', b'\x02', b'\x02', b'\x0b', b'\x14', 0]) };
+    static TEXT_POS: Cell<i32> = const { Cell::new(0) };
+    static TEXT_FRAME: Cell<i32> = const { Cell::new(0) };
+    static COLOUR_CYCLE: Cell<u8> = const { Cell::new(0) };
+}
+
+fn text_pos() -> i32 {
+    TEXT_POS.with(Cell::get)
+}
+fn set_text_pos(v: i32) {
+    TEXT_POS.with(|c| c.set(v));
+}
+fn text_frame() -> i32 {
+    TEXT_FRAME.with(Cell::get)
+}
+fn set_text_frame(v: i32) {
+    TEXT_FRAME.with(|c| c.set(v));
+}
+fn colour_cycle() -> u8 {
+    COLOUR_CYCLE.with(Cell::get)
+}
+fn set_colour_cycle(v: u8) {
+    COLOUR_CYCLE.with(|c| c.set(v));
+}
+fn set_text_jsw_byte(i: usize, v: u8) {
+    TEXT_JSW.with(|t| t.borrow_mut()[i] = v);
+}
 
 static TEXT_TICKER: &[u8] = b"      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      \0";
 
 static TEXT_END: i32 = (TEXT_TICKER.len() - 33) as i32;
-
-static mut TEXT_POS: i32 = 0;
-static mut TEXT_FRAME: i32 = 0;
-static mut COLOUR_CYCLE: u8 = 0;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
@@ -76,24 +100,24 @@ fn do_title_ticker() {
     unsafe {
         if audioMusicPlaying != 0 {
             if video_flash() != 0 {
-                TEXT_JSW[1] = b'\x0b';
-                TEXT_JSW[3] = b'\x02';
+                set_text_jsw_byte(1, b'\x0b');
+                set_text_jsw_byte(3, b'\x02');
             } else {
-                TEXT_JSW[1] = b'\x02';
-                TEXT_JSW[3] = b'\x0b';
+                set_text_jsw_byte(1, b'\x02');
+                set_text_jsw_byte(3, b'\x0b');
             }
             return;
         }
 
-        COLOUR_CYCLE = COLOUR_CYCLE_ADJ[COLOUR_CYCLE as usize];
+        set_colour_cycle(COLOUR_CYCLE_ADJ[colour_cycle() as usize]);
 
-        if TEXT_POS < TEXT_END {
-            if TEXT_FRAME < 6 {
-                TEXT_FRAME += 2;
+        if text_pos() < TEXT_END {
+            if text_frame() < 6 {
+                set_text_frame(text_frame() + 2);
                 return;
             }
-            TEXT_POS += 1;
-            TEXT_FRAME = 0;
+            set_text_pos(text_pos() + 1);
+            set_text_frame(0);
             return;
         }
 
@@ -105,20 +129,22 @@ fn do_title_drawer() {
     unsafe {
         if audioMusicPlaying != 0 {
             for &tile in TITLE_JSW.iter().take(100) {
-                Video_Write(tile_2_pixel(tile), addr_of_mut!(TEXT_JSW) as *const i8);
+                TEXT_JSW.with(|t| {
+                    Video_Write(tile_2_pixel(tile), t.borrow().as_ptr().cast());
+                });
             }
             return;
         }
 
-        if COLOUR_CYCLE == 1 {
+        if colour_cycle() == 1 {
             System_Border(Video_CycleColours());
         }
 
         Video_WriteLarge(0, 0, c"\x01\x01\x02\x07".as_ptr());
         Video_WriteLarge(
-            -(TEXT_FRAME & 6),
+            -(text_frame() & 6),
             19 * 8,
-            TEXT_TICKER.as_ptr().add(TEXT_POS as usize) as *const i8,
+            TEXT_TICKER.as_ptr().add(text_pos() as usize) as *const i8,
         );
     }
 }
@@ -207,9 +233,9 @@ fn do_title_init() {
         Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0".as_ptr() as *const i8);
         Video_WriteLarge(0, 19 * 8, TEXT_TICKER.as_ptr() as *const i8);
 
-        TEXT_POS = 0;
-        TEXT_FRAME = -1;
-        COLOUR_CYCLE = 1;
+        set_text_pos(0);
+        set_text_frame(-1);
+        set_colour_cycle(1);
 
         Audio_Music(MUS_TITLE, MUS_PLAY);
 
