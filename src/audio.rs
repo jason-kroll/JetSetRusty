@@ -513,10 +513,12 @@ pub extern "C" fn Audio_Output(output: *mut i16) {
         if samplesSfx == 0 {
             samplesSfx = Timer_Update(&raw mut timerSfx);
 
-            for i in 0..NSFX {
-                if AUDIO_SFX[i].clock == sfxClock {
+            let audio_sfx =
+                std::slice::from_raw_parts(std::ptr::addr_of!(AUDIO_SFX).cast::<SfxInfo>(), NSFX);
+            for (i, sfx) in audio_sfx.iter().enumerate() {
+                if sfx.clock == sfxClock {
                     CUR_SFX = i;
-                    if let Some(f) = AUDIO_SFX[i].do_sfx {
+                    if let Some(f) = sfx.do_sfx {
                         f();
                     }
                 }
@@ -531,8 +533,11 @@ pub extern "C" fn Audio_Output(output: *mut i16) {
         *out_l = 0;
         *out_r = 0;
 
-        for i in 0..musicChannels {
-            let ch = &mut AUDIO_CHANNEL[i];
+        let audio_channel = std::slice::from_raw_parts_mut(
+            std::ptr::addr_of_mut!(AUDIO_CHANNEL).cast::<Channel>(),
+            NCHANNELS,
+        );
+        for ch in audio_channel.iter_mut().take(musicChannels) {
             if ch.do_phase.is_some() {
                 // Square wave oscillator: phase MSB selects left[0]/left[1]
                 let phase = (ch.phase >> 31) as usize;

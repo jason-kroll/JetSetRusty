@@ -139,6 +139,8 @@ impl CodesState {
         self.pos = (self.pos + 1) & 3;
     }
 
+    // c"" literals forbid the interior nul bytes these control strings carry
+    #[allow(clippy::manual_c_str_literals)]
     fn do_codes_responder(&mut self) {
         match unsafe { gameInput } {
             KEY_1 => self.key = 1, // blue
@@ -184,6 +186,8 @@ impl CodesState {
         }
     }
 
+    // c"" literals forbid the interior nul bytes these control strings carry
+    #[allow(clippy::manual_c_str_literals)]
     fn codes_action(&mut self) {
         unsafe {
             System_Border(0);
@@ -195,14 +199,14 @@ impl CodesState {
             );
             video_write(
                 88 * WIDTH + 3 * 8 - 1,
-                b"\x02\x07\x15\x00".as_ptr() as *const i8,
+                c"\x02\x07\x15".as_ptr(),
             );
             video_draw_robot(88 * WIDTH + 2 * 8, CODES_SPRITE[0], 1);
-            video_write(88 * WIDTH + 6 * 8 - 1, b"\x15\x00".as_ptr() as *const i8);
+            video_write(88 * WIDTH + 6 * 8 - 1, c"\x15".as_ptr());
             video_draw_robot(88 * WIDTH + 5 * 8, CODES_SPRITE[1], 2);
-            video_write(88 * WIDTH + 9 * 8 - 1, b"\x15\x00".as_ptr() as *const i8);
+            video_write(88 * WIDTH + 9 * 8 - 1, c"\x15".as_ptr());
             video_draw_robot(88 * WIDTH + 8 * 8, CODES_SPRITE[2], 3);
-            video_write(88 * WIDTH + 12 * 8 - 1, b"\x15\x00".as_ptr() as *const i8);
+            video_write(88 * WIDTH + 12 * 8 - 1, c"\x15".as_ptr());
             video_draw_robot(88 * WIDTH + 11 * 8, CODES_SPRITE[3], 4);
 
             self.get_code();

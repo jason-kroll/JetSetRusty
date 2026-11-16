@@ -272,12 +272,12 @@ static CHAR_SET_LARGE: [[u16; 8]; 96] = [
     [2032, 3096, 6604, 4644, 4644, 6476, 3096, 2032],
 ];
 
-fn video_set_pixel(pixels: &mut Vec<Pixel>, pos: i32, ink: u8) {
+fn video_set_pixel(pixels: &mut [Pixel], pos: i32, ink: u8) {
     pixels[pos as usize].ink = ink;
     system_set_pixel(pos, ink as i32);
 }
 
-pub fn video_get_pixel(pixels: &mut Vec<Pixel>, pos: i32) -> i32 {
+pub fn video_get_pixel(pixels: &mut [Pixel], pos: i32) -> i32 {
     pixels[pos as usize].point as i32
 }
 
@@ -345,7 +345,7 @@ pub fn video_draw_rope_seg(pos: i32, ink: u8) {
     video_draw_rope_seg_inner(&mut pixels, pos, ink);
 }
 
-pub fn video_draw_rope_seg_inner(pixels: &mut Vec<Pixel>, pos: i32, ink: u8) {
+pub fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
     pixels[pos as usize].point = 1;
     video_set_pixel(pixels, pos, ink);
 }
@@ -381,9 +381,8 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    for row in 0..8 {
+    for mut byte in what.iter().copied() {
         let mut pixel = pos;
-        let mut byte = what[row];
         for _ in 0..8 {
             pixels[pixel as usize].point = byte & B_LEVEL;
             video_set_pixel(&mut pixels, pixel, colour[(byte & 1) as usize]);
@@ -403,15 +402,14 @@ pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32
     let mut die = 0i32;
 
     let mut pos = pos & !7;
-    let mut y = pos / WIDTH;
+    let y0 = pos / WIDTH;
     pos += 15;
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    for row in 0..16 {
+    for (row, mut word) in line.iter().copied().enumerate() {
         let mut pixel = pos;
-        let mut word = line[row];
-        let ink = attr[(y >> level) as usize];
+        let ink = attr[((y0 + row as i32) >> level) as usize];
         for _ in 0..16 {
             if word & 1 != 0 {
                 if video_get_pixel(&mut pixels, pixel) & B_ROBOT as i32 != 0 {
@@ -424,7 +422,6 @@ pub extern "C" fn Video_DrawMiner(pos: i32, line: *const u16, level: i32) -> i32
             word >>= 1;
         }
         pos += WIDTH;
-        y += 1;
     }
 
     die
@@ -438,9 +435,8 @@ pub extern "C" fn Video_DrawRobot(pos: i32, line: *const u16, ink: u8) {
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    for row in 0..16 {
+    for mut word in line.iter().copied() {
         let mut pixel = pos;
-        let mut word = line[row];
         for _ in 0..16 {
             if word & 1 != 0 {
                 pixels[pixel as usize].point |= B_ROBOT | 1;
@@ -465,9 +461,8 @@ pub extern "C" fn Video_DrawSprite(pos: i32, line: *const u16, paper: u8, ink: u
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    for row in 0..16 {
+    for mut word in line.iter().copied() {
         let mut pixel = pos;
-        let mut word = line[row];
         for _ in 0..16 {
             pixels[pixel as usize].point = (word & 1) as u8;
             video_set_pixel(&mut pixels, pixel, colour[(word & 1) as usize]);
@@ -520,10 +515,9 @@ pub extern "C" fn Video_WriteLarge(x: i32, y: i32, text: *const i8) {
 
         let ch = (text[i] - b' ') as usize; // Space is the offset for start of alphabet
         let byte = &CHAR_SET_LARGE[ch];
-        for col in 0..CHAR_WIDTH {
+        for mut line in byte.iter().take(CHAR_WIDTH).copied() {
             if (0..WIDTH).contains(&x) {
                 let mut pixel = pos + x;
-                let mut line = byte[col];
                 for _ in 0..CHAR_HEIGHT_LARGE {
                     let bit = (line & 1) as usize;
                     video_set_pixel(&mut pixels, pixel, ink[bit]);
@@ -579,9 +573,8 @@ pub extern "C" fn Video_Write(pos: i32, text: *const i8) {
         let ch = text[i] as usize;
         let row = &CHAR_SET[ch];
         let width = row[0] as usize;
-        for col in 1..=width {
+        for mut line in row.iter().take(width + 1).skip(1).copied() {
             let mut pixel = pos;
-            let mut line = row[col];
             for _ in 0..CHAR_HEIGHT {
                 let bit = (line & 1) as usize;
                 pixels[pixel as usize].point = bit as u8;

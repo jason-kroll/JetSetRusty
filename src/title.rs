@@ -105,8 +105,7 @@ unsafe extern "C" fn do_title_ticker() {
 unsafe extern "C" fn do_title_drawer() {
     unsafe {
         if audioMusicPlaying != 0 {
-            for i in 0..100 {
-                let tile = TITLE_JSW[i];
+            for &tile in TITLE_JSW.iter().take(100) {
                 Video_Write(tile_2_pixel(tile), addr_of_mut!(TEXT_JSW) as *const i8);
             }
             return;
@@ -116,7 +115,7 @@ unsafe extern "C" fn do_title_drawer() {
             System_Border(Video_CycleColours());
         }
 
-        Video_WriteLarge(0, 0, b"\x01\x01\x02\x07\0".as_ptr() as *const i8);
+        Video_WriteLarge(0, 0, c"\x01\x01\x02\x07".as_ptr());
         Video_WriteLarge(
             -(TEXT_FRAME & 6),
             19 * 8,
@@ -135,6 +134,8 @@ unsafe extern "C" fn do_title_responder() {
     }
 }
 
+// c"" literals forbid the interior nul bytes these control strings carry
+#[allow(clippy::manual_c_str_literals)]
 unsafe extern "C" fn do_title_init() {
     unsafe {
         System_Border(0x0);
@@ -146,7 +147,7 @@ unsafe extern "C" fn do_title_init() {
         );
         Video_Write(
             24 * WIDTH + 128,
-            b"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14\0".as_ptr() as *const i8,
+            c"\x10\x14\x01\x05\x14\x14\x02\x09\x10\x14".as_ptr(),
         );
         Video_Write(
             32 * WIDTH + 112,
@@ -199,11 +200,11 @@ unsafe extern "C" fn do_title_init() {
         );
         Video_Write(
             112 * WIDTH + 128,
-            b"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14\0".as_ptr() as *const i8,
+            c"\x01\x01\x14\x13\x14\x14\x01\x09\x14\x14".as_ptr(),
         );
         Video_Write(
             120 * WIDTH + 144,
-            b"\x01\x01\x12\x13\x01\x09\x10\x11\0".as_ptr() as *const i8,
+            c"\x01\x01\x12\x13\x01\x09\x10\x11".as_ptr(),
         );
 
         Video_WriteLarge(0, 0, b"\x01\x00\x02\x04\0".as_ptr() as *const i8);

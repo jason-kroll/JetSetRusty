@@ -4941,11 +4941,6 @@ static mut LEVEL_TILE: [Tile; LEVEL_TILES] = [const {
 }; LEVEL_TILES];
 
 #[inline]
-fn tile(cell: usize) -> &'static Tile {
-    unsafe { &LEVEL_TILE[cell] }
-}
-
-#[inline]
 fn tile_mut(cell: usize) -> &'static mut Tile {
     unsafe { &mut LEVEL_TILE[cell] }
 }
@@ -4974,10 +4969,14 @@ pub unsafe extern "C" fn Level_ItemCount() -> i32 {
 fn restore_items() {
     unsafe {
         ACTIVE_LEVELS = LEVEL_DATA;
-        for i in 0..LEVEL_DATA.len() {
-            for j in 0..ACTIVE_LEVELS[i].item_count as usize {
-                let item_pos = ACTIVE_LEVELS[i].item[j] as usize;
-                ACTIVE_LEVELS[i].data[item_pos] = 1;
+        let active_levels = std::slice::from_raw_parts_mut(
+            std::ptr::addr_of_mut!(ACTIVE_LEVELS).cast::<LevelData>(),
+            LEVEL_DATA.len(),
+        );
+        for level in active_levels.iter_mut() {
+            for &item in level.item.iter().take(level.item_count as usize) {
+                let item_pos = item as usize;
+                level.data[item_pos] = 1;
             }
         }
     }
@@ -5066,15 +5065,17 @@ fn level_ticker() {
         let left_offset = CONVEY_ROTATE[0];
         let right_offset = CONVEY_ROTATE[1];
 
-        for cell in 0..LEVEL_TILES {
-            match LEVEL_TILE[cell].tile_type {
+        let level_tile = std::slice::from_raw_parts_mut(
+            std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(),
+            LEVEL_TILES,
+        );
+        for t in level_tile.iter_mut() {
+            match t.tile_type {
                 TileType::ConveyL | TileType::RampLC => {
-                    LEVEL_TILE[cell].gfx[left_offset] =
-                        LEVEL_TILE[cell].gfx[left_offset].rotate_right(2);
+                    t.gfx[left_offset] = t.gfx[left_offset].rotate_right(2);
                 }
                 TileType::ConveyR | TileType::RampRC => {
-                    LEVEL_TILE[cell].gfx[right_offset] =
-                        LEVEL_TILE[cell].gfx[left_offset].rotate_left(2);
+                    t.gfx[right_offset] = t.gfx[left_offset].rotate_left(2);
                 }
                 _ => {}
             }
@@ -5090,16 +5091,19 @@ pub fn Level_Ticker() {
 }
 
 fn level_drawer() {
-    for cell in 0..LEVEL_TILES {
-        match unsafe { LEVEL_TILE[cell].draw_mode } {
-            DrawMode::Tile => do_tile(cell, tile(cell)),
+    let level_tile = unsafe {
+        std::slice::from_raw_parts_mut(std::ptr::addr_of_mut!(LEVEL_TILE).cast::<Tile>(), LEVEL_TILES)
+    };
+    for (cell, t) in level_tile.iter_mut().enumerate() {
+        match t.draw_mode {
+            DrawMode::Tile => do_tile(cell, t),
             DrawMode::Item => {
-                do_item(tile_mut(cell));
-                do_tile(cell, tile(cell));
+                do_item(&mut *t);
+                do_tile(cell, t);
             }
             DrawMode::Flash => {
-                do_flash(tile_mut(cell));
-                do_tile(cell, tile(cell));
+                do_flash(&mut *t);
+                do_tile(cell, t);
             }
         }
     }
@@ -5110,6 +5114,8 @@ pub unsafe extern "C" fn Level_Drawer() {
     level_drawer();
 }
 
+// c"" literals forbid the interior nul bytes these control strings carry
+#[allow(clippy::manual_c_str_literals)]
 pub fn level_init() {
     let level_idx = game_level();
     let level = unsafe { &ACTIVE_LEVELS[level_idx] };

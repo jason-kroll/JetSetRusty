@@ -421,7 +421,7 @@ pub fn run() {
 
     // Keyboard and RNG --------------------------------------------------------
     KEY_STATE.with(|c| {
-        c.set(unsafe { sdl::SDL_GetKeyboardState(std::ptr::null_mut()) } as *const u8);
+        c.set(unsafe { sdl::SDL_GetKeyboardState(std::ptr::null_mut()) });
     });
     unsafe { srand(time(std::ptr::null_mut::<i64>()) as u32) };
 

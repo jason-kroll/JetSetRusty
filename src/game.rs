@@ -752,10 +752,10 @@ pub fn game_draw_lives() {
     let game = &*GAME_STATE;
     let lives = game.lives.load(Ordering::Relaxed) as usize;
 
-    for l in 0..lives {
+    for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;
         unsafe {
-            Miner_DrawSeqSprite(pos as i32, 0x0, LIFE_INK[l]);
+            Miner_DrawSeqSprite(pos as i32, 0x0, ink);
         }
     }
 }

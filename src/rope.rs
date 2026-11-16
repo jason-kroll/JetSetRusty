@@ -175,7 +175,7 @@ const R_ABOVE: i32 = 0;
 // ----------------------------------------------------------------------------
 
 fn do_rope_drawer() {
-    let mut data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
+    let data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
     let ink = ROPE.ink.load(Ordering::Relaxed) as u8;
 
     let mut x = ROPE.x.load(Ordering::Relaxed) * 8;
@@ -189,11 +189,9 @@ fn do_rope_drawer() {
     }
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
-    for seg in 1..ROPE_SEGS {
-        let data = &ROPE_DATA[data_idx];
+    for (seg, data) in (1..ROPE_SEGS).zip(ROPE_DATA.iter().skip(data_idx)) {
         y += data.y;
         x -= data.x * ROPE_MOVE[ROPE.side.load(Ordering::Relaxed) as usize];
-        data_idx += 1;
 
         let pos = y * WIDTH + x;
 

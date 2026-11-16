@@ -57,15 +57,13 @@ extern "C" fn do_loader_drawer2() {
         // First row of loading bar: set paper color then draw 22 block chars
         Video_Write(
             80 * WIDTH + 5 * 8,
-            b"\x01\x06\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\0"
-                .as_ptr() as *const i8,
+            c"\x01\x06\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14".as_ptr(),
         );
         // Three more identical rows
         for row in [88i32, 96, 104] {
             Video_Write(
                 row * WIDTH + 5 * 8,
-                b"\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\0"
-                    .as_ptr() as *const i8,
+                c"\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14\x14".as_ptr(),
             );
         }
 
@@ -85,7 +83,7 @@ extern "C" fn do_loader_drawer1() {
         // "fawtytoo" (paper=1, ink=7)
         Video_Write(
             23 * 8 * WIDTH,
-            b"\x01\x01\x02\x07fawtytoo\0".as_ptr() as *const i8,
+            c"\x01\x01\x02\x07fawtytoo".as_ptr(),
         );
 
         // BUILD string right-aligned on the same row
