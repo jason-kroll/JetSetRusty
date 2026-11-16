@@ -154,10 +154,8 @@ static ROPE: RopeState = RopeState {
 // C-visible function pointer variables (game.c calls these indirectly)
 // ----------------------------------------------------------------------------
 
-#[unsafe(no_mangle)]
 pub static mut Rope_Ticker: Event = None;
 
-#[unsafe(no_mangle)]
 pub static mut Rope_Drawer: Event = None;
 
 // ----------------------------------------------------------------------------
@@ -289,8 +287,7 @@ fn rope_drawer_fn() {
     do_rope_drawer();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn Rope_Init() {
+pub fn Rope_Init() {
     let level = GAME_STATE.level.load(Ordering::Relaxed);
     let (x, ink) = match level {
         QUIRKAFLEEG => (16, 6),
