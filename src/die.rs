@@ -5,6 +5,7 @@ use crate::common::WIDTH;
 use crate::game::{GAME_STATE, Game_Action, LIVES};
 use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
 use crate::video::{Video_DrawSprite, Video_PixelInkFill, Video_PixelPaperFill};
+use std::cell::Cell;
 use std::sync::atomic::Ordering;
 
 use crate::game_main::{DoNothing, System_Border};
@@ -16,16 +17,25 @@ unsafe extern "C" {
 }
 
 static dieBlank: [u16; 16] = [0; 16];
-static mut dieLevel: i32 = 0;
+thread_local! {
+    static DIE_LEVEL: Cell<i32> = const { Cell::new(0) };
+}
+
+fn die_level() -> i32 {
+    DIE_LEVEL.with(Cell::get)
+}
+fn set_die_level(v: i32) {
+    DIE_LEVEL.with(|c| c.set(v));
+}
 
 fn Die_Drawer() {
-    Video_PixelInkFill(0, 128 * WIDTH, unsafe { dieLevel >> 1 } as u8);
+    Video_PixelInkFill(0, 128 * WIDTH, (die_level() >> 1) as u8);
 }
 
 fn Die_Ticker() {
     unsafe {
-        dieLevel -= 1;
-        if dieLevel > 0 {
+        set_die_level(die_level() - 1);
+        if die_level() > 0 {
             return;
         }
 
@@ -49,7 +59,7 @@ fn Die_Ticker() {
 fn Die_Init() {
     unsafe {
         GAME_STATE.lives.fetch_sub(1, Ordering::Relaxed);
-        dieLevel = 15;
+        set_die_level(15);
         System_Border(0x0);
         Video_PixelPaperFill(0, 128 * WIDTH, 0x0);
         let miner = GAME_STATE.miner.lock().unwrap();
