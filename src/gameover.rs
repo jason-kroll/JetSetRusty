@@ -1,5 +1,6 @@
 use crate::audio::{Audio_Play, Audio_Sfx, MUS_STOP, SFX_GAMEOVER};
-use crate::common::{Action, DoNothing, Drawer, Responder, Ticker, WIDTH};
+use crate::common::WIDTH;
+use crate::game_main::{DoNothing, set_action, set_drawer, set_responder, set_ticker};
 use crate::video::video_pixel_fill;
 use std::ptr::addr_of;
 
@@ -85,7 +86,7 @@ unsafe extern "C" fn gameover_ticker() {
             return;
         }
 
-        Action = Some(Title_Action);
+        set_action(Some(Title_Action));
     }
 }
 
@@ -100,16 +101,14 @@ unsafe extern "C" fn gameover_init() {
         Audio_Play(MUS_STOP);
         Audio_Sfx(SFX_GAMEOVER as i32);
 
-        Ticker = Some(gameover_ticker);
+        set_ticker(Some(gameover_ticker));
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Gameover_Action() {
-    unsafe {
-        Responder = Some(DoNothing);
-        Ticker = Some(gameover_init);
-        Drawer = Some(gameover_drawer);
-        Action = Some(DoNothing);
-    }
+    set_responder(Some(DoNothing));
+    set_ticker(Some(gameover_init));
+    set_drawer(Some(gameover_drawer));
+    set_action(Some(DoNothing));
 }
