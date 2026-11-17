@@ -1,0 +1,10 @@
+# Death sequence: place Willy on the vertical guardian's patrol line in First
+# Landing (level 28). The robot sweeps through him -> die_action: the ink-fill
+# death animation, lives 7->6, Willy restored at the room entry, then he walks
+# right a little to show play resumes.
+frames 800
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 28   # First Landing (Willy placed at the left edge)
+400 set miner 208 96   # stand on the right platform, on the robot's patrol line
+620 right 60       # after the respawn, walk right
