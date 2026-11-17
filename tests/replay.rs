@@ -175,6 +175,11 @@ fn cheat() {
     check("cheat");
 }
 
+#[test]
+fn harm() {
+    check("harm");
+}
+
 // ---- Tests of the harness: comparison logic ----------------------------------
 
 const A: &str = "000000 aaaa 1111\n000001 bbbb 2222\n000002 cccc 3333\n";

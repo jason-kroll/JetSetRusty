@@ -1,0 +1,14 @@
+# Death by spike tiles: Willy is dropped onto the Harm spire in First Landing
+# (level 28: Harm tiles at col 29, rows 3-7). A jump can never reach them from
+# the platform below (the JSW jump table tops out 20px above take-off), so this
+# pins the spike death the way the game actually delivers it: the first physics
+# tick after placement sees Harm in the tiles below the sprite, -> die_action ->
+# the ink-fill death animation, lives 7->6, the room redraws and Willy is
+# restored at the room entry, then walks right to show play resumes. Unlike
+# death.txt the kill comes from LevelData tile types, not robot sprite overlap.
+frames 900
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 28   # First Landing
+360 set miner 236 8    # mid-air directly above the spikes (col 29, rows 3-7) -> Harm death
+620 right 60       # after respawn, walk right along the entry floor
