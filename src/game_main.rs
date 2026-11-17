@@ -245,6 +245,43 @@ fn set_joy_state(left: i32, right: i32, fire: i32) {
     JOY_STATE.with(|s| s.set([left, right, fire]));
 }
 
+// Upstream 69070b9 joystick events. The mapping from event to state lives in
+// the pure map_joy_event below so it is unit-testable — replay mode never runs
+// the SDL event loop (JOY_STATE stays zero there), so the golden hashes cannot
+// cover it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum JoyEvent {
+    ButtonDown,
+    ButtonUp,
+    Axis0(i16),
+}
+
+// Map a joystick event to (new [left, right, fire] state, one-shot game input).
+// Any button is "fire" (plus a one-shot Key::Else input); axis 0 beyond
+// +/-255 is left/right, inside the deadzone the reading is ignored.
+fn map_joy_event(state: [i32; 3], ev: JoyEvent) -> ([i32; 3], i32) {
+    match ev {
+        JoyEvent::ButtonDown => ([state[0], state[1], 1], Key::Else as i32),
+        JoyEvent::ButtonUp => ([state[0], state[1], 0], Key::None as i32),
+        JoyEvent::Axis0(value) => {
+            let (left, right) = if value < -255 {
+                (1, 0)
+            } else if value > 255 {
+                (0, 1)
+            } else {
+                (0, 0)
+            };
+            ([left, right, state[2]], Key::None as i32)
+        }
+    }
+}
+
+fn apply_joy_event(ev: JoyEvent) {
+    let (state, input) = map_joy_event(JOY_STATE.with(|s| s.get()), ev);
+    set_joy_state(state[0], state[1], state[2]);
+    set_game_input(input);
+}
+
 // Open a joystick if none is open yet (startup + hotplug), as upstream's
 // SDL_JoystickOpen(0) plus event-driven open.
 fn open_joystick(id: JoystickId) {
@@ -408,35 +445,20 @@ fn system_get_event() -> bool {
                 true
             }
             // Upstream 69070b9: any joystick button is "fire" (and a one-shot
-            // KEY_ELSE input); axis 0 beyond +/-255 is left/right.
+            // Key::Else input); axis 0 beyond +/-255 is left/right. The
+            // mapping itself is the pure, unit-tested map_joy_event.
             Some(SdlEvent::JoyButtonDown { .. }) => {
-                set_joy_state(
-                    JOY_STATE.with(|s| s.get()[0]),
-                    JOY_STATE.with(|s| s.get()[1]),
-                    1,
-                );
-                set_game_input(Key::Else as i32);
+                apply_joy_event(JoyEvent::ButtonDown);
                 true
             }
             Some(SdlEvent::JoyButtonUp { .. }) => {
-                set_joy_state(
-                    JOY_STATE.with(|s| s.get()[0]),
-                    JOY_STATE.with(|s| s.get()[1]),
-                    0,
-                );
+                apply_joy_event(JoyEvent::ButtonUp);
                 true
             }
             Some(SdlEvent::JoyAxisMotion {
                 axis_idx: 0, value, ..
             }) => {
-                let (left, right) = if value < -255 {
-                    (1, 0)
-                } else if value > 255 {
-                    (0, 1)
-                } else {
-                    (0, 0)
-                };
-                set_joy_state(left, right, JOY_STATE.with(|s| s.get()[2]));
+                apply_joy_event(JoyEvent::Axis0(value));
                 true
             }
             Some(SdlEvent::JoyDeviceAdded { which, .. }) => {
@@ -834,6 +856,61 @@ mod tests {
     // game: upstream's Cheat_Disabled unpauses on any unrecognised input, so a
     // leaked Super press (or Super+Tab, which maps to Key::Pause) would
     // otherwise pause/unpause the game from under the WM.
+    // The joystick event mapping (upstream 69070b9), pinned as pure logic:
+    // axis 0 beyond +/-255 is left/right with a deadzone, any button is fire
+    // plus a one-shot Key::Else input, and everything else emits no input.
+    #[test]
+    fn joy_axis_threshold_is_pinned() {
+        let s = [0, 0, 0];
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(-256)),
+            ([1, 0, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(-255)),
+            ([0, 0, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(0)),
+            ([0, 0, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(255)),
+            ([0, 0, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(256)),
+            ([0, 1, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(i16::MIN)),
+            ([1, 0, 0], Key::None as i32)
+        );
+        assert_eq!(
+            map_joy_event(s, JoyEvent::Axis0(i16::MAX)),
+            ([0, 1, 0], Key::None as i32)
+        );
+    }
+
+    #[test]
+    fn joy_buttons_and_axis_preserve_the_other_channels() {
+        // button down: fire=1 and a one-shot Key::Else input, left/right kept
+        assert_eq!(
+            map_joy_event([1, 0, 0], JoyEvent::ButtonDown),
+            ([1, 0, 1], Key::Else as i32)
+        );
+        // button up: fire=0, no one-shot input, left/right kept
+        assert_eq!(
+            map_joy_event([0, 1, 1], JoyEvent::ButtonUp),
+            ([0, 1, 0], Key::None as i32)
+        );
+        // axis motion: fire preserved, no one-shot input
+        assert_eq!(
+            map_joy_event([0, 0, 1], JoyEvent::Axis0(300)),
+            ([0, 1, 1], Key::None as i32)
+        );
+    }
+
     #[test]
     fn gui_keycodes_and_chords_are_swallowed() {
         let lgui = keycode_i32(Kc::LGui);
