@@ -165,6 +165,11 @@ fn rope() {
     check("rope");
 }
 
+#[test]
+fn conveyors() {
+    check("conveyors");
+}
+
 
 // ---- Tests of the harness: comparison logic ----------------------------------
 

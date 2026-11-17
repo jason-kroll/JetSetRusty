@@ -1,0 +1,9 @@
+# Conveyor belt: The Bathroom (the start room, level 33) has a belt at
+# x=160..191. Willy stands on it with no input and the belt carries him;
+# then he walks right off the belt and jumps.
+frames 1000
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+360 set miner 168 96   # stand on the conveyor belt
+560 right 250      # walk right, off the belt
+850 space 1        # jump
