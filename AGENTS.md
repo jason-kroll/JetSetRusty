@@ -116,6 +116,15 @@ The game moved from SDL2 (`sdl2` crate 0.38, system libsdl2 via pkg-config) to S
 - Joystick support (ported from upstream `69070b9`) uses the `JoystickSubsystem`: events enabled, first device opened at startup, later devices via `JoyDeviceAdded`. `JoyAxisMotion` on axis 0 beyond ±255 is left/right, any `JoyButtonDown` is fire (jump / start / a one-shot `Key::Else` input). The state lives in a thread-local `JOY_STATE` cell that stays zero in replay mode, so goldens are unaffected.
 - Keycode *values* are unchanged from SDL2, so `map_keycode`'s arithmetic and the replay scripts are untouched — all golden hashes survived the migration byte-identical.
 
+### Upstream parity — fawtytoo/JetSetWilly @ 783d7c1
+
+`reference/c-original/` is pinned at upstream's initial commit `db7fc50`; upstream has ~70 commits after that (HEAD `783d7c1`). We audited every one against this port (`db7fc50..HEAD`): most gameplay fixes were already in the port (rope cluster, miner movement/sprite fixes, pause rework, Shift-based level cheat, copy-protection default, palette, pan table, large font). Ported since the audit: `7c1aed3` (die level underflow), `941841d` (room-above transition), `a53b948`/`783d7c1` (lives animate with the music clock; gameover sprite), `69070b9` (joystick). Deliberately **not** ported:
+
+- **All timing/vsync commits** — `90b5421` ("Rely on VSYNC alone"), `333eba0`, `a0b2283`, `34dfe4f`, `ae2451c`, `30ea641`, `f1881ec`, `119c332`, `82cea95`. Upstream HEAD paces the game solely via vsync, which runs unthrottled (fast Willy) wherever vsync is ignored; our wall-clock pacer (see *Frame pacing*) already does this correctly and is a deliberate deviation.
+- `9433dcc` — self-admitted regression ("New level uses immediate drawing (regression)").
+- `5729eb8` — SDL2 scale-quality hint; SDL3 side already pinned to `ScaleMode::Nearest`.
+- Pure refactors/housekeeping: `static` keywords, renames, system.c→main.c merge, licence headers, data-table reformats (`92c0cc1`, `1d3fb33`, `6494cea`, `6c534d2`), VS/Debian/images/.gitkeep.
+
 ### Lints
 
 `CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. There are no `static mut`s left, but if one ever reappears, beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build (`4e36bf1`).
