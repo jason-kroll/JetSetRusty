@@ -6,7 +6,7 @@ use sdl3::event::Event as SdlEvent;
 use sdl3::keyboard::{Keycode, Scancode};
 use sdl3::pixels::{Color, PixelFormat};
 use sdl3::rect::Rect;
-use sdl3::render::Texture;
+use sdl3::render::{BlendMode, Texture};
 use std::cell::{Cell, RefCell};
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
@@ -466,6 +466,11 @@ pub fn run() {
     let mut texture = texture_creator
         .create_texture_streaming(PixelFormat::ARGB8888, WIDTH as u32, HEIGHT as u32)
         .expect("create streaming texture");
+    // SDL3 defaults alpha-format textures to BLENDMODE_BLEND (SDL2 used NONE),
+    // but present_frame leaves the alpha byte untouched (zero), so blending
+    // would erase the game image. Restore the SDL2 semantics explicitly.
+    target.set_blend_mode(BlendMode::None);
+    texture.set_blend_mode(BlendMode::None);
 
     sdl.mouse().show_cursor(false);
 
