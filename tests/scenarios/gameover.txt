@@ -1,0 +1,10 @@
+# Game over: same guardian kill as death.txt, but with lives set to 0 first, so
+# after the death animation die_ticker sees lives < 0 and switches to
+# gameover_action: the boot-kick + GAME OVER screen for 256 ticks, then back to
+# the title screen.
+frames 1400
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 28   # First Landing (Willy placed at the left edge)
+360 set lives 0    # the next death takes lives below zero -> game over
+400 set miner 208 96   # stand on the right platform, on the robot's patrol line
