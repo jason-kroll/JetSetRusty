@@ -669,3 +669,53 @@ pub fn game_action() {
     set_ticker(Some(game_init_room));
     set_drawer(Some(do_game_drawer));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering::Relaxed;
+
+    #[test]
+    fn change_level_above_guard() {
+        let game = &*GAME_STATE;
+        let above = Direction::Above as i32;
+
+        // Set current room + Willy's x (tile kept consistent). Drops the
+        // miner lock before returning — never hold it across game_change_level.
+        let setup = |level: i32, x: i32| {
+            game.level.store(level, Relaxed);
+            let mut m = game.miner.lock().unwrap();
+            m.x = x;
+            m.y = 104;
+            m.tile = 13 * 32 + (x / 8);
+            m.air = 0;
+        };
+
+        // Guarded: entering The Drive from below with 22 < x < 32 is blocked.
+        setup(45, 25);
+        game_change_level(above);
+        assert_eq!(game.level.load(Relaxed), 45);
+        assert_eq!(game.miner.lock().unwrap().air, 2);
+
+        // Guarded: entering First Landing from below with x > 182 is blocked.
+        setup(22, 200);
+        game_change_level(above);
+        assert_eq!(game.level.load(Relaxed), 22);
+        assert_eq!(game.miner.lock().unwrap().air, 2);
+
+        // Boundaries are strict: x == 22 and x == 182 are NOT blocked.
+        setup(45, 22);
+        game_change_level(above);
+        assert_eq!(game.level.load(Relaxed), THEDRIVE); // 4
+        assert_eq!(game.miner.lock().unwrap().y, 104); // Above branch repositions
+
+        setup(22, 182);
+        game_change_level(above);
+        assert_eq!(game.level.load(Relaxed), FIRSTLANDING); // 28
+
+        // Unguarded plain Above transition: First Landing (28) -> Top Landing (34).
+        setup(28, 40);
+        game_change_level(above);
+        assert_eq!(game.level.load(Relaxed), 34);
+    }
+}
