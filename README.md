@@ -3,10 +3,6 @@
 *Some rando on the internet is porting fawtytoo's C version of JetSetWilly into
 Rust. This is that port.*
 
-**Note about the rewrite:** the zlib [`LICENCE`](LICENCE) (clause 2) requires
-altered versions to be *plainly marked as such*. This is a modified port, not
-the original software (see *Licence* below).
-
 A Rust port of **Jet Set Willy**, the 1984 ZX Spectrum game by Matthew Smith
 (Software Projects). It is ported from
 [fawtytoo/JetSetWilly](https://github.com/fawtytoo/JetSetWilly), Steve Clark's
@@ -14,9 +10,14 @@ C/SDL2 reimplementation. The game is now 100% Rust, with no C compiled, and
 gameplay is meant to be identical to the C version.
 
 The reference implementation in C lives surprisingly in the
-[reference/c-original/](reference/c-original/) — directory. More commit have
+[reference/c-original/](reference/c-original/) — directory. More commits have
 been made to the original since I started this and I haven't ported them over
 quite yet.
+
+**Note** the zlib [`LICENCE`](LICENCE) (clause 2) requires altered versions to
+be *plainly marked as such*. So, this is a **modified port**, not the original
+software (see *Licence* below), although the C original in included for
+reference (in a directory by that very name).
 
 You can see the original README.md [here](reference/c-original/README.md)
 
