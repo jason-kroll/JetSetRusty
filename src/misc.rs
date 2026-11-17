@@ -169,9 +169,76 @@ pub fn video_viewport(
     multiply
 }
 
+// Initial size for a `--windowed` window: the largest integer scale (up to 4)
+// of the full screen including its 8-pixel border — (WIDTH+16) x (HEIGHT+16)
+// = 272x208, exactly 4:3 — that fits inside the desktop mode, so the window
+// opens as a crisp integer upscale (1088x832 on a 1080p display). A tiling
+// window manager can then reshape it freely; the per-frame letterbox in
+// game_main keeps the game at 4:3 whatever size it ends up.
+pub fn windowed_size(display_w: i32, display_h: i32) -> (i32, i32) {
+    const MAX_MULTIPLY: i32 = 4;
+    let screen_w = WIDTH + 16;
+    let screen_h = HEIGHT + 16;
+    for m in (1..=MAX_MULTIPLY).rev() {
+        if screen_w * m <= display_w && screen_h * m <= display_h {
+            return (screen_w * m, screen_h * m);
+        }
+    }
+    // Degenerate tiny display: fall back to the 1x screen size.
+    (screen_w, screen_h)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // video_viewport as a pure (x, y, w, h, multiply) tuple.
+    fn vp(width: i32, height: i32) -> (i32, i32, i32, i32, i32) {
+        let (mut x, mut y, mut w, mut h) = (0, 0, 0, 0);
+        let m = video_viewport(width, height, &mut x, &mut y, &mut w, &mut h);
+        (x, y, w, h, m)
+    }
+
+    // video_viewport is the per-frame letterbox: whatever the window size
+    // (fullscreen desktop or a reshaped --windowed window), the game area is
+    // centered and keeps the 4:3 ratio of the full 272x208 screen, with an
+    // integer multiply clamped to >= 1. These pin the exact arithmetic.
+    #[test]
+    fn video_viewport_pins_fullscreen_1080p() {
+        assert_eq!(vp(1920, 1080), (296, 42, 1328, 996, 5));
+    }
+
+    #[test]
+    fn video_viewport_pins_exact_4x_window() {
+        // 1088x832 = 4x the 272x208 screen: exact 4x game area, 32px border.
+        assert_eq!(vp(1088, 832), (32, 32, 1024, 768, 4));
+    }
+
+    #[test]
+    fn video_viewport_pins_landscape_window() {
+        assert_eq!(vp(1000, 500), (193, 19, 614, 461, 2));
+    }
+
+    #[test]
+    fn video_viewport_pins_portrait_window() {
+        assert_eq!(vp(800, 1200), (24, 318, 752, 564, 2));
+    }
+
+    #[test]
+    fn video_viewport_clamps_multiply_on_tiny_windows() {
+        let (x, y, w, h, m) = vp(200, 200);
+        assert_eq!((x, y, w, h), (6, 29, 188, 141));
+        assert_eq!(m, 1); // 141 / 192 = 0, clamped to 1
+    }
+
+    #[test]
+    fn windowed_size_picks_largest_fitting_scale() {
+        assert_eq!(windowed_size(1920, 1080), (1088, 832)); // 4x fits
+        assert_eq!(windowed_size(1366, 768), (816, 624)); // 4x too tall, 3x fits
+        assert_eq!(windowed_size(1024, 768), (816, 624));
+        assert_eq!(windowed_size(500, 400), (272, 208)); // only 1x fits
+        assert_eq!(windowed_size(100, 100), (272, 208)); // degenerate fallback
+    }
 
     // Pin every palette entry as an exact RGB triple.
     #[test]

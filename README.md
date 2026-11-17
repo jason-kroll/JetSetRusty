@@ -47,6 +47,29 @@ that.)
 Also, the 1984 original has this nice room called \[ that we can't get to. I
 haven't decided what to do about that yet, but it really should be reachable.
 
+## Deliberate Differences
+
+So, now that we're fully ported from C to Rust, and I'm not going to make
+changes that would be merged back into fawtytoo's upstream original, I used a
+GitHub feature to remove this repo from the fork map. It's now kinda its own
+thing. Why not add some flags to play around with the implementation?
+
+### --items N
+
+In order to test the victory sequence, you can start up JSW and tell it that you
+only need to find N items (where a sensible N might be 1 for example) like so:
+
+```sh
+cargo run -- --items 1
+```
+
+### --windowed
+
+If you'd like to play JSW in a window instead of fullscreen, use this flag
+```sh
+cargo run -- --windowed
+```
+
 ![JetSet Willy title screen](images/JetSetWilly-Title.gif)
 
 ## Controls
@@ -68,6 +91,10 @@ Type the cheat code just like in the original. Once it's active, hold a level
 key and press Enter: `1`–`0` select levels 1–10, `A`–`T` select levels 11–30,
 and holding Shift moves those to 31–60. See [`ROOMS.md`](ROOMS.md) for the
 full room list.
+
+The cheat mode is persistent once enabled, so if you die (as likely you will...)
+you can start again in The Bathroom and transport again wherever. You can tell
+it's enabled because a white and blue Maria shows up in the game status display.
 
 ### Copy protection
 
@@ -105,6 +132,7 @@ from. Cargo does not compile it.
 
 ## Licence
 
-zlib licence; see [`LICENCE`](LICENCE). Copyright © 2021–2026 Steve Clark and
-© 1984 Matthew Smith (Software Projects). In keeping with the licence, this is
-an **altered version**: a Rust port, not the original software.
+zlib licence; see [`LICENCE`](LICENCE). Copyright © 2021–2026 Steve Clark and ©
+1984 Matthew Smith (Software Projects). In keeping with the licence, this is an
+**altered version**: a Rust port with additional changes, not the original
+software.

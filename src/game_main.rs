@@ -1,5 +1,5 @@
 use crate::common::{Event, HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport};
+use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport, windowed_size};
 use sdl3::EventPump;
 use sdl3::JoystickSubsystem;
 use sdl3::audio::{AudioCallback, AudioFormat, AudioSpec, AudioStream};
@@ -462,6 +462,41 @@ pub(crate) fn map_keycode(sym: i32) -> i32 {
     }
 }
 
+// ---- Command-line dev flags -------------------------------------------------
+
+// `jetsetrusty [--windowed] [--items N]` (`--replay` is handled separately in
+// run() before SDL init). Parsed as a pure function so the flag combinations
+// are unit-testable.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct DevFlags {
+    // Open a resizable window instead of fullscreen; the game is letterboxed
+    // to 4:3 inside whatever size the window manager gives the window.
+    pub windowed: bool,
+    // `--items N`: debug override for the remaining-item count at game start
+    // (None = unset).
+    pub items: Option<i32>,
+}
+
+pub(crate) fn parse_flags(args: &[String]) -> DevFlags {
+    let mut flags = DevFlags::default();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--windowed" {
+            flags.windowed = true;
+            i += 1;
+        } else if args[i] == "--items" {
+            // A missing or unparseable value still consumes the slot.
+            if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<i32>().ok()) {
+                flags.items = Some(v);
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    flags
+}
+
 // ---- Entry point ------------------------------------------------------------
 
 // Wall-clock pacer arithmetic as pure functions, so unit tests can pin the
@@ -486,19 +521,10 @@ pub fn run() {
     if args.get(1).map(String::as_str) == Some("--replay") {
         std::process::exit(crate::replay::main(&args[2..]));
     }
-    let mut i = 1;
-    while i < args.len() {
-        if args[i] == "--items" {
-            if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<i32>().ok()) {
-                DEBUG_ITEM_COUNT.store(v, Relaxed);
-                eprintln!(
-                    "jetsetrusty: --items {v} (remaining-item count overridden at game start)"
-                );
-            }
-            i += 2;
-        } else {
-            i += 1;
-        }
+    let flags = parse_flags(&args[1..]);
+    if let Some(v) = flags.items {
+        DEBUG_ITEM_COUNT.store(v, Relaxed);
+        eprintln!("jetsetrusty: --items {v} (remaining-item count overridden at game start)");
     }
 
     // SDL init ----------------------------------------------------------------
@@ -510,19 +536,37 @@ pub fn run() {
         .get_mode()
         .expect("desktop display mode");
 
+    // The letterboxed viewport is recomputed every frame in the main loop from
+    // the window's current drawable size; `multiply` is the integer upscale of
+    // the game texture into the target texture below. Initialised from the
+    // desktop mode — in `--windowed` mode the first loop iteration recomputes
+    // it from the actual window size before anything is drawn.
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let multiply = video_viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
-    let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
+    let mut multiply = video_viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
 
     // Window and renderer -----------------------------------------------------
     // SDL3 dropped SDL_WINDOW_FULLSCREEN_DESKTOP: plain fullscreen is
     // borderless at the desktop resolution, which is what we want.
-    let window = video
-        .window("Jet-Set Willy", 0, 0)
-        .position_centered()
-        .fullscreen()
-        .build()
-        .expect("create window");
+    // `--windowed` instead opens a resizable window at an integer scale of the
+    // full 272x208 screen (game area + border); the per-frame letterbox in the
+    // main loop keeps the game at 4:3 inside whatever shape the window manager
+    // gives the window, with the border colour filling the bars.
+    let window = if flags.windowed {
+        let (ww, wh) = windowed_size(mode.w, mode.h);
+        video
+            .window("Jet-Set Willy", ww as u32, wh as u32)
+            .position_centered()
+            .resizable()
+            .build()
+            .expect("create window")
+    } else {
+        video
+            .window("Jet-Set Willy", 0, 0)
+            .position_centered()
+            .fullscreen()
+            .build()
+            .expect("create window")
+    };
     // SDL3 dropped the renderer flags: create_renderer picks an accelerated
     // vsync renderer by default where supported. Pacing is wall-clock (see
     // the main loop), so vsync is only for tear-free output, never timing.
@@ -642,6 +686,38 @@ pub fn run() {
 
         present_frame(&mut texture);
 
+        // Re-letterbox for the window's current size. output_size is the
+        // renderer's drawable size in pixels, so HiDPI scaling is handled;
+        // fall back to the window's screen-coordinate size on error. In
+        // fullscreen the size never changes, so this yields the same viewport
+        // as at startup; in `--windowed` mode a reshaped window is re-fit
+        // every frame.
+        let (win_w, win_h) = canvas
+            .output_size()
+            .unwrap_or_else(|_| canvas.window().size());
+        let new_multiply = video_viewport(
+            win_w as i32,
+            win_h as i32,
+            &mut vx,
+            &mut vy,
+            &mut vw,
+            &mut vh,
+        );
+        if new_multiply != multiply {
+            // The window crossed an integer-scale threshold: recreate the
+            // upscale target at the new multiply (same SDL3 modes as below).
+            multiply = new_multiply;
+            target = texture_creator
+                .create_texture_target(
+                    PixelFormat::ARGB8888,
+                    (WIDTH * multiply) as u32,
+                    (HEIGHT * multiply) as u32,
+                )
+                .expect("create target texture");
+            target.set_blend_mode(BlendMode::None);
+            target.set_scale_mode(ScaleMode::Nearest);
+        }
+
         let [r, g, b] = colour_rgb(BORDER_INDEX.load(Relaxed));
         canvas.set_draw_color(Color::RGB(r, g, b));
         canvas.clear();
@@ -651,9 +727,12 @@ pub fn run() {
                     .expect("copy game texture to target");
             })
             .expect("render target support");
-        canvas
-            .copy(&target, None, viewport)
-            .expect("copy target to window");
+        if vw > 0 && vh > 0 {
+            let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
+            canvas
+                .copy(&target, None, viewport)
+                .expect("copy target to window");
+        }
         canvas.present();
     }
 
@@ -723,6 +802,57 @@ mod tests {
         for k in [Key::Enter, Key::K1, Key::K2, Key::K3, Key::K4] {
             assert_eq!(map_keycode(SDL_KEYS[k as usize]), k as i32);
         }
+    }
+
+    #[test]
+    fn parse_flags_handles_windowed_and_items() {
+        let a = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(parse_flags(&a(&[])), DevFlags::default());
+        assert_eq!(
+            parse_flags(&a(&["--windowed"])),
+            DevFlags {
+                windowed: true,
+                items: None
+            }
+        );
+        assert_eq!(
+            parse_flags(&a(&["--items", "7", "--windowed"])),
+            DevFlags {
+                windowed: true,
+                items: Some(7)
+            }
+        );
+        assert_eq!(
+            parse_flags(&a(&["--windowed", "--items", "-3"])),
+            DevFlags {
+                windowed: true,
+                items: Some(-3)
+            }
+        );
+        // Unknown flags are ignored; a missing or invalid --items value is
+        // consumed without setting items (same as the old inline loop).
+        assert_eq!(
+            parse_flags(&a(&["--bogus", "--items"])),
+            DevFlags {
+                windowed: false,
+                items: None
+            }
+        );
+        assert_eq!(
+            parse_flags(&a(&["--items", "x", "--windowed"])),
+            DevFlags {
+                windowed: true,
+                items: None
+            }
+        );
+        // Repeated --items: the last one wins (the old loop overwrote too).
+        assert_eq!(
+            parse_flags(&a(&["--items", "1", "--items", "2"])),
+            DevFlags {
+                windowed: false,
+                items: Some(2)
+            }
+        );
     }
 
     #[test]

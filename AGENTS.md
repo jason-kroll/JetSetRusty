@@ -11,9 +11,12 @@ A Rust port of the 1984 ZX Spectrum game "Jet Set Willy" (originally by Matthew 
 ```bash
 cargo build           # debug build
 cargo build --release # optimized
-cargo run             # run the game
+cargo run             # run the game (fullscreen)
+cargo run -- --windowed  # run in a resizable window instead
 cargo test            # golden-frame regression tests (see *Regression tests*)
 ```
+
+Dev flags (parsed in `game_main.rs::parse_flags`): `--windowed` opens a resizable window at an integer scale of the full 272x208 screen (game area + border, e.g. 1088x832 on 1080p — see `misc.rs::windowed_size`) instead of fullscreen; the main loop re-runs `video_viewport` every frame against the window's current drawable size, so the game stays letterboxed at 4:3 with the border colour filling the bars whatever shape a tiling WM gives it. `--items N` overrides the remaining-item count at game start. Both compose; under `--replay` they are ignored (replay never initialises SDL, so the golden hashes are unaffected).
 
 **Required tools:** `build-essential cmake` — no system SDL package is needed.
 
