@@ -1,5 +1,7 @@
 #![warn(unused_unsafe)]
-use crate::audio::{MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_play, audio_sfx};
+use crate::audio::{
+    MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_music_clock, audio_play, audio_sfx,
+};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::gameover_action;
@@ -25,7 +27,7 @@ use crate::game_main::{
 };
 use crate::levels::level_init;
 use crate::miner::{
-    miner_draw_seq_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
+    miner_draw_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
 };
 use crate::misc::{timer_set, timer_update};
 use crate::robots::{robots_draw_cheat, robots_drawer, robots_flush, robots_init, robots_ticker};
@@ -621,7 +623,8 @@ pub fn game_draw_lives() {
 
     for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;
-        miner_draw_seq_sprite(pos as i32, 0x0, ink);
+        // Upstream a53b948: lives animate with musicClock >> 4, as in the original.
+        miner_draw_sprite(pos as i32, 0x0, ink, audio_music_clock() >> 4);
     }
 }
 

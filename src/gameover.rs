@@ -3,6 +3,7 @@ use crate::common::WIDTH;
 use crate::game_main::{
     do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
 };
+use crate::miner::miner_draw_sprite;
 use crate::video::video_pixel_fill;
 use std::cell::{Cell, RefCell};
 
@@ -18,10 +19,6 @@ static PLINTH_SPRITE: [u16; 16] = [
 static BOOT_SPRITE: [u16; 16] = [
     4224, 4224, 4224, 4224, 4224, 4224, 4224, 8320, 8320, 18498, 34869, 33801, 32769, 32770, 17293,
     15478,
-];
-
-static MINER_SPRITE: [u16; 16] = [
-    960, 960, 2016, 832, 992, 960, 384, 960, 2016, 2016, 3952, 4016, 960, 1888, 1760, 1904,
 ];
 
 thread_local! {
@@ -95,7 +92,8 @@ fn gameover_ticker() {
 fn gameover_init() {
     system_border(0x0);
     video_pixel_fill(0, 128 * WIDTH);
-    video_draw_sprite(96 * WIDTH + 15 * 8, &MINER_SPRITE, 0x0, 0x7);
+    // Upstream 783d7c1: draw Willy via Miner_DrawSprite with index 2.
+    miner_draw_sprite(96 * WIDTH + 15 * 8, 0x0, 0x7, 2);
     video_draw_sprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
     set_boot_ticks(0);
 

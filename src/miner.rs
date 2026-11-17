@@ -144,8 +144,9 @@ pub fn miner_inc_seq() {
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
-pub fn miner_draw_seq_sprite(pos: i32, paper: u8, ink: u8) {
-    let row = MINER_SEQUENCE[miner_seq_index() as usize];
+// Upstream Miner_DrawSprite: minerSequence[index & 7].
+pub fn miner_draw_sprite(pos: i32, paper: u8, ink: u8, index: i32) {
+    let row = MINER_SEQUENCE[(index & 7) as usize];
     video_draw_sprite(pos, &MINER_SPRITE[row], paper, ink);
 }
 

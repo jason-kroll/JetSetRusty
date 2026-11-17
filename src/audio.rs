@@ -184,6 +184,11 @@ pub fn audio_music_playing() -> i32 {
     AUDIO_MUSIC_PLAYING.load(Ordering::Relaxed)
 }
 
+// Upstream a53b948 animates the lives icons with musicClock >> 4.
+pub fn audio_music_clock() -> i32 {
+    AUDIO_STATE.lock().unwrap().music_clock
+}
+
 pub fn audio_pan_x() -> i32 {
     AUDIO_PAN_X.with(Cell::get)
 }
