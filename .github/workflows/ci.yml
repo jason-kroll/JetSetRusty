@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # lets you re-run it by hand from the Actions tab
+
+permissions:
+  contents: read # least privilege; the workflow only reads the repo
+
+concurrency: # cancel a run if a newer commit lands mid-run
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # edition 2024 needs Rust >= 1.85; stable is fine (no rust-version pinned)
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      # SDL3 is compiled from source by sdl3-sys, so cmake + gcc are required
+      # even though no system SDL package is needed.
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - uses: Swatinem/rust-cache@v2 # caches ~/.cargo + target/; without this
+      # every run recompiles SDL3 from source (minutes)
+
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test # includes the golden replay tests (headless, no SDL)
+      - run: cargo build
+
+      # Smoke-run the real binary headless; 124 = killed by timeout, i.e. it
+      # ran the whole time without panicking.
+      - name: Smoke-run (dummy video/audio)
+        run: |
+          for args in "" "--windowed"; do
+            ec=0
+            SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 10 \
+              ./target/debug/jetsetrusty $args || ec=$?
+            if [ "$ec" -ne 0 ] && [ "$ec" -ne 124 ]; then exit "$ec"; fi
+          done
