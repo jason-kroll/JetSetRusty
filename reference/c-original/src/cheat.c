@@ -1,81 +1,86 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "common.h"
 #include "game.h"
 
-char        cheatCode[] = "writetyper.";
-int         cheatEnabled = 0;
-int         cheatPos = 0;
-int         cheatLevel[2];
-EVENT       Cheat_Responder = Cheat_Disabled;
+static char         *cheatCode = "writetyper";
+static int          cheatPos = 0;
+
+int                 cheatEnabled = 0;
+EVENT               Cheat_Responder = Cheat_Disabled;
 
 void Cheat_Enabled()
 {
-    int         level;
+    int     level = 0;
+    int     i;
 
-    if (gameInput == KEY_ENTER && cheatPos > 0)
+    for (i = 0; i < 30; i++)
     {
-        level = cheatLevel[0];
-        if (cheatPos == 2)
+        if (System_IsKey(KEY_1 + i))
         {
-            level = level * 10 + cheatLevel[1];
+            level = i + 1;
+            break;
         }
-        level--;
-
-        cheatPos = 0;
-
-        if (level < 0 || level > 59 || level == gameLevel)
-        {
-            return;
-        }
-
-        gameLevel = level;
-        Ticker = Game_InitRoom; // NOT Action
-        return;
     }
 
-    if (gameInput < KEY_0 || gameInput > KEY_9)
+    if (!System_IsKey(KEY_ENTER))
     {
-        cheatPos = 0;
+        Game_Pause(0);
         return;
     }
 
-    if (cheatPos == 2)
+    if (level == 0)
     {
-        cheatPos = 0;
         return;
     }
 
-    cheatLevel[cheatPos] = gameInput - KEY_0;
-    cheatPos++;
+    if (System_IsKey(KEY_LSHIFT) || System_IsKey(KEY_RSHIFT))
+    {
+        level += 30;
+    }
+
+    level--;
+    if (level == gameLevel)
+    {
+        return;
+    }
+
+    gameLevel = level;
+    Action = Game_InitRoom;
 }
 
 void Cheat_Disabled()
 {
-    if (gameLevel != FIRSTLANDING || minerWilly.y != 104)
+    if (gameLevel != FIRSTLANDING || minerWilly.y != 104 || cheatCode[cheatPos] != gameInput - KEY_A + 'a')
     {
         cheatPos = 0;
-        return;
-    }
-
-    if (gameInput < KEY_A || gameInput > KEY_Z)
-    {
-        return;
-    }
-
-    if (cheatCode[cheatPos] != gameInput - KEY_A + 'a')
-    {
-        cheatPos = 0;
+        Game_Pause(0);
         return;
     }
 
     cheatPos++;
-    if (cheatCode[cheatPos] != '.')
+    if (cheatCode[cheatPos] != '\0')
     {
         return;
     }
 
-    cheatEnabled = 1;
-    cheatPos = 0;
+    Game_CheatEnabled();
 
     Cheat_Responder = Cheat_Enabled;
-    Robots_DrawCheat();
 }

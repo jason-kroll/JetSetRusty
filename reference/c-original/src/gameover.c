@@ -1,18 +1,35 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "common.h"
 #include "video.h"
 #include "audio.h"
-#include "system.h"
 #include "game.h"
 
-WORD    plinthSprite[16] = {14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0, 30702, 14316};
-WORD    bootSprite[16] = {4224, 4224, 4224, 4224, 4224, 4224, 4224, 8320, 8320, 18498, 34869, 33801, 32769, 32770, 17293, 15478};
+static u16      plinthSprite[16] = {14316, 30702, 0, 28662, 61431, 61431, 54619, 56251, 54619, 57339, 60791, 61175, 28022, 0, 30702, 14316};
+static u16      bootSprite[16] = {4224, 4224, 4224, 4224, 4224, 4224, 4224, 8320, 8320, 18498, 34869, 33801, 32769, 32770, 17293, 15478};
 
-int     bootTicks;
+static int      bootTicks;
 
-char    textGame[18] = "\x1\x0\x2\x0" "G " "\x2\x0" "a " "\x2\x0" "m " "\x2\x0" "e";
-char    textOver[18] = "\x1\x0\x2\x0" "O " "\x2\x0" "v " "\x2\x0" "e " "\x2\x0" "r";
+static char     textGame[18] = "\x1\x0\x2\x0" "G " "\x2\x0" "a " "\x2\x0" "m " "\x2\x0" "e";
+static char     textOver[18] = "\x1\x0\x2\x0" "O " "\x2\x0" "v " "\x2\x0" "e " "\x2\x0" "r";
 
-void Gameover_Drawer()
+static void Gameover_Drawer()
 {
     if (bootTicks <= 96)
     {
@@ -29,7 +46,7 @@ void Gameover_Drawer()
     Video_WriteLarge(18 * 8, 6 * 8, textOver);
 }
 
-void Gameover_Ticker()
+static void Gameover_Ticker()
 {
     int c = bootTicks >> 2;
 
@@ -52,11 +69,11 @@ void Gameover_Ticker()
     Action = Title_Action;
 }
 
-void Gameover_Init()
+static void Gameover_Init()
 {
     System_Border(0x0);
     Video_PixelFill(0, 128 * WIDTH);
-    Video_DrawSprite(96 * WIDTH + 15 * 8, minerSprite[4 + 2], 0x0, 0x7);
+    Miner_DrawSprite(96 * WIDTH + 15 * 8, 0x0, 0x7, 2);
     Video_DrawSprite(112 * WIDTH + 15 * 8, plinthSprite, 0x0, 0x2);
     bootTicks = 0;
 

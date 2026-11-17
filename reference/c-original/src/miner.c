@@ -1,11 +1,28 @@
-#include "common.h"
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
+#include "misc.h"
 #include "video.h"
 #include "game.h"
 #include "audio.h"
-#include "system.h"
 
-#define D_LEFT  0
-#define D_RIGHT 1
+#define D_RIGHT 0
+#define D_LEFT  1
 #define D_JUMP  2
 
 typedef struct
@@ -19,20 +36,27 @@ typedef struct
 }
 JUMP;
 
-WORD    minerSprite[9][16] =
+static u16      minerSprite[16][16] =
 {
-    {3840, 3840, 8064, 2816, 7936, 3840, 1536, 3840, 8064, 16320, 32736, 28512, 7936, 23424, 28864, 12736},
-    {960, 960, 2016, 704, 1984, 960, 384, 960, 2016, 2016, 3824, 3568, 960, 1760, 1888, 3808},
-    {240, 240, 504, 176, 496, 240, 96, 240, 472, 472, 472, 440, 240, 96, 96, 224},
-    {60, 60, 126, 44, 124, 60, 24, 60, 126, 126, 239, 223, 60, 110, 118, 238},
     {15360, 15360, 32256, 13312, 15872, 15360, 6144, 15360, 32256, 32256, 63232, 64256, 15360, 30208, 28160, 30464},
     {3840, 3840, 8064, 3328, 3968, 3840, 1536, 3840, 7040, 7040, 7040, 7552, 3840, 1536, 1536, 1792},
     {960, 960, 2016, 832, 992, 960, 384, 960, 2016, 2016, 3952, 4016, 960, 1888, 1760, 1904},
     {240, 240, 504, 208, 248, 240, 96, 240, 504, 1020, 2046, 1782, 248, 474, 782, 908},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+    {3840, 3840, 8064, 2816, 7936, 3840, 1536, 3840, 8064, 16320, 32736, 28512, 7936, 23424, 28864, 12736},
+    {960, 960, 2016, 704, 1984, 960, 384, 960, 2016, 2016, 3824, 3568, 960, 1760, 1888, 3808},
+    {240, 240, 504, 176, 496, 240, 96, 240, 472, 472, 472, 440, 240, 96, 96, 224},
+    {60, 60, 126, 44, 124, 60, 24, 60, 126, 126, 239, 223, 60, 110, 118, 238},
+    {32768, 20480, 43008, 20480, 43008, 54528, 27136, 55040, 43648, 55232, 65472, 32256, 17408, 17408, 0, 0},
+    {0, 0, 0, 0, 0, 11328, 7808, 16320, 10912, 22000, 11248, 24448, 4352, 8320, 0, 0},
+    {0, 0, 0, 0, 0, 2832, 1952, 4080, 3432, 2748, 5500, 2784, 5440, 10816, 5120, 10240},
+    {0, 0, 0, 0, 0, 712, 488, 1020, 682, 1375, 703, 1528, 272, 160, 0, 0},
+    {0, 0, 0, 0, 0, 4928, 6016, 16320, 21824, 64160, 64832, 8096, 2176, 1280, 0, 0},
+    {0, 0, 0, 0, 0, 2256, 1504, 4080, 5808, 15696, 16040, 1872, 680, 596, 40, 20},
+    {0, 0, 0, 0, 0, 564, 376, 1020, 1364, 4010, 4052, 506, 136, 260, 0, 0},
+    {3, 10, 21, 10, 21, 171, 86, 235, 341, 1003, 1023, 126, 34, 34, 0, 0}
 };
 
-JUMP    jumpInfo[] =
+static JUMP     jumpInfo[] =
 {
     {-4, -32, 6, 5, 72},
     {-4, 0, 4, 5, 74},
@@ -54,24 +78,24 @@ JUMP    jumpInfo[] =
     {4, 32, 4, 5, 72}
 };
 
-MINER   minerWilly, minerStore;
-WORD    (*minerFrame)[16];
-int     minerAttrSplit;
-int     minerAlign;
+static MINER    minerStore;
+static u16      (*minerFrame)[16];
 
-BYTE    minerSeqIndex;
-int     minerSeq[] = {4, 5, 6, 7, 3, 2, 1, 0};
+MINER           minerWilly = {.frame = 0, .dir = D_RIGHT};
+int             minerWillyRope;
+int             minerAttrSplit;
 
-WORD *Miner_GetSprite()
+static int      minerSequence[8] = {0, 1, 2, 3, 7, 6, 5, 4};
+
+void Miner_DrawSprite(int pos, u8 paper, u8 ink, int index)
 {
-    return minerSprite[minerSeq[minerSeqIndex >> 5]];
+    Video_DrawSprite(pos, minerSprite[minerSequence[index & 7]], paper, ink);
 }
 
 void Miner_Restore()
 {
     minerWilly.x = minerStore.x;
     minerWilly.y = minerStore.y;
-    minerWilly.dy = minerStore.dy;
     minerWilly.tile = minerStore.tile;
     minerWilly.align = minerStore.align;
     minerWilly.frame = minerStore.frame;
@@ -79,14 +103,12 @@ void Miner_Restore()
     minerWilly.move = minerStore.move;
     minerWilly.air = minerStore.air;
     minerWilly.jump = minerStore.jump;
-    minerWilly.rope = minerStore.rope;
 }
 
 void Miner_Save()
 {
     minerStore.x = minerWilly.x;
     minerStore.y = minerWilly.y;
-    minerStore.dy = minerWilly.dy;
     minerStore.tile = minerWilly.tile;
     minerStore.align = minerWilly.align;
     minerStore.frame = minerWilly.frame;
@@ -94,12 +116,15 @@ void Miner_Save()
     minerStore.move = minerWilly.move;
     minerStore.air = minerWilly.air;
     minerStore.jump = minerWilly.jump;
-    minerStore.rope = minerWilly.rope;
 
-    minerFrame = gameLevel == NIGHTMAREROOM ? robotGfx[20] : minerSprite;
+    minerFrame = &minerSprite[0];
+    if (gameLevel == NIGHTMAREROOM)
+    {
+        minerFrame = &minerSprite[8];
+    }
 }
 
-int IsSolid(int tile)
+static int IsSolid(int tile)
 {
     if (tile < 0 || tile == 512)
     {
@@ -139,7 +164,7 @@ int IsSolid(int tile)
     return 0;
 }
 
-void MoveLeftRight()
+static void MoveLeftRight()
 {
     int y = 0, offset = 0;
 
@@ -148,14 +173,14 @@ void MoveLeftRight()
         return;
     }
 
-    if (minerWilly.rope > 0)
+    if (minerWillyRope > 0)
     {
         return;
     }
 
     if (minerWilly.dir == D_RIGHT)
     {
-        if (minerWilly.frame < 7)
+        if (minerWilly.frame < 3)
         {
             minerWilly.frame++;
             return;
@@ -188,7 +213,7 @@ void MoveLeftRight()
 
         minerWilly.x += 8;
         minerWilly.tile++;
-        minerWilly.frame = 4;
+        minerWilly.frame = 0;
     }
     else if (gameMode != GM_RUNNING)
     {
@@ -228,28 +253,20 @@ void MoveLeftRight()
         minerWilly.frame = 3;
     }
 
-    if (minerWilly.y + y < 0)
-    {
-        Game_ChangeLevel(R_ABOVE);
-        return;
-    }
-
     minerWilly.y += y;
     minerWilly.tile += offset;
 }
 
-void UpdateDir(int conveyDir)
+static void UpdateDir(int conveyDir)
 {
     int dir = 0;
 
-    System_UpdateKeys();
-
-    if ((System_IsKeyLeft() || conveyDir == C_LEFT) && gameMode < GM_RUNNING)
+    if ((System_IsKey(KEY_LEFT) || System_IsJoyLeft() || conveyDir == C_LEFT) && gameMode < GM_RUNNING)
     {
         dir += 1;
     }
 
-    if (System_IsKeyRight() || conveyDir == C_RIGHT || gameMode == GM_RUNNING)
+    if (System_IsKey(KEY_RIGHT) || System_IsJoyRight() || conveyDir == C_RIGHT || gameMode == GM_RUNNING)
     {
         dir += 2;
     }
@@ -264,7 +281,6 @@ void UpdateDir(int conveyDir)
         {
             minerWilly.dir = D_LEFT;
             minerWilly.move = 0;
-            minerWilly.frame &= 3;
         }
         else
         {
@@ -277,7 +293,6 @@ void UpdateDir(int conveyDir)
         {
             minerWilly.dir = D_RIGHT;
             minerWilly.move = 0;
-            minerWilly.frame += 4;
         }
         else
         {
@@ -285,13 +300,13 @@ void UpdateDir(int conveyDir)
         }
     }
 
-    if (System_IsKeyJump() && gameMode < GM_RUNNING)
+    if ((System_IsKey(KEY_JUMP) || System_IsJoyFire()) && gameMode < GM_RUNNING)
     {
         minerWilly.air = 1;
         minerWilly.jump = 0;
-        if (minerWilly.rope > 0)
+        if (minerWillyRope > 0)
         {
-            minerWilly.rope = -1;
+            minerWillyRope = -16;
             minerWilly.y &= 120;
             minerWilly.align = 4;
             minerWilly.move = 1;
@@ -300,12 +315,12 @@ void UpdateDir(int conveyDir)
     }
 }
 
-void DoMinerTicker()
+static void DoMinerTicker()
 {
     int tile, type[2], y;
     int conveyDir = C_NONE;
 
-    if (minerWilly.rope > 0)
+    if (minerWillyRope > 0)
     {
         UpdateDir(conveyDir);
         return;
@@ -325,7 +340,7 @@ void DoMinerTicker()
         if (Level_GetTileType(tile) == T_SOLID || Level_GetTileType(tile + 1) == T_SOLID)
         {
             // we need to re-align Willy
-            minerWilly.dy = minerWilly.y = (y + 8) & 120;
+            minerWilly.y = (y + 8) & 120;
             minerWilly.tile = tile + 32;
             minerWilly.align = 4;
 
@@ -439,62 +454,69 @@ void DoMinerTicker()
 
 void Miner_Ticker()
 {
-    int tile, offset = 0, align;
-    int i, type;
-
     DoMinerTicker();
 
-    tile = minerWilly.tile;
-    minerWilly.dy = minerWilly.y;
-    align = minerWilly.align;
-
-    if (minerWilly.align == 4 && minerWilly.air == 0)
+    if (minerWilly.y < 0)
     {
-        if (Level_GetTileRamp(tile + 64) == T_RAMPL)
-        {
-            offset = (minerWilly.frame & 3) << 1;
-            align = YALIGN(offset);
-        }
-        else if (Level_GetTileRamp(tile + 65) == T_RAMPR)
-        {
-            offset = 6 - ((minerWilly.frame & 3) << 1);
-            align = YALIGN(offset);
-        }
-
-        minerWilly.dy += offset;
-    }
-
-    for (i = 0; i < align; i++)
-    {
-        tile = minerWilly.tile + SPRITETILE(i);
-        type = Level_GetTileType(tile);
-        if (type == T_ITEM)
-        {
-            Level_EraseItem(tile);
-            Game_GotItem();
-        }
-        else if (type == T_HARM)
-        {
-            Action = Die_Action;
-        }
+        Game_ChangeLevel(R_ABOVE);
     }
 }
 
 void Miner_Drawer()
 {
-    Video_DrawMiner(minerWilly.dy << 8 | minerWilly.x, minerFrame[minerWilly.frame], minerAttrSplit);
+    int     tile, adj, offset = 0, align;
+    int     i;
+
+    align = minerWilly.align;
+
+    if (minerWilly.air == 0)
+    {
+        if (Level_GetTileRamp(minerWilly.tile + 64) == T_RAMPL)
+        {
+            offset = minerWilly.frame << 1;
+            align = YALIGN(offset);
+        }
+        else if (Level_GetTileRamp(minerWilly.tile + 65) == T_RAMPR)
+        {
+            offset = 6 - (minerWilly.frame << 1);
+            align = YALIGN(offset);
+        }
+    }
+
+    if (Video_DrawMiner(((minerWilly.y + offset) << 8) | minerWilly.x, minerFrame[(minerWilly.dir << 2) | minerWilly.frame], minerAttrSplit))
+    {
+        Action = Die_Action;
+        return;
+    }
+
+    tile = minerWilly.tile;
+    for (i = 0, adj = 1; i < align; i++, tile += adj, adj ^= 30)
+    {
+        if (Level_GetTileType(tile) == T_HARM)
+        {
+            Action = Die_Action;
+            return;
+        }
+    }
+
+    tile = minerWilly.tile;
+    for (i = 0, adj = 1; i < align; i++, tile += adj, adj ^= 30)
+    {
+        if (Level_GetTileType(tile) == T_ITEM)
+        {
+            Level_EraseItem(tile);
+            Game_GotItem();
+        }
+    }
 }
 
 void Miner_Init()
 {
     minerWilly.x = 20 * 8;
-    minerWilly.dy = minerWilly.y = 13 * 8;
+    minerWilly.y = 13 * 8;
     minerWilly.tile = 13 * 32 + 20;
     minerWilly.align = 4;
-    minerWilly.frame = 4;
-    minerWilly.dir = D_RIGHT;
     minerWilly.move = 0;
-    minerWilly.rope = 0;
     minerWilly.air = 0;
 
     Miner_Save();

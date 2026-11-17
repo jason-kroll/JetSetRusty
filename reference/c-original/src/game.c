@@ -1,83 +1,30 @@
-#include "common.h"
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
+#include "misc.h"
 #include "audio.h"
 #include "video.h"
-#include "system.h"
 
 #include "game.h"
 
-int     gamePaused = 0, gameMusic = MUS_PLAY;
-int     gameLevel, gameLevelDir;
-int     gameLives;
-int     gameClockTicks;
-int     gameMode;
+static int      gameMusic = MUS_PLAY;
 
-int     itemCount;
-
-char    *levelName[] =
-{
-    "The Off Licence",
-    "The Bridge",
-    "Under the MegaTree",
-    "At the Foot of the MegaTree",
-    "The Drive",
-    "The Security Guard",
-    "Entrance to Hades",
-    "Cuckoo's Nest",
-    "Inside the MegaTrunk",
-    "On a Branch Over the Drive",
-    "The Front Door",
-    "The Hall",
-    "Tree Top",
-    "Out on a limb",
-    "Rescue Esmerelda",
-    "I'm sure I've seen this before..",
-    "We must perform a Quirkafleeg",
-    "Up on the Battlements",
-    "On the Roof",
-    "The Forgotten Abbey",
-    "Ballroom East",
-    "Ballroom West",
-    "To the Kitchens                                Main Stairway",
-    "The Kitchen",
-    "West of Kitchen",
-    "Cold Store",
-    "East Wall Base",
-    "The Chapel",
-    "First Landing",
-    "The Nightmare Room",
-    "The Banyan Tree",
-    "Swimming Pool",
-    "Halfway up the East Wall",
-    "The Bathroom",
-    "Top Landing",
-    "Master Bedroom",
-    "A bit of tree",
-    "Orangery",
-    "Priests' Hole",
-    "Emergency Generator",
-    "Dr Jones will never believe this",
-    "The Attic",
-    "Under the Roof",
-    "Conservatory Roof",
-    "On top of the house",
-    "Under the Drive",
-    "Tree Root",
-    "Nomen Luni",
-    "The Wine Cellar",
-    "Watch Tower",
-    "Tool Shed",
-    "Back Stairway",
-    "Back Door",
-    "West Wing",
-    "West Bedroom",
-    "West Wing Roof",
-    "Above the West Bedroom",
-    "The Beach",
-    "The Yacht",
-    "The Bow"
-};
-
-int     levelBorder[] =
+static int      levelBorder[] =
 {
     5, 4, 6, 2, 3, 1, 2, 1, 4, 2,
     2, 4, 6, 5, 1, 3, 2, 1, 2, 1,
@@ -87,28 +34,26 @@ int     levelBorder[] =
     5, 2, 1, 2, 5, 1, 2, 2, 5, 5
 };
 
-char    gameScoreItems;
-char    gameScoreClock[3];
-EVENT   DoClockUpdate;
+static char     gameScoreItems;
+static char     gameScoreClock[3];
+static EVENT    DoClockUpdate;
 
-int     gameRoom[][4] =
-{
-    {0, 0, 0, 1}, {0, 0, 0, 2}, {0, 1, 0, 3}, {8, 2, 0, 4}, {6, 3, 45, 5}, {10, 4, 6, 19}, {0, 5, 0, 14}, {0, 0, 2, 8}, {12, 7, 3, 9}, {13, 8, 4, 10},
-    {0, 9, 5, 11}, {0, 10, 0, 20}, {0, 0, 8, 13}, {0, 12, 9, 10}, {20, 44, 39, 15}, {0, 14, 0, 16}, {49, 15, 0, 17}, {0, 16, 0, 18}, {18, 17, 0, 47}, {0, 5, 0, 48},
-    {26, 11, 0, 21}, {27, 20, 0, 22}, {28, 21, 0, 23}, {0, 22, 0, 24}, {30, 23, 0, 25}, {31, 24, 0, 51}, {32, 0, 20, 27}, {33, 26, 21, 28}, {34, 27, 22, 29}, {0, 28, 0, 30},
-    {36, 29, 24, 31}, {37, 30, 0, 53}, {38, 0, 26, 33}, {0, 0, 0, 34} /* the bathroom */, {40, 33, 28, 35}, {41, 34, 29, 36}, {42, 35, 30, 37}, {43, 36, 31, 55}, {59, 0, 32, 39}, {14, 38, 0, 40},
-    {16, 39, 0, 41}, {0, 40, 34, 42}, {47, 41, 36, 43}, {0, 42, 37, 0}, {0, 0, 38, 14}, {4, 46, 0, 6}, {3, 47, 0, 45}, {0, 18, 42, 0}, {51, 19, 0, 50}, {0, 0, 16, 0},
-    {52, 48, 0, 57}, {53, 25, 48, 52}, {54, 51, 50, 0}, {55, 31, 51, 54}, {56, 53, 52, 0}, {0, 37, 53, 56}, {0, 55, 54, 0}, {57, 50, 0, 58}, {0, 57, 0, 59}, {0, 58, 0, 0}
-};
+static int      gameInactivityTimer;
 
-int     gameInactivityTimer;
+static u8       lifeInk[] = {0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7};
 
-BYTE    lifeInk[] = {0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7};
+int      gameFrame;
+static TIMER    gameTimer;
 
-int     gameFrameAdj[5] = {1, 2, 3, 4, 0};
-int     gameFrame;
+int             gamePaused = 0;
+int             gameLevel;
+int             gameLives;
+int             gameClockTicks;
+int             gameMode;
 
-void DoDrawClock()
+int             itemCount;
+
+static void DoDrawClock()
 {
     char    text[24] = "\x1\x0\x2\x7" " " "\x2\x6" " " "\x2\x5" ":" "\x2\x4" " " "\x2\x3" " " "\x2\x2" " " "\x2\x1" "m";
 
@@ -126,7 +71,7 @@ void DoDrawClock()
     DoClockUpdate = DoNothing;
 }
 
-void DrawItems()
+static void DrawItems()
 {
     char    text[9] = "\x1\x0\x2\x6" " " "\x2\x7" " ";
 
@@ -139,13 +84,13 @@ void DrawItems()
     Video_WriteLarge(6 * 8 + 4, STATUS, text);
 }
 
-void GameDrawLives()
+static void GameDrawLives()
 {
     int l;
 
     for (l = 0; l < gameLives; l++)
     {
-        Video_DrawSprite(LIVES + l * 16, Miner_GetSprite(), 0x0, lifeInk[l]);
+        Miner_DrawSprite(LIVES + l * 16, 0x0, lifeInk[l], musicClock >> 4);
     }
 }
 
@@ -164,28 +109,30 @@ void Game_DrawStatus()
 
 void Game_ChangeLevel(int dir)
 {
+    int     level = Level_Dir(dir);
+
     if (dir == R_ABOVE)
     {
         // this fixes jumping up from the ramp in "Under the Drive"
         //  and appearing inside the floor in "The Drive"
         // also applies to "First Landing"
-        if ((gameRoom[gameLevel][dir] == THEDRIVE && minerWilly.x > 22) || (gameRoom[gameLevel][dir] == FIRSTLANDING && minerWilly.x > 182))
+        if ((level == THEDRIVE && minerWilly.x > 22 && minerWilly.x < 32) || (level == FIRSTLANDING && minerWilly.x > 182))
         {
             minerWilly.air = 2;
             return; // we're not changing rooms
         }
     }
 
-    gameLevel = gameRoom[gameLevel][dir];
+    gameLevel = level;
 
     switch (dir)
     {
       case R_ABOVE:
-        minerWilly.dy = minerWilly.y = 13 * 8;
+        minerWilly.y = 13 * 8;
+        minerWilly.x = (minerWilly.tile & 31) * 8;
         minerWilly.tile = 13 * 32 + (minerWilly.tile & 31);
         minerWilly.align = 4;
         minerWilly.air = 0;
-        minerWilly.rope = 0;
         break;
 
       case R_RIGHT:
@@ -199,7 +146,7 @@ void Game_ChangeLevel(int dir)
             minerWilly.air = 2;
         }
 
-        minerWilly.dy = minerWilly.y = 0;
+        minerWilly.y = 0;
         minerWilly.tile &= 31;
         break;
 
@@ -212,7 +159,7 @@ void Game_ChangeLevel(int dir)
     Game_InitRoom();
 }
 
-void ClockTicker()
+static void ClockTicker()
 {
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -262,15 +209,16 @@ void Game_GotItem()
     Audio_Sfx(SFX_ITEM);
 }
 
-void DoPauseDrawer()
+static void DoPauseDrawer()
 {
     if (gamePaused == 16 * 5)
     {
-        Video_CycleColours(1);
+        Level_SetBorder();
+        Video_CycleColours();
     }
 }
 
-void DoPauseTicker()
+static void DoPauseTicker()
 {
     if (gamePaused++ == 16 * 5)
     {
@@ -278,20 +226,20 @@ void DoPauseTicker()
     }
 }
 
-void DoGameDrawer()
+static void DoGameDrawer()
 {
-    if (gameFrame != 0)
+    if (gameMusic == MUS_PLAY)
+    {
+        GameDrawLives();
+    }
+
+    if (gameFrame == 0)
     {
         return;
     }
 
     Level_Drawer();
     Robots_Drawer();
-
-    if (gameMusic == MUS_PLAY)
-    {
-        GameDrawLives();
-    }
 
     if (gameMode == GM_TOILET)
     {
@@ -304,22 +252,30 @@ void DoGameDrawer()
     DoClockUpdate();
 }
 
-void DoGameTicker()
+static void DoDrawOnce()
 {
-    if (gameFrame != 0)
+    DoGameDrawer();
+
+    Drawer = DoNothing;
+}
+
+static void DoGameTicker()
+{
+    if (gameMusic == MUS_STOP && gameInactivityTimer++ == 256 * 5 && gameMode < GM_RUNNING)
+    {
+        Game_Pause(1);
+
+        return;
+    }
+
+    gameFrame = Timer_Update(&gameTimer);
+    if (gameFrame == 0)
     {
         return;
     }
 
-    gameInactivityTimer++;
-
     Level_Ticker();
     Robots_Ticker();
-
-    if (gameMusic == MUS_PLAY)
-    {
-        minerSeqIndex += 8;
-    }
 
     if (gameMode == GM_TOILET)
     {
@@ -362,7 +318,7 @@ void DoGameTicker()
 
 void Game_Pause(int state)
 {
-    if (gameMode >= GM_RUNNING)
+    if (gamePaused == state || gameMode >= GM_RUNNING)
     {
         return;
     }
@@ -398,20 +354,38 @@ void Game_Pause(int state)
     }
 }
 
-void DoGameResponder()
+void Game_CheatEnabled()
+{
+    if (gamePaused)
+    {
+        gameFrame = 1;
+
+        Ticker = DoNothing;
+        Drawer = DoDrawOnce;
+
+        Game_DrawStatus();
+        System_Border(levelBorder[gameLevel]);
+    }
+
+    cheatEnabled = 1;
+
+    Robots_DrawCheat();
+}
+
+static void DoGameResponder()
 {
     gameInactivityTimer = 0;
 
-    if (gameInput == KEY_PAUSE || gamePaused)
+    if (gameInput == KEY_PAUSE)
     {
         Game_Pause(gamePaused ? 0 : 1);
-        gameFrame = 0;
     }
-
-    if (gameInput == KEY_MUTE)
+    else if (gameInput == KEY_MUTE)
     {
         gameMusic = gameMusic == MUS_PLAY ? MUS_STOP : MUS_PLAY;
         Audio_Play(gameMusic);
+
+        Game_Pause(0);
     }
     else if (gameInput == KEY_ESCAPE)
     {
@@ -423,29 +397,11 @@ void DoGameResponder()
     }
 }
 
-void DoGameAction()
-{
-    gameFrame = gameFrameAdj[gameFrame];
-
-    if (gameInactivityTimer == 256)
-    {
-        if (gameMusic == MUS_STOP && gameMode < GM_RUNNING)
-        {
-            Game_Pause(1);
-
-            gameInactivityTimer++;
-        }
-    }
-}
-
 void Game_InitRoom()
 {
     Level_Init();
     Robots_Init();
     Rope_Init();
-    Video_PixelFill(129 * WIDTH, 8 * WIDTH);
-    Video_Write(0, "\x1\x0\x2\x6");
-    Video_Write((16 * 8 + 1) * WIDTH + (WIDTH - Video_TextWidth(levelName[gameLevel])) / 2, levelName[gameLevel]);
     System_Border(levelBorder[gameLevel]);
     Miner_Save();
 
@@ -455,12 +411,23 @@ void Game_InitRoom()
         minerAttrSplit = 5; // willy goes blue when underwater
     }
 
-    gameFrame = 0;
+    Timer_Set(&gameTimer, 12, TICKRATE);
+    gameFrame = 1;
     gameInactivityTimer = 0;
 
-    Ticker = DoGameTicker;
+    minerWillyRope = 0;
 
-    Action = DoGameAction;
+    if (gamePaused)
+    {
+        Ticker = DoNothing;
+        Drawer = DoDrawOnce;
+    }
+    else
+    {
+        Ticker = DoGameTicker;
+    }
+
+    Action = DoNothing;
 }
 
 void Game_GameReset()
@@ -476,7 +443,6 @@ void Game_GameReset()
 
     gamePaused = 0;
 
-    minerSeqIndex = 0;
     gameLives = 7;
 
     Audio_Music(MUS_GAME, gameMusic);

@@ -1,5 +1,22 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "misc.h"
-#include "system.h"
 #include "game.h"
 
 #include "audio.h"
@@ -22,7 +39,7 @@
 typedef struct
 {
     int     left[3], right[3];    // pseudo stereo/panning effects
-    UINT    phase, frequency;
+    u32     phase, frequency;
     EVENT   DoPhase;
 }
 CHANNEL;
@@ -37,47 +54,27 @@ typedef struct
 }
 SFX;
 
-int     panTable[2][249] =
+static int      panTable[241] =
 {
-    {
-        256, 254, 253, 252, 251, 250, 249, 248, 247,
-        246, 245, 244, 243, 242, 241, 240, 239, 238, 237, 236, 235, 234, 233, 232, 231,
-        230, 229, 228, 227, 226, 225, 224, 222, 221, 220, 219, 218, 217, 216, 215, 214,
-        213, 212, 211, 210, 209, 208, 207, 206, 205, 204, 203, 202, 201, 200, 199, 198,
-        197, 196, 195, 194, 193, 192, 190, 189, 188, 187, 186, 185, 184, 183, 182, 181,
-        180, 179, 178, 177, 176, 175, 174, 173, 172, 171, 170, 169, 168, 167, 166, 165,
-        164, 163, 162, 161, 160, 158, 157, 156, 155, 154, 153, 152, 151, 150, 149, 148,
-        147, 146, 145, 144, 143, 142, 141, 140, 139, 138, 137, 136, 135, 134, 133, 132,
-        131, 130, 129, 128, 126, 125, 124, 123, 122, 121, 120, 119, 118, 117, 116, 115,
-        114, 113, 112, 111, 110, 109, 108, 107, 106, 105, 104, 103, 102, 101, 100, 99,
-        98, 97, 96, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82,
-        81, 80, 79, 78, 77, 76, 75, 74, 73, 72, 71, 70, 69, 68, 67, 66,
-        65, 64, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49,
-        48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33,
-        32, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
-        15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
-    },
-    {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32,
-        33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
-        49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 64, 65,
-        66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
-        82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 96, 97, 98,
-        99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114,
-        115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 128, 129, 130, 131,
-        132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147,
-        148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 160, 161, 162, 163, 164,
-        165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180,
-        181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 192, 193, 194, 195, 196, 197,
-        198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213,
-        214, 215, 216, 217, 218, 219, 220, 221, 222, 224, 225, 226, 227, 228, 229, 230,
-        231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246,
-        247, 248, 249, 250, 251, 252, 253, 254, 256
-    }
+    256, 255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 242, 240,
+    239, 238, 237, 236, 235, 234, 233, 232, 231, 230, 229, 228, 227, 225, 224,
+    223, 222, 221, 220, 219, 218, 217, 216, 215, 214, 213, 212, 210, 209, 208,
+    207, 206, 205, 204, 203, 202, 201, 200, 199, 198, 197, 195, 194, 193, 192,
+    191, 190, 189, 188, 187, 186, 185, 184, 183, 182, 180, 179, 178, 177, 176,
+    175, 174, 173, 172, 171, 170, 169, 168, 167, 165, 164, 163, 162, 161, 160,
+    159, 158, 157, 156, 155, 154, 153, 152, 150, 149, 148, 147, 146, 145, 144,
+    143, 142, 141, 140, 139, 138, 137, 135, 134, 133, 132, 131, 130, 129, 128,
+    127, 126, 125, 124, 123, 122, 121, 119, 118, 117, 116, 115, 114, 113, 112,
+    111, 110, 109, 108, 107, 106, 104, 103, 102, 101, 100,  99,  98,  97,  96,
+     95,  94,  93,  92,  91,  89,  88,  87,  86,  85,  84,  83,  82,  81,  80,
+     79,  78,  77,  76,  74,  73,  72,  71,  70,  69,  68,  67,  66,  65,  64,
+     63,  62,  61,  59,  58,  57,  56,  55,  54,  53,  52,  51,  50,  49,  48,
+     47,  46,  44,  43,  42,  41,  40,  39,  38,  37,  36,  35,  34,  33,  32,
+     31,  29,  28,  27,  26,  25,  24,  23,  22,  21,  20,  19,  18,  17,  16,
+     14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0
 };
 
-UINT    frequencyTable[128] =
+static u32      frequencyTable[128] =
 {
     0x00184cbb, 0x0019bea3, 0x001b4688, 0x001ce5bd, 0x001e9da1, 0x00206fae, 0x00225d71, 0x00246891,
     0x002692cb, 0x0028ddfb, 0x002b4c15, 0x002ddf2d, 0x00309976, 0x00337d46, 0x00368d11, 0x0039cb7a,
@@ -97,7 +94,7 @@ UINT    frequencyTable[128] =
     0x6132edbe, 0x66fa8c2a, 0x6d1a23d8, 0x7396f4b1, 0x7a768772, 0x81beb8a3, 0x8975c674, 0x91a245b2
 };
 
-short   musicScore[3][1130] =
+static short    musicScore[3][1130] =
 {
     {
         16, 58, 0, 19, 65, 13, 3, 1, 19, 70, 13, 3, 1, 19, 73, 13, 3, 1, 19, 65, 13, 3, 1, 19, 70, 13, 3, 1, 19, 73, 13, 3, 1, 19, 65, 13, 3, 1, 19, 70, 13, 3, 1, 19, 73, 13, 3, 1, 19, 65, 13, 3, 1, 19, 70, 13, 3, 1, 19, 73, 13, 0, 0, 3, 1,
@@ -141,7 +138,7 @@ short   musicScore[3][1130] =
     }
 };
 
-int     sfxPitch[][50] =
+static int      sfxPitch[][50] =
 {
     {96, 90, 84, 78, 72, 66, 60, 54, 0},
     {84, 81, 78, 75, 72, 69, 66, 63, 60, 57, 54, 51, 48, 45, 42, 39, 0},
@@ -151,7 +148,7 @@ int     sfxPitch[][50] =
     {0}
 };
 
-CHANNEL audioChannel[NCHANNELS] =
+static CHANNEL  audioChannel[NCHANNELS] =
 {
     {{0, 0, 0}, {0, 0, 0}, 0, 0, DoNothing},
     {{0, 0, 0}, {0, 0, 0}, 0, 0, DoNothing},
@@ -163,7 +160,7 @@ CHANNEL audioChannel[NCHANNELS] =
     {{MUSICVOLUME, -MUSICVOLUME, 0}, {-MUSICVOLUME, MUSICVOLUME, 0}, 0, 0, DoNothing}
 };
 
-CHANNEL *musicChannel[NMUSIC] = // mapping
+static CHANNEL  *musicChannel[NMUSIC] = // mapping
 {
     &audioChannel[3],
     &audioChannel[4],
@@ -172,29 +169,31 @@ CHANNEL *musicChannel[NMUSIC] = // mapping
     &audioChannel[7]
 };
 
-SFX     sfxInfo[NSFX] =
+static SFX      sfxInfo[NSFX] =
 {
     {sfxPitch[SFX_NONE], 0, &audioChannel[0], 0, DoNothing, DoNothing},
     {sfxPitch[SFX_NONE], 0, &audioChannel[1], 0, DoNothing, DoNothing},
     {sfxPitch[SFX_NONE], 0, &audioChannel[2], 0, DoNothing, DoNothing}
 };
 
-int     musicIndex;
-int     musicTempo, musicPitch;
-int     musicClock = 0, musicDelta;
-short   *curMusic;
-int     samplesMusic = 0;
+static int      musicIndex;
+static int      musicTempo, musicPitch;
+int             musicClock = 0;
+static int      musicDelta;
+static short    *curMusic;
+static int      samplesMusic = 0;
 
-int     audioMusicPlaying = MUS_STOP;
-int     audioPanX;
-int     musicChannels = 0;
+static int      musicChannels = 0;
 
-int     sfxClock = 0;
-int     samplesSfx = 0;
+static int      sfxClock = 0;
+static int      samplesSfx = 0;
 
-TIMER   timerSfx, timerMusic;
-CHANNEL *curChannel;
-SFX     *curSfx;
+static TIMER    timerSfx, timerMusic;
+static CHANNEL  *curChannel;
+static SFX      *curSfx;
+
+int             audioMusicPlaying = MUS_STOP;
+int             audioPanX;
 
 void Audio_ReduceMusicSpeed()
 {
@@ -203,9 +202,9 @@ void Audio_ReduceMusicSpeed()
     Timer_Set(&timerMusic, SAMPLERATE, musicTempo);
 }
 
-void DoPhase()
+static void DoPhase()
 {
-    UINT    phase = curChannel->phase >> 31;
+    u32     phase = curChannel->phase >> 31;
 
     curChannel->left[2] = curChannel->left[phase];
     curChannel->right[2] = curChannel->right[phase];
@@ -213,14 +212,14 @@ void DoPhase()
     curChannel->phase += curChannel->frequency;
 }
 
-void DoChannelOff()
+static void DoChannelOff()
 {
     curChannel->DoPhase = DoNothing;
     curChannel->left[2] = 0;
     curChannel->right[2] = 0;
 }
 
-void ChannelStereo(CHANNEL *channel, int left, int right)
+static void ChannelStereo(CHANNEL *channel, int left, int right)
 {
     left = SFXVOLUME * left >> 8;
     right = SFXVOLUME * right >> 8;
@@ -231,18 +230,18 @@ void ChannelStereo(CHANNEL *channel, int left, int right)
     channel->right[1] = right;
 }
 
-void ChannelPan(CHANNEL *channel, int pan)
+static void ChannelPan(CHANNEL *channel, int pan)
 {
-    ChannelStereo(channel, panTable[L][pan], panTable[R][pan]);
+    ChannelStereo(channel, panTable[pan], 256 - panTable[pan]);
 }
 
-void DoSfxOff()
+static void DoSfxOff()
 {
     curSfx->DoSfx = DoNothing;
     curSfx->channel->DoPhase = DoChannelOff;
 }
 
-void DoSfxOn()
+static void DoSfxOn()
 {
     curSfx->channel->DoPhase = DoPhase;
     curSfx->DoSfx = curSfx->DoPlay;
@@ -250,7 +249,7 @@ void DoSfxOn()
     curSfx->DoSfx();
 }
 
-void DoSfxPlay()
+static void DoSfxPlay()
 {
     curSfx->channel->frequency = frequencyTable[*curSfx->pitch];
     curSfx->clock += curSfx->length;
@@ -264,7 +263,7 @@ void DoSfxPlay()
     curSfx->DoSfx = DoSfxOff;
 }
 
-void DoSfxWilly()
+static void DoSfxWilly()
 {
     curSfx->channel->DoPhase = DoPhase;
     curSfx->clock += curSfx->length;
@@ -332,7 +331,7 @@ void Audio_Sfx(int sfx)
     curSfx->clock = sfxClock;
 }
 
-void MusicReset()
+static void MusicReset()
 {
     int index;
 
@@ -346,91 +345,78 @@ void MusicReset()
     musicClock = 0;
 }
 
-void Audio_Callback(short *buffer, int length)
+void Audio_Output(short output[2])
 {
-    short   left, right;
     int     channel, data, time;
 
-    length /= 2;
-
-    while (length)
+    if (samplesMusic == 0)
     {
-        if (samplesMusic == 0)
-        {
-            samplesMusic = Timer_Update(&timerMusic);
+        samplesMusic = Timer_Update(&timerMusic);
 
-            if (audioMusicPlaying)
+        if (audioMusicPlaying)
+        {
+            if (musicDelta == musicClock)
             {
-                if (musicDelta == musicClock)
+                do
                 {
-                    do
+                    data = *curMusic++;
+                    channel = data & 0x0f; 
+                    switch (data & 0xf0)
                     {
-                        data = *curMusic++;
-                        channel = data & 0x0f; 
-                        switch (data & 0xf0)
-                        {
-                          case EV_NOTEOFF:
-                            musicChannel[channel]->DoPhase = DoChannelOff;
-                            break;
+                      case EV_NOTEOFF:
+                        musicChannel[channel]->DoPhase = DoChannelOff;
+                        break;
 
-                          case EV_NOTEON:
-                            musicChannel[channel]->frequency = frequencyTable[*curMusic++ + musicPitch];
-                            musicChannel[channel]->DoPhase = DoPhase;
-                            break;
+                      case EV_NOTEON:
+                        musicChannel[channel]->frequency = frequencyTable[*curMusic++ + musicPitch];
+                        musicChannel[channel]->DoPhase = DoPhase;
+                        break;
 
-                          case EV_END:
-                            audioMusicPlaying = *curMusic;
-                            MusicReset();
-                            time = audioMusicPlaying ? 0 : 1;
-                            continue;
-                        }
-
-                        time = *curMusic++;
-                        musicDelta += time;
+                      case EV_END:
+                        audioMusicPlaying = *curMusic;
+                        MusicReset();
+                        time = audioMusicPlaying ? 0 : 1;
+                        continue;
                     }
-                    while (time == 0);
+
+                    time = *curMusic++;
+                    musicDelta += time;
                 }
-
-                musicClock++;
-            }
-        }
-
-        if (samplesSfx == 0)
-        {
-            samplesSfx = Timer_Update(&timerSfx);
-
-            curSfx = &sfxInfo[0];
-            for (channel = 0; channel < NSFX; channel++, curSfx++)
-            {
-                if (curSfx->clock == sfxClock)
-                {
-                    curSfx->DoSfx();
-                }
+                while (time == 0);
             }
 
-            sfxClock++;
-        }
-
-        while (samplesMusic && samplesSfx && length)
-        {
-            left = right = 0;
-
-            curChannel = &audioChannel[0];
-            for (channel = 0; channel < musicChannels; channel++, curChannel++)
-            {
-                curChannel->DoPhase();
-                left += curChannel->left[2];
-                right += curChannel->right[2];
-            }
-
-            *buffer++ = left;
-            *buffer++ = right;
-
-            samplesMusic--;
-            samplesSfx--;
-            length--;
+            musicClock++;
         }
     }
+
+    if (samplesSfx == 0)
+    {
+        samplesSfx = Timer_Update(&timerSfx);
+
+        curSfx = &sfxInfo[0];
+        for (channel = 0; channel < NSFX; channel++, curSfx++)
+        {
+            if (curSfx->clock == sfxClock)
+            {
+                curSfx->DoSfx();
+            }
+        }
+
+        sfxClock++;
+    }
+
+    output[L] = output[R] = 0;
+
+    curChannel = &audioChannel[0];
+    for (channel = 0; channel < musicChannels; channel++, curChannel++)
+    {
+        curChannel->DoPhase();
+        output[L] += curChannel->left[2];
+        output[R] += curChannel->right[2];
+    }
+
+    samplesMusic--;
+    samplesSfx--;
 }
 
 void Audio_Play(int playing)
@@ -441,8 +427,6 @@ void Audio_Play(int playing)
 
 void Audio_Music(int music, int playing)
 {
-    System_AudioLock();
-
     musicIndex = music;
     MusicReset();
     musicPitch = 0;
@@ -456,8 +440,6 @@ void Audio_Music(int music, int playing)
     samplesMusic = 0;
     Timer_Set(&timerMusic, SAMPLERATE, TICKRATE);
     Audio_Play(playing);
-
-    System_AudioUnlock();
 }
 
 void Audio_Init()

@@ -1,212 +1,190 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "common.h"
 #include "video.h"
 #include "game.h"
 
 #define ROPE_SEGS   33
-#define ROPE_OFFSET 4
 
 typedef struct
 {
-    BYTE    x, y;
+    int     x, y;
 }
-POINT;
+DATA;
 
-typedef struct
-{
-    POINT   point;
-    int     pos;
-    int     tile;
-    int     align;
-}
-ROPE;
-
-POINT   ropeStart[60] =
-{
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {16, 3}, {0, 0}, {16, 15}, {0, 0},
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {16, 3}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
-    {0, 0}, {16, 3}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {14, 15}, {0, 0}, {0, 0}
-};
-
-POINT   ropeInc[86] =
+static DATA     ropeData[86] =
 {
     {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {0, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {1, 3}, {2, 3}, {2, 3}, {2, 3}, {2, 3}, {2, 2}, {2, 3}, {2, 3}, {2, 2}, {2, 3}, {2, 2}, {2, 3}, {2, 2}, {2, 3}, {2, 2}, {2, 2}, {2, 2}, {2, 3}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {1, 2}, {2, 2}, {2, 2}, {1, 2}, {1, 2}, {2, 2}, {1, 2}, {1, 2}, {2, 2}, {2, 2}, {3, 2}, {2, 2}, {3, 2}, {2, 2}, {3, 2}, {3, 2}, {3, 2}, {3, 2}, {3, 2}, {3, 2}
 };
 
-int     ropeDir, ropeFrame;
-BYTE    ropeInk;
+static int      ropeMove[2] = {-1, 1};
 
-ROPE    ropeSeg[ROPE_SEGS];
+static int      ropeDir, ropePos, ropeHold;
+static int      ropeX, ropeSide;
+static u8       ropeInk;
 
-EVENT   Rope_Ticker, Rope_Drawer;
+EVENT           Rope_Ticker, Rope_Drawer;
 
-void DoRopeDrawer()
+static void DoRopeDrawer()
 {
-    int seg;
+    int     x, y, pos;
+    int     seg;
+    DATA    *data = &ropeData[ropePos];
 
-    for (seg = 0; seg < ROPE_SEGS; seg++)
-    {
-        Video_DrawRopeSeg(ropeSeg[seg].pos, ropeInk);
-    }
-}
-
-int Rope_Animate()
-{
-    int     x, y, seg, frame, hit = 0;
-    ROPE    *rope = &ropeSeg[0];
-    int     tile = ropeSeg[0].tile;
-
-    x = rope->point.x;
+    x = ropeX * 8;
     y = 0;
-    frame = ropeFrame < 0 ? -ropeFrame : ropeFrame;
-    for (seg = 1; seg < ROPE_SEGS; seg++, frame++)
+
+    Video_DrawRopeSeg(x, ropeInk);
+
+    if (ropePos == 0)
     {
-        y += ropeInc[frame].y;
-        tile += ((y & 8) != (rope->point.y & 8)) * 32;
-
-        if (ropeFrame > 0)
-        {
-            x += ropeInc[frame].x;
-            tile += ((x & 8) != (rope->point.x & 8));
-        }
-        else if (ropeFrame < 0)
-        {
-            x -= ropeInc[frame].x;
-            tile -= ((x & 8) != (rope->point.x & 8));
-        }
-
-        rope++;
-        rope->point.x = x;
-        rope->point.y = y;
-        rope->tile = tile;
-        rope->align = YALIGN(y);
-
-        // only accept the first segment that touches Willy
-        ropeSeg[seg].pos = (y << 8) + x + ROPE_OFFSET;
-        if (hit == 0 && (Video_GetPixel(ropeSeg[seg].pos) & B_WILLY))
-        {
-            hit = seg;
-        }
+        ropeSide ^= 1;
     }
 
-    ropeFrame += ropeDir ? 2 : -2;
-    if (ropeFrame > -18 && ropeFrame < 18)
+    for (seg = 1; seg < ROPE_SEGS; seg++, data++)
     {
-        ropeFrame += ropeDir ? 2 : -2;
-    }
-    else if (ropeFrame == 54 || ropeFrame == -54)
-    {
-        ropeDir = 1 - ropeDir;
-    }
+        y += data->y;
+        x -= data->x * ropeMove[ropeSide];
 
-    return hit;
-}
-
-void DoRopeTicker()
-{
-    int seg, x;
-
-    seg = Rope_Animate();
-    if (minerWilly.rope < 0) // this allows Willy to jump off a rope
-    {
-        if (minerWilly.rope-- == -16) // for 16 frames
+        pos = y * WIDTH + x;
+        if (minerWillyRope == 0 && (Video_GetPixel(pos) & B_WILLY))
         {
-            minerWilly.rope = 0;
+            minerWillyRope = seg;
+            ropeHold = 1;
         }
 
+        if (minerWillyRope == seg && ropeHold)
+        {
+            minerWilly.x = x & 248;
+            minerWilly.y = y - 8;
+
+            if ((x & 6) == 6)
+            {
+                minerWilly.frame = 1;
+            }
+            else if (x & 4)
+            {
+                minerWilly.frame = 0;
+            }
+            else
+            {
+                minerWilly.x -= 8;
+                if (x & 2)
+                {
+                    minerWilly.frame = 3;
+                }
+                else
+                {
+                    minerWilly.frame = 2;
+                }
+            }
+
+            minerWilly.tile = minerWilly.y / 8 * 32 + minerWilly.x / 8;
+            minerWilly.align = YALIGN(y); // y before deduction
+        }
+
+        Video_DrawRopeSeg(pos, ropeInk);
+    }
+
+    if (minerWillyRope < 0) // this allows Willy to jump/fall off a rope
+    {
+        minerWillyRope++;
+        ropeHold = 0;
         return;
     }
 
-    if (minerWilly.rope == 0)
+    if (ropeHold && minerWilly.move)
     {
-        if (seg == 0)
+        seg = minerWillyRope + ropeMove[ropeDir ^ minerWilly.dir];
+
+        if (Level_Dir(R_ABOVE) == 0 && seg < 15)
         {
+            seg = 15;
+        }
+
+        if (seg < ROPE_SEGS)
+        {
+            minerWillyRope = seg;
             return;
         }
 
-        minerWilly.rope = seg;
+        minerWillyRope = -16;
+        minerWilly.y &= 124;
         minerWilly.air = 0;
     }
+}
 
-    x = ropeSeg[minerWilly.rope].point.x;
-
-    minerWilly.x = x & 248;
-    minerWilly.y = ropeSeg[minerWilly.rope].point.y - 8;
-    minerWilly.frame = ((x & 7) >> 1) | (minerWilly.dir << 2);
-    minerWilly.tile = ropeSeg[minerWilly.rope].tile;
-    minerWilly.align = ropeSeg[minerWilly.rope].align;
-
-    if (minerWilly.move == 0)
+static void DoRopeTicker()
+{
+    ropePos += ropeMove[ropeDir ^ ropeSide] * 2;
+    if (ropePos < 16)
     {
-        return;
+        ropePos += ropeMove[ropeDir ^ ropeSide] * 2;
     }
-
-    seg = minerWilly.rope + (ropeDir - minerWilly.dir ? -1 : 1);
-
-    if (seg == 2)
+    else if (ropePos == 54)
     {
-        Game_ChangeLevel(R_ABOVE);
-        return;
+        ropeDir ^= 1;
     }
-    else if (seg < ropeStart[gameLevel].y)
-    {
-        return;
-    }
-
-    if (seg < ROPE_SEGS)
-    {
-        minerWilly.rope = seg;
-        return;
-    }
-
-    minerWilly.rope = -1;
-    minerWilly.air = 2;
-    minerWilly.y &= 124;
-    minerWilly.align = YALIGN(minerWilly.y);
 }
 
 void Rope_Init()
 {
-    ropeDir = 0;
-    ropeFrame = 34;
-
-    if (ropeStart[gameLevel].x == 0)
+    if (gameLevel == QUIRKAFLEEG)
+    {
+        ropeX = 16;
+        ropeInk = 6;
+    }
+    else if (gameLevel == ONTHEROOF)
+    {
+        ropeX = 16;
+        ropeInk = 4;
+    }
+    else if (gameLevel == COLDSTORE)
+    {
+        ropeX = 16;
+        ropeInk = 6;
+    }
+    else if (gameLevel == SWIMMINGPOOL)
+    {
+        ropeX = 16;
+        ropeInk = 7;
+    }
+    else if (gameLevel == THEBEACH)
+    {
+        ropeX = 14;
+        ropeInk = 5;
+    }
+    else
     {
         Rope_Ticker = DoNothing;
         Rope_Drawer = DoNothing;
         return;
     }
+
+    // all ropes start the same way
+    ropeDir = 0;
+    ropePos = 34;
+    ropeSide = 0;
+
+    // this is normally reset by copying over entity definitions
+    ropeHold = 0;
+
     Rope_Ticker = DoRopeTicker;
     Rope_Drawer = DoRopeDrawer;
-
-    ropeSeg[0].pos = ropeStart[gameLevel].x * 8;
-    ropeSeg[0].point.x = ropeSeg[0].pos - ROPE_OFFSET;
-    ropeSeg[0].point.y = 0;
-    ropeSeg[0].tile = ropeStart[gameLevel].x - 33;
-    ropeSeg[0].align = 4;
-
-    if (gameLevel == SWIMMINGPOOL)
-    {
-        ropeInk = 7;
-    }
-    else if (gameLevel == COLDSTORE)
-    {
-        ropeInk = 6;
-    }
-    else if (gameLevel == THEBEACH)
-    {
-        ropeInk = 5;
-    }
-    else if (gameLevel == ONTHEROOF)
-    {
-        ropeInk = 4;
-    }
-    else if (gameLevel == QUIRKAFLEEG)
-    {
-        ropeInk = 6;
-    }
-
-    Rope_Animate();
 }

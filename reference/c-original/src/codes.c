@@ -1,12 +1,27 @@
-// jetset willy
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
 
 #include "common.h"
 #include "video.h"
-#include "system.h"
 
 #define CODE(p, s)  ((codesCode[p] - 1) << s)
 
-int     codesDigit[180] =
+static int      codesDigit[180] =
 {
     43, 76, 15, 123, 206, 101, 35, 212, 99, 39, 8, 55, 204, 37, 1, 32, 2, 81,
     44, 202, 222, 181, 47, 83, 74, 179, 90, 45, 154, 27, 165, 71, 44, 238, 124, 65,
@@ -20,7 +35,7 @@ int     codesDigit[180] =
     160, 109, 112, 29, 195, 210, 141, 118, 62, 180, 141, 213, 181, 134, 138, 115, 208, 118
 };
 
-WORD    codesSprite[4][16] =
+static u16      codesSprite[4][16] =
 {
     {32766, 49923, 49149, 49149, 65533, 65533, 65533, 63997, 61951, 63999, 63999, 63999, 63997, 63997, 65531, 32766},
     {32766, 50947, 49149, 49149, 65533, 65533, 65533, 61951, 60671, 64767, 63999, 62463, 59391, 57597, 65523, 32766},
@@ -28,15 +43,14 @@ WORD    codesSprite[4][16] =
     {32766, 50691, 49149, 49149, 49149, 49151, 65535, 65023, 63999, 61951, 59903, 57599, 63999, 63997, 65435, 32766}
 };
 
-int     codesAttempt = 1;
-int     codesNeeded;
-int     codesPos, codesPosLast = 0;
-int     codesCode[4];
-int     codesKey;
-char    codesCell[7] = "\x1\x0\x2\x7\x14\x14";
-int     codesFlash = 0;
+static int      codesAttempt = 1;
+static int      codesNeeded;
+static int      codesPos, codesPosLast = 0;
+static int      codesCode[4];
+static int      codesKey;
+static char     codesCell[7] = "\x1\x0\x2\x7\x14\x14";
 
-void DrawCursor(int pos)
+static void DrawCursor(int pos)
 {
     int pixel = 88 * WIDTH + 16 * 8;
 
@@ -47,9 +61,9 @@ void DrawCursor(int pos)
     Video_Write(pixel + pos * 24, codesCell);
 }
 
-void GetCode()
+static void GetCode()
 {
-    char    location[5] = "\x2\x7";
+    char    location[5] = "\x2\x7  ";
 
     codesNeeded = System_Rnd() % 180;
 
@@ -74,9 +88,9 @@ void GetCode()
     DrawCursor(3);
 }
 
-void DoCodesDrawer()
+static void DoCodesDrawer()
 {
-    codesCell[3] = 0x7;
+    codesCell[3] = '\x7';
     DrawCursor(codesPos);
 
     if (codesKey == 0)
@@ -90,16 +104,17 @@ void DoCodesDrawer()
     codesKey = 0;
 }
 
-void DoCodesTicker()
+static void DoCodesTicker()
 {
-    BYTE    swap;
-
-    if (codesFlash != videoFlash)
+    if (videoFlash)
     {
-        swap = codesCell[0];
-        codesCell[0] = codesCell[2];
-        codesCell[2] = swap;
-        codesFlash = videoFlash;
+        codesCell[0] = '\x2';
+        codesCell[2] = '\x1';
+    }
+    else
+    {
+        codesCell[0] = '\x1';
+        codesCell[2] = '\x2';
     }
 
     if (codesKey < 1)
@@ -113,7 +128,7 @@ void DoCodesTicker()
     codesPos &= 3;
 }
 
-void DoCodesResponder()
+static void DoCodesResponder()
 {
     switch (gameInput)
     {

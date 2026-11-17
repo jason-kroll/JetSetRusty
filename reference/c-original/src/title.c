@@ -1,10 +1,27 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "common.h"
 #include "video.h"
 #include "audio.h"
 #include "game.h"
-#include "system.h"
 
-int     titleJSW[] =
+static int      titleJSW[] =
 {
     100, 101, 102, 104, 105, 106, 108, 109, 110, 113, 114, 115, 117, 118, 119, 121, 122, 123,
     133, 136, 141, 145, 149, 154,
@@ -18,17 +35,16 @@ int     titleJSW[] =
     454, 455, 456, 457, 458, 460, 462, 463, 464, 466, 467, 468, 471
 };
 
-char    textJSW[6] = "\x1\x2\x2\xb\x14";
+static char     textJSW[6] = "\x1\x2\x2\xb\x14";
 
-char    textTicker[] = "      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      ";
+static char     textTicker[] = "      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      ";
 
-int     textPos, textEnd = (int)sizeof(textTicker) - 33;
-int     textFrame;
-BYTE    colourCycle;
-int     colourCycleAdj[6] = {1, 2, 3, 4, 5, 1};
-int     titleFlash = 0;
+static int      textPos, textEnd = (int)sizeof(textTicker) - 33;
+static int      textFrame;
+static u8       colourCycle;
+static int      colourCycleAdj[6] = {1, 2, 3, 4, 5, 1};
 
-void GameStart()
+static void GameStart()
 {
     Video_PixelFill(128 * WIDTH, 64 * WIDTH);
 
@@ -52,18 +68,19 @@ void GameStart()
     Game_Action();
 }
 
-void DoTitleTicker()
+static void DoTitleTicker()
 {
-    char    swap;
-
     if (audioMusicPlaying)
     {
-        if (titleFlash != videoFlash)
+        if (videoFlash)
         {
-            swap = textJSW[3];
-            textJSW[3] = textJSW[1];
-            textJSW[1] = swap;
-            titleFlash = videoFlash;
+            textJSW[1] = '\xb';
+            textJSW[3] = '\x2';
+        }
+        else
+        {
+            textJSW[1] = '\x2';
+            textJSW[3] = '\xb';
         }
 
         return;
@@ -87,7 +104,7 @@ void DoTitleTicker()
     Action = Title_Action;
 }
 
-void DoTitleDrawer()
+static void DoTitleDrawer()
 {
     int tile, *pos = &titleJSW[0];
 
@@ -103,16 +120,16 @@ void DoTitleDrawer()
 
     if (colourCycle == 1)
     {
-        Video_CycleColours(0);
+        System_Border(Video_CycleColours());
     }
 
     Video_WriteLarge(0, 0, "\x1\x1\x2\x7");
     Video_WriteLarge(-(textFrame & 6), 19 * 8, textTicker + textPos);
 }
 
-void DoTitleResponder()
+static void DoTitleResponder()
 {
-    if (gameInput == KEY_ENTER)
+    if (gameInput == KEY_ENTER || System_IsJoyFire())
     {
         Action = GameStart;
     }
@@ -122,7 +139,7 @@ void DoTitleResponder()
     }
 }
 
-void DoTitleInit()
+static void DoTitleInit()
 {
     System_Border(0x0);
     Video_PixelFill(0, WIDTH * HEIGHT);

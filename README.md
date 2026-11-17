@@ -9,10 +9,10 @@ A Rust port of **Jet Set Willy**, the 1984 ZX Spectrum game by Matthew Smith
 C/SDL2 reimplementation. The game is now 100% Rust, with no C compiled, and
 gameplay is meant to be identical to the C version.
 
-The reference implementation in C lives surprisingly in the
-[reference/c-original/](reference/c-original/) — directory. More commits have
-been made to the original since I started this and I haven't ported them over
-quite yet.
+The reference implementation in C lives in the
+[reference/c-original/](reference/c-original/) directory, synced to upstream
+fawtytoo/JetSetWilly @ `783d7c1` (the Rust port tracks that snapshot; see
+"Upstream parity" in [AGENTS.md](AGENTS.md)).
 
 **Note** the zlib [`LICENCE`](LICENCE) (clause 2) requires altered versions to
 be *plainly marked as such*. So, this is a **modified port**, not the original

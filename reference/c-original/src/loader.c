@@ -1,47 +1,58 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "misc.h"
 #include "video.h"
 #include "audio.h"
-#include "system.h"
 
-#ifndef NOCODES
-#define NEXT_ACTION Codes_Action
-#else
-#define NEXT_ACTION Title_Action
-#endif
+static int      loaderTicks = 0;
+static char     loaderText[25] = "\x1\x7\x2\x2" "JetSet Willy Loading";
 
-int     loaderTicks = 0;
-char    loaderText[25] = "\x1\x7\x2\x2" "JetSet Willy Loading";
-int     loaderFlash = 0;
-
-void DoLoaderResponder()
+static void DoLoaderResponder()
 {
-    Action = NEXT_ACTION;
+    Action = Title_Action;
 }
 
-void DoLoaderTicker()
+static void DoLoaderTicker()
 {
-    BYTE    swap;
-
-    if (loaderFlash != videoFlash)
+    if (videoFlash)
     {
-        swap = loaderText[3];
-        loaderText[3] = loaderText[1];
-        loaderText[1] = swap;
-        loaderFlash = videoFlash;
+        loaderText[1] = '\x7';
+        loaderText[3] = '\x2';
+    }
+    else
+    {
+        loaderText[1] = '\x2';
+        loaderText[3] = '\x7';
     }
 
     if (loaderTicks++ == 256)
     {
-        Action = NEXT_ACTION;
+        Action = Codes_Action;
     }
 }
 
-void DoLoaderDrawer3()
+static void DoLoaderDrawer3()
 {
     Video_WriteLarge(6 * 8, 11 * 8, loaderText);
 }
 
-void DoLoaderDrawer2()
+static void DoLoaderDrawer2()
 {
     if (audioMusicPlaying)
     {
@@ -59,12 +70,12 @@ void DoLoaderDrawer2()
     Drawer = DoLoaderDrawer3;
 }
 
-void DoLoaderDrawer1()
+static void DoLoaderDrawer1()
 {
     System_Border(0x1);
     Video_PixelPaperFill(0, WIDTH * HEIGHT, 0x1);
     Video_Write(23 * 8 * WIDTH, "\x1\x1\x2\x7" "fawtytoo");
-    Video_Write(23 * 8 * WIDTH + WIDTH - Video_TextWidth(BUILD), "\x2\x0" BUILD);
+    Video_Write(23 * 8 * WIDTH + WIDTH - Video_TextWidth(__DATE__), "\x2\x0" __DATE__);
 
     Audio_Music(MUS_LOADER, MUS_PLAY);
 

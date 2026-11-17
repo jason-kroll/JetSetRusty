@@ -1,3 +1,21 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #define LIVES           (18 * 8 + 4) * WIDTH + 4
 #define STATUS          (21 * 8 + 4)
 
@@ -33,12 +51,11 @@ enum
 
 typedef struct
 {
-    BYTE    x, y, dy;
+    int     x, y;
     int     tile, align;
     int     frame;
     int     dir, move;
     int     air, jump;
-    int     rope;
 } MINER;
 
 extern int      itemCount;
@@ -47,8 +64,7 @@ extern int      gamePaused;
 extern int      gameLives;
 
 extern MINER    minerWilly;
-
-extern WORD     robotGfx[][8][16];
+extern int      minerWillyRope;
 
 // game
 extern int  gameLevel;
@@ -57,9 +73,10 @@ extern int  gameClockTicks;
 void Game_InitRoom(void);
 void Game_GotItem(void);
 void Game_ChangeLevel(int);
-void Game_Inactivity(int);
 void Game_GameReset(void);
 void Game_DrawStatus(void);
+void Game_Pause(int);
+void Game_CheatEnabled(void);
 
 // cheat
 extern int      cheatEnabled;
@@ -99,18 +116,18 @@ int Level_GetTileType(int);
 int Level_GetTileRamp(int);
 void Level_EraseItem(int);
 int Level_ItemCount(void);
+int Level_Dir(int);
+void Level_SetBorder(void);
 
 // miner
-extern WORD minerSprite[][16];
 extern int  minerAttrSplit;
-extern BYTE minerSeqIndex;
 
 void Miner_Init(void);
 void Miner_Ticker(void);
 void Miner_Drawer(void);
 void Miner_Save(void);
 void Miner_Restore(void);
-WORD *Miner_GetSprite(void);
+void Miner_DrawSprite(int, u8, u8, int);
 
 // robots
 void Robots_Init(void);

@@ -1,18 +1,35 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #include "misc.h"
-#include "system.h"
 
 #include "video.h"
 
 typedef struct
 {
-    BYTE    ink;
-    BYTE    point;
+    u8      ink;
+    u8      point;
 }
 PIXEL;
 
-PIXEL   videoPixel[WIDTH * HEIGHT];
+static PIXEL    videoPixel[WIDTH * HEIGHT];
 
-BYTE    charSet[128][10] =
+static u8       charSet[128][10] =
 {
     {0},
     {0}, // paper
@@ -125,13 +142,13 @@ BYTE    charSet[128][10] =
     {9, 60, 66, 153, 165, 165, 129, 66, 60, 0}
 };
 
-WORD    charSetLarge[96][8] =
+static u16      charSetLarge[96][8] =
 {
     {0, 0, 0, 0, 0, 0, 0, 0},
     {0, 0, 60, 7166, 7166, 60, 0, 0},
     {0, 7, 15, 0, 0, 15, 7, 0},
     {528, 8190, 8190, 528, 8190, 8190, 528, 0},
-    {3132, 6270, 4162, 12355, 12355, 8134, 3980, 0},
+    {1592, 3196, 2116, 6214, 6214, 4044, 1928, 0},
     {6158, 7694, 1920, 480, 120, 7198, 7174, 0},
     {3968, 8156, 4222, 4578, 4030, 8156, 4160, 0},
     {0, 0, 8, 15, 7, 0, 0, 0},
@@ -182,7 +199,7 @@ WORD    charSetLarge[96][8] =
     {14, 6, 4098, 8190, 8190, 4098, 6, 14},
     {4094, 8190, 4096, 4096, 4096, 8190, 4094, 0},
     {1022, 2046, 3072, 6144, 3072, 2046, 1022, 0},
-    {2046, 8190, 7168, 1920, 7168, 8190, 2046, 0},
+    {2046, 8190, 7168, 2016, 7168, 8190, 2046, 0},
     {7182, 7998, 1008, 192, 1008, 7998, 7182, 0},
     {30, 62, 4192, 8128, 8128, 4192, 62, 30},
     {7694, 7942, 4482, 4290, 4194, 6206, 7198, 0},
@@ -197,18 +214,18 @@ WORD    charSetLarge[96][8] =
     {4032, 8160, 4128, 4128, 4128, 6240, 2112, 0},
     {3968, 8128, 4192, 4130, 4094, 8190, 4096, 0},
     {4032, 8160, 4384, 4384, 4384, 6624, 2496, 0},
-    {4160, 8188, 8190, 4162, 6, 12, 0, 0},
-    {18368, 53216, 34848, 34848, 65472, 32736, 32, 0},
+    {4128, 8188, 8190, 4130, 6, 12, 0, 0},
+    {20416, 57312, 36896, 36896, 65472, 32736, 32, 0},
     {4098, 8190, 8190, 64, 32, 8160, 8128, 0},
     {0, 0, 4128, 8166, 8166, 4096, 0, 0},
     {0, 24576, 57344, 32768, 32800, 65510, 32742, 0},
     {4098, 8190, 8190, 768, 1920, 7392, 6240, 0},
     {0, 0, 4098, 8190, 8190, 4096, 0, 0},
-    {8160, 8160, 96, 1984, 96, 8160, 8128, 0},
+    {8160, 8160, 96, 8128, 96, 8160, 8128, 0},
     {32, 8160, 8128, 32, 32, 8160, 8128, 0},
     {4032, 8160, 4128, 4128, 4128, 8160, 4032, 0},
-    {32800, 65504, 65472, 34848, 2080, 4064, 1984, 0},
-    {1984, 4064, 2080, 34848, 65472, 65504, 32800, 0},
+    {32800, 65504, 65472, 36896, 4128, 8160, 4032, 0},
+    {4032, 8160, 4128, 36896, 65472, 65504, 32800, 0},
     {4128, 8160, 8128, 4192, 32, 224, 192, 0},
     {2112, 6368, 4512, 4384, 4896, 7776, 3136, 0},
     {32, 32, 4092, 8190, 4128, 6176, 2048, 0},
@@ -216,20 +233,26 @@ WORD    charSetLarge[96][8] =
     {0, 2016, 4064, 6144, 6144, 4064, 2016, 0},
     {4064, 8160, 6144, 3840, 6144, 8160, 4064, 0},
     {6240, 7392, 1920, 768, 1920, 7392, 6240, 0},
-    {2016, 36832, 34816, 34816, 51200, 32736, 16352, 0},
+    {4064, 40928, 36864, 36864, 53248, 32736, 16352, 0},
     {6240, 7264, 5664, 4896, 4512, 6368, 6240, 0},
     {0, 192, 192, 4092, 7998, 4098, 4098, 0},
     {0, 0, 0, 8190, 8190, 0, 0, 0},
     {0, 4098, 4098, 7998, 4092, 192, 192, 0},
     {4, 6, 2, 6, 4, 6, 2, 0},
-    {4080, 6168, 13260, 9252, 9252, 12876, 6168, 4080}
+    {2032, 3096, 6604, 4644, 4644, 6476, 3096, 2032}
 };
 
-BYTE    textInk[2] = {0x0, 0x0};
+static u8       textInk[2] = {0x0, 0x0};
 
 int Video_GetPixel(int pos)
 {
     return videoPixel[pos].point;
+}
+
+void Video_SetPixel(int pos, u8 ink)
+{
+    videoPixel[pos].ink = ink;
+    System_SetPixel(pos, ink);
 }
 
 int Video_TextWidth(char *text)
@@ -244,122 +267,105 @@ int Video_TextWidth(char *text)
     return l;
 }
 
-void Video_CycleColours(int state)
+int Video_CycleColours()
 {
-    int     pos, border = -1;
-    PIXEL   *pixel = &videoPixel[0];
+    int     pos;
 
-    if (state == 1)
+    for (pos = 0; pos < WIDTH * HEIGHT; pos++)
     {
-        border = pixel->ink;
+        Video_SetPixel(pos, (videoPixel[pos].ink + 3) & 0xf);
     }
 
-    for (pos = 0; pos < WIDTH * HEIGHT; pos++, pixel++)
-    {
-        pixel->ink = (pixel->ink + 3) & 0xf;
-    }
-
-    if (border == -1)
-    {
-        border = (pixel - 1)->ink; // equals last attribute position changed
-    }
-
-    System_Border(border);
+    return videoPixel[0].ink;
 }
 
-void Video_PixelPaperFill(int dest, int size, BYTE ink)
+void Video_PixelPaperFill(int pos, int size, u8 ink)
 {
-    PIXEL   *pixel = &videoPixel[dest];
-
-    for ( ; size > 0; size--, pixel++)
+    for ( ; size > 0; size--, pos++)
     {
-        if ((pixel->point & 1) == 0)
+        if ((Video_GetPixel(pos) & 1) == 0)
         {
-            pixel->ink = ink;
+            Video_SetPixel(pos, ink);
         }
     }
 }
 
-void Video_PixelInkFill(int dest, int size, BYTE ink)
+void Video_PixelInkFill(int pos, int size, u8 ink)
 {
-    PIXEL   *pixel = &videoPixel[dest];
-
-    for ( ; size > 0; size--, pixel++)
+    for ( ; size > 0; size--, pos++)
     {
-        if (pixel->point & 1)
+        if (Video_GetPixel(pos) & 1)
         {
-            pixel->ink = ink;
+            Video_SetPixel(pos, ink);
         }
     }
 }
 
-void Video_PixelFill(int dest, int size)
+void Video_PixelFill(int pos, int size)
 {
-    PIXEL   *pixel = &videoPixel[dest];
-
-    for ( ; size > 0; size--, pixel++)
+    for ( ; size > 0; size--, pos++)
     {
-        pixel->point = 0;
-        pixel->ink = 0x0;
+        videoPixel[pos].point = 0;
+        Video_SetPixel(pos, 0x0);
     }
 }
 
-void Video_DrawRopeSeg(int pos, BYTE ink)
+void Video_DrawRopeSeg(int pos, u8 ink)
 {
     videoPixel[pos].point = 1;
-    videoPixel[pos].ink = ink;
+    Video_SetPixel(pos, ink);
 }
 
 void Video_DrawArrow(int pos, int dir)
 {
-    PIXEL   *pixel;
     int     bit;
 
-    pixel = &videoPixel[pos + dir];
-    (pixel)->point |= B_ROBOT | 1;
-    (pixel)->ink = 7;
-    (pixel + 6)->point |= B_ROBOT | 1;
-    (pixel + 6)->ink = 7;
-    pixel += WIDTH;
-    (pixel + WIDTH)->point |= B_ROBOT | 1;
-    (pixel + WIDTH)->ink = 7;
-    (pixel + WIDTH + 6)->point |= B_ROBOT | 1;
-    (pixel + WIDTH + 6)->ink = 7;
-    pixel -= dir;
+    pos += dir;
+    videoPixel[pos].point |= B_ROBOT | 1;
+    Video_SetPixel(pos, 7);
+    videoPixel[pos + 6].point |= B_ROBOT | 1;
+    Video_SetPixel(pos + 6, 7);
+    pos += WIDTH;
+    videoPixel[pos + WIDTH].point |= B_ROBOT | 1;
+    Video_SetPixel(pos + WIDTH, 7);
+    videoPixel[pos + WIDTH + 6].point |= B_ROBOT | 1;
+    Video_SetPixel(pos + WIDTH + 6, 7);
+    pos -= dir;
 
-    for (bit = 0; bit < 8; bit++, pixel++)
+    for (bit = 0; bit < 8; bit++, pos++)
     {
-        pixel->point |= B_ROBOT | 1;
-        pixel->ink = 7;
+        videoPixel[pos].point |= B_ROBOT | 1;
+        Video_SetPixel(pos, 7);
     }
 }
 
-void Video_DrawTile(int tile, BYTE *what, BYTE paper, BYTE ink)
+void Video_DrawTile(int tile, u8 *what, u8 paper, u8 ink)
 {
     int     row, bit;
     int     pos = TILE2PIXEL(tile) + 7;
-    PIXEL   *pixel;
-    BYTE    byte;
-    BYTE    colour[2] = {paper, ink};
+    int     pixel;
+    u8      byte;
+    u8      colour[2] = {paper, ink};
 
     for (row = 0; row < 8; row++, pos += WIDTH, what++)
     {
-        pixel = &videoPixel[pos];
+        pixel = pos;
         byte = *what;
         for (bit = 0; bit < 8; bit++, pixel--, byte >>= 1)
         {
-            pixel->point = byte & B_LEVEL;
-            pixel->ink = colour[byte & 1];
+            videoPixel[pixel].point = byte & B_LEVEL;
+            Video_SetPixel(pixel, colour[byte & 1]);
         }
     }
 }
 
-void Video_DrawMiner(int pos, WORD *line, int level)
+int Video_DrawMiner(int pos, u16 *line, int level)
 {
     int     row, bit, y;
-    PIXEL   *pixel;
+    int     pixel;
     int     attr[4] = {0x8, 0x8, 0x8, 0x1}, ink;
-    WORD    word;
+    u16     word;
+    int     die = 0;
 
     pos &= ~7;
     y = pos / WIDTH;
@@ -367,70 +373,72 @@ void Video_DrawMiner(int pos, WORD *line, int level)
 
     for (row = 0; row < 16; row++, pos += WIDTH, line++, y++)
     {
-        pixel = &videoPixel[pos];
+        pixel = pos;
         word = *line;
         ink = attr[y >> level];
         for (bit = 0; bit < 16; bit++, pixel--, word >>= 1)
         {
             if (word & 1)
             {
-                if (pixel->point & B_ROBOT)
+                if (Video_GetPixel(pixel) & B_ROBOT)
                 {
-                    Action = Die_Action;
+                    die = 1;
                 }
 
-                pixel->point |= B_WILLY | 1;
-                pixel->ink = ink;
+                videoPixel[pixel].point |= B_WILLY | 1;
+                Video_SetPixel(pixel, ink);
             }
         }
     }
+
+    return die;
 }
 
-void Video_DrawRobot(int pos, WORD *line, BYTE ink)
+void Video_DrawRobot(int pos, u16 *line, u8 ink)
 {
     int     row, bit;
-    PIXEL   *pixel;
-    WORD    word;
+    int     pixel;
+    u16     word;
 
     pos += 15;
 
     for (row = 0; row < 16; row++, pos += WIDTH, line++)
     {
-        pixel = &videoPixel[pos];
+        pixel = pos;
         word = *line;
         for (bit = 0; bit < 16; bit++, pixel--, word >>= 1)
         {
             if (word & 1)
             {
-                pixel->point |= B_ROBOT | 1;
-                pixel->ink = ink;
+                videoPixel[pixel].point |= B_ROBOT | 1;
+                Video_SetPixel(pixel, ink);
             }
         }
     }
 }
 
-void Video_DrawSprite(int pos, WORD *line, BYTE paper, BYTE ink)
+void Video_DrawSprite(int pos, u16 *line, u8 paper, u8 ink)
 {
     int     row, bit;
-    PIXEL   *pixel;
-    WORD    word;
-    BYTE    colour[2] = {paper, ink};
+    int     pixel;
+    u16     word;
+    u8      colour[2] = {paper, ink};
 
     pos += 15;
 
     for (row = 0; row < 16; row++, pos += WIDTH, line++)
     {
-        pixel = &videoPixel[pos];
+        pixel = pos;
         word = *line;
         for (bit = 0; bit < 16; bit++, pixel--, word >>= 1)
         {
-            pixel->point = word & 1;
-            pixel->ink = colour[word & 1];
+            videoPixel[pixel].point = word & 1;
+            Video_SetPixel(pixel, colour[word & 1]);
         }
     }
 }
 
-int TextCode(char *text)
+static int TextCode(char *text)
 {
     if (*text == 0x1)
     {
@@ -449,8 +457,8 @@ int TextCode(char *text)
 void Video_WriteLarge(int x, int y, char *text)
 {
     int     col, bit, pos;
-    WORD    *byte, line;
-    PIXEL   *pixel;
+    u16     *byte, line;
+    int     pixel;
 
     pos = y * WIDTH;
     for ( ; *text; text++)
@@ -467,11 +475,11 @@ void Video_WriteLarge(int x, int y, char *text)
         {
             if (x >= 0 && x < WIDTH)
             {
-                pixel = &videoPixel[pos + x];
+                pixel = pos + x;
                 line = *byte;
                 for (bit = 0; bit < 16; bit++, pixel += WIDTH, line >>= 1)
                 {
-                    pixel->ink = textInk[line & 1];
+                    Video_SetPixel(pixel, textInk[line & 1]);
                 }
             }
         }
@@ -481,8 +489,8 @@ void Video_WriteLarge(int x, int y, char *text)
 void Video_Write(int pos, char *text)
 {
     int     col, bit;
-    BYTE    *byte, line;
-    PIXEL   *pixel;
+    u8      *byte, line;
+    int     pixel;
     int     width;
 
     for ( ; *text; text++)
@@ -498,28 +506,13 @@ void Video_Write(int pos, char *text)
 
         for (col = 0; col < width; col++, byte++, pos++)
         {
-            pixel = &videoPixel[pos];
+            pixel = pos;
             line = *byte;
             for (bit = 0; bit < 8; bit++, pixel += WIDTH, line >>= 1)
             {
-                pixel->ink = textInk[line & 1];
-                pixel->point = line & 1;
+                videoPixel[pixel].point = line & 1;
+                Video_SetPixel(pixel, textInk[line & 1]);
             }
         }
     }
-}
-
-void Video_Draw()
-{
-    PIXEL   *pixel = &videoPixel[0];
-    int     pos;
-
-    System_LockTexture();
-
-    for (pos = 0; pos < WIDTH * HEIGHT; pos++, pixel++)
-    {
-        System_SetPixel(pos, pixel->ink);
-    }
-
-    System_UnlockTexture();
 }

@@ -1,16 +1,38 @@
+//  Copyright 2021-2026 by Steve Clark
+
+//  This software is provided 'as-is', without any express or implied
+//  warranty.  In no event will the authors be held liable for any damages
+//  arising from the use of this software.
+
+//  Permission is granted to anyone to use this software for any purpose,
+//  including commercial applications, and to alter it and redistribute it
+//  freely, subject to the following restrictions:
+
+//  1. The origin of this software must not be misrepresented; you must not
+//     claim that you wrote the original software. If you use this software
+//     in a product, an acknowledgment in the product documentation would be
+//     appreciated but is not required. 
+//  2. Altered source versions must be plainly marked as such, and must not be
+//     misrepresented as being the original software.
+//  3. This notice may not be removed or altered from any source distribution.
+
 #define WIDTH   256
 #define HEIGHT  192
 
-typedef unsigned char   BYTE;
-typedef unsigned short  WORD;
-typedef unsigned int    UINT;
+typedef unsigned char   u8;
+typedef unsigned short  u16;
+typedef unsigned int    u32;
 
 typedef void (*EVENT)(void);
 
 enum
 {
-    KEY_NONE,
-    KEY_0,
+    KEY_LEFT,
+    KEY_RIGHT,
+    KEY_JUMP,
+    KEY_ENTER,
+    KEY_LSHIFT,
+    KEY_RSHIFT,
     KEY_1,
     KEY_2,
     KEY_3,
@@ -20,13 +42,7 @@ enum
     KEY_7,
     KEY_8,
     KEY_9,
-    KEY_ENTER,
-    KEY_LEFT,
-    KEY_RIGHT,
-    KEY_JUMP,
-    KEY_ESCAPE,
-    KEY_PAUSE,
-    KEY_MUTE,
+    KEY_0,
     KEY_A,
     KEY_B,
     KEY_C,
@@ -53,8 +69,12 @@ enum
     KEY_X,
     KEY_Y,
     KEY_Z,
+    KEY_ESCAPE,
+    KEY_PAUSE,
+    KEY_MUTE,
     KEY_QUIT,
-    KEY_ELSE
+    KEY_ELSE,
+    KEY_NONE
 };
 
 extern EVENT    Action, Responder, Ticker, Drawer;
@@ -65,6 +85,14 @@ extern int      videoFlash;
 
 void DoNothing(void);
 void DoQuit(void);
+
+void System_Border(int);
+int System_Rnd(void);
+int System_IsKey(int);
+int System_IsJoyLeft(void);
+int System_IsJoyRight(void);
+int System_IsJoyFire(void);
+void System_SetPixel(int, int);
 
 void Codes_Action(void);
 void Loader_Action(void);
