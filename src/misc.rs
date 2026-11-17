@@ -90,6 +90,15 @@ pub static VIDEO_COLOUR: [Colour; 16] = [
     }, // brown
 ];
 
+// RGB triple for a palette index, in r,g,b order. This is what the SDL
+// present path (texture upload and border) ultimately shows, so it is
+// pinned entry-by-entry by the unit test below — an SDL3 migration must
+// reproduce these exact bytes.
+pub fn colour_rgb(index: usize) -> [u8; 3] {
+    let c = &VIDEO_COLOUR[index];
+    [c.r, c.g, c.b]
+}
+
 // Timer -----------------------------------------------------------------------
 #[derive(Clone, Copy, Default)]
 pub struct Timer {
@@ -158,4 +167,36 @@ pub fn video_viewport(
         multiply = 1;
     }
     multiply
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Pin every palette entry as an exact RGB triple.
+    #[test]
+    fn palette_rgb_values_are_pinned() {
+        let expected: [[u8; 3]; 16] = [
+            [0x00, 0x00, 0x00], // black
+            [0x00, 0x00, 0xff], // blue
+            [0xff, 0x00, 0x00], // red
+            [0xff, 0x00, 0xff], // magenta
+            [0x00, 0xff, 0x00], // green
+            [0x00, 0xaa, 0xff], // light blue
+            [0xff, 0xff, 0x00], // yellow
+            [0xff, 0xff, 0xff], // white
+            [0xcc, 0xcc, 0xcc], // mid grey
+            [0x00, 0x55, 0xff], // mid blue
+            [0xaa, 0x00, 0x00], // mid red
+            [0x55, 0x00, 0x00], // dark red
+            [0x00, 0xaa, 0x00], // mid green
+            [0x00, 0x55, 0x00], // dark green
+            [0xff, 0x80, 0x00], // orange
+            [0x80, 0x40, 0x00], // brown
+        ];
+        assert_eq!(VIDEO_COLOUR.len(), expected.len());
+        for (i, e) in expected.iter().enumerate() {
+            assert_eq!(colour_rgb(i), *e, "palette entry {i}");
+        }
+    }
 }

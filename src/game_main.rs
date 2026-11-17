@@ -1,5 +1,5 @@
 use crate::common::{Event, HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, VIDEO_COLOUR, timer_set, timer_update, video_viewport};
+use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport};
 use sdl2::EventPump;
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::event::Event as SdlEvent;
@@ -209,10 +209,10 @@ fn present_frame(texture: &mut Texture) {
                 for (pos, &index) in fb.borrow().iter().enumerate() {
                     let pos = pos as i32;
                     let offset = ((pos / WIDTH) * pitch as i32 + (pos & 255) * 4) as usize;
-                    let c = &VIDEO_COLOUR[index as usize];
-                    buf[offset] = c.b;
-                    buf[offset + 1] = c.g;
-                    buf[offset + 2] = c.r;
+                    let [r, g, b] = colour_rgb(index as usize);
+                    buf[offset] = b;
+                    buf[offset + 1] = g;
+                    buf[offset + 2] = r;
                 }
             });
         })
@@ -356,6 +356,21 @@ impl Clock {
     }
 }
 
+// Wall-clock pacer arithmetic as pure functions, so unit tests can pin the
+// cadence and the no-catch-up behavior (see the main loop in run()). Both
+// work on the "milliseconds * TICKRATE" scale: frame_time > now * TICKRATE
+// means a frame is still owed.
+fn pacer_should_wait(frame_time: u64, now_ms: u64) -> bool {
+    frame_time > now_ms * TICKRATE as u64
+}
+
+// Schedule the next frame 1000 (ms*TICKRATE) after now. Restarting from the
+// current wall clock — rather than accumulating like the C original's
+// System_StartFrame — drops any backlog after a stall.
+fn next_frame_time(now_ms: u64) -> u64 {
+    now_ms * TICKRATE as u64 + 1000
+}
+
 pub fn run() {
     // `jetsetrusty --replay <script>`: headless, deterministic run for the
     // regression tests (see replay.rs). No SDL is initialised.
@@ -485,10 +500,10 @@ pub fn run() {
     let mut clock = Clock::new();
     let mut frame_time: u64 = 0;
     while GAME_RUNNING.load(Relaxed) {
-        while frame_time > clock.now(timer.ticks()) * TICKRATE as u64 {
+        while pacer_should_wait(frame_time, clock.now(timer.ticks())) {
             timer.delay(1);
         }
-        frame_time = clock.now(timer.ticks()) * TICKRATE as u64 + 1000;
+        frame_time = next_frame_time(clock.now(timer.ticks()));
 
         let frame = timer_update(&mut timer_frame);
 
@@ -504,8 +519,8 @@ pub fn run() {
 
         present_frame(&mut texture);
 
-        let border = &VIDEO_COLOUR[BORDER_INDEX.load(Relaxed)];
-        canvas.set_draw_color(Color::RGB(border.r, border.g, border.b));
+        let [r, g, b] = colour_rgb(BORDER_INDEX.load(Relaxed));
+        canvas.set_draw_color(Color::RGB(r, g, b));
         canvas.clear();
         canvas
             .with_texture_canvas(&mut target, |c| {
@@ -521,4 +536,114 @@ pub fn run() {
 
     // Teardown: SDL_Quit and friends run via Drop when sdl, canvas, the
     // textures, and the audio device go out of scope.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sdl2::keyboard::Keycode as Kc;
+
+    // Pin the SDL-keycode -> game-input contract that live play and replay
+    // share through map_keycode. Written against named Keycode constants, so
+    // the assertions keep the same meaning across an SDL2 -> SDL3 migration:
+    // the same physical key must produce the same game input.
+    #[test]
+    fn map_keycode_pins_special_keys() {
+        assert_eq!(map_keycode(Kc::Return.into_i32()), Key::Enter as i32);
+        assert_eq!(map_keycode(Kc::Escape.into_i32()), Key::Escape as i32);
+        assert_eq!(map_keycode(Kc::Pause.into_i32()), Key::Pause as i32);
+        assert_eq!(map_keycode(Kc::Tab.into_i32()), Key::Pause as i32);
+        assert_eq!(map_keycode(Kc::LAlt.into_i32()), Key::Mute as i32);
+        assert_eq!(map_keycode(Kc::RAlt.into_i32()), Key::Mute as i32);
+    }
+
+    #[test]
+    fn map_keycode_pins_digits() {
+        let base = Kc::NUM_1.into_i32();
+        for i in 0..4 {
+            assert_eq!(map_keycode(base + i), Key::K1 as i32 + i, "digit {i}");
+        }
+        for kc in [
+            Kc::NUM_0,
+            Kc::NUM_5,
+            Kc::NUM_6,
+            Kc::NUM_7,
+            Kc::NUM_8,
+            Kc::NUM_9,
+        ] {
+            assert_eq!(map_keycode(kc.into_i32()), Key::Else as i32);
+        }
+    }
+
+    #[test]
+    fn map_keycode_pins_letters() {
+        // Only e i p r t w y produce letter inputs; every other letter is
+        // Key::Else.
+        let mapped = [4, 8, 15, 17, 19, 22, 24]; // e i p r t w y
+        for offset in 0..26 {
+            let sym = Kc::A.into_i32() + offset;
+            let expected = if mapped.contains(&offset) {
+                Key::A as i32 + offset
+            } else {
+                Key::Else as i32
+            };
+            assert_eq!(map_keycode(sym), expected, "letter offset {offset}");
+        }
+    }
+
+    #[test]
+    fn map_keycode_pins_movement_keys_to_else() {
+        // Held movement keys are polled via system_is_key, not one-shot input.
+        for kc in [Kc::Left, Kc::Right, Kc::Space, Kc::LShift, Kc::RShift] {
+            assert_eq!(map_keycode(kc.into_i32()), Key::Else as i32);
+        }
+    }
+
+    // SDL_KEYS must stay coherent with map_keycode for the inputs that
+    // system_is_key polls: Return maps back to Enter and digits 1-4 to K1-K4.
+    #[test]
+    fn sdl_keys_table_matches_map_keycode() {
+        assert_eq!(SDL_KEYS.len(), 36);
+        for k in [Key::Enter, Key::K1, Key::K2, Key::K3, Key::K4] {
+            assert_eq!(map_keycode(SDL_KEYS[k as usize]), k as i32);
+        }
+    }
+
+    #[test]
+    fn pacer_runs_at_60hz() {
+        let t0 = 1000u64;
+        let ft = next_frame_time(t0); // frame scheduled at t0
+        assert!(pacer_should_wait(ft, t0)); // just ran: owed until 1000/60 ms pass
+        assert!(pacer_should_wait(ft, t0 + 16)); // 16 ms < 16.67 ms
+        assert!(!pacer_should_wait(ft, t0 + 17)); // 17 ms > 16.67 ms: next frame fires
+        assert_eq!(next_frame_time(t0 + 17), (t0 + 17) * TICKRATE as u64 + 1000);
+    }
+
+    #[test]
+    fn pacer_drops_backlog_after_a_stall() {
+        // The C original's System_StartFrame accumulates `time += 1000` and
+        // fast-forwards to catch up after a stall. We deliberately restart
+        // from the wall clock instead: after a long stall exactly one frame
+        // runs, and the next frame is scheduled from the new now, never from
+        // the backlog.
+        let t0 = 1000u64;
+        let ft = next_frame_time(t0);
+        let stalled = t0 + 5000; // e.g. window unfocused for 5 s
+        assert!(!pacer_should_wait(ft, stalled)); // no burst of catch-up frames
+        assert_eq!(next_frame_time(stalled), stalled * TICKRATE as u64 + 1000);
+    }
+
+    #[test]
+    fn clock_accumulates_wrapping_ticks() {
+        let mut clock = Clock::new();
+        assert_eq!(clock.now(100), 100);
+        assert_eq!(clock.now(250), 250);
+        // The u32 millisecond clock wraps every ~49.7 days; the delta across
+        // the wrap must accumulate as the small elapsed value.
+        let mut clock = Clock {
+            last: 0xFFFF_FFF0,
+            total: 0xFFFF_FFF0,
+        };
+        assert_eq!(clock.now(0x10), 0xFFFF_FFF0u64 + 0x20);
+    }
 }
