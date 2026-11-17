@@ -18,16 +18,16 @@ something.
 
 | No. | Name                             | Teleport |
 |:---:|:---------------------------------|:--------:|
-|  0  | The Off Licence                  |    1     |
-|  1  | The Bridge                       |    2     |
-|  2  | Under the MegaTree               |    3     |
-|  3  | At the Foot of the MegaTree      |    4     |
-|  4  | The Drive                        |    5     |
-|  5  | The Security Guard               |    6     |
-|  6  | Entrance to Hades                |    7     |
-|  7  | Cuckoo's Nest                    |    8     |
-|  8  | Inside the MegaTrunk             |    9     |
-|  9  | On a Branch Over the Drive       |    0     |
+|  0  | On a Branch Over the Drive       |    0     |
+|  1  | The Off Licence                  |    1     |
+|  2  | The Bridge                       |    2     |
+|  3  | Under the MegaTree               |    3     |
+|  4  | At the Foot of the MegaTree      |    4     |
+|  5  | The Drive                        |    5     |
+|  6  | The Security Guard               |    6     |
+|  7  | Entrance to Hades                |    7     |
+|  8  | Cuckoo's Nest                    |    8     |
+|  9  | Inside the MegaTrunk             |    9     |
 | 10  | The Front Door                   |    a     |
 | 11  | The Hall                         |    b     |
 | 12  | Tree Top                         |    c     |
