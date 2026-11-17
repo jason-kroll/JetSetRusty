@@ -1,12 +1,12 @@
 use crate::common::{Event, HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport};
-use sdl2::EventPump;
-use sdl2::audio::{AudioCallback, AudioSpecDesired};
-use sdl2::event::Event as SdlEvent;
-use sdl2::keyboard::{Keycode, Scancode};
-use sdl2::pixels::{Color, PixelFormatEnum};
-use sdl2::rect::Rect;
-use sdl2::render::Texture;
+use sdl3::EventPump;
+use sdl3::audio::{AudioCallback, AudioFormat, AudioSpec, AudioStream};
+use sdl3::event::Event as SdlEvent;
+use sdl3::keyboard::{Keycode, Scancode};
+use sdl3::pixels::{Color, PixelFormat};
+use sdl3::rect::Rect;
+use sdl3::render::Texture;
 use std::cell::{Cell, RefCell};
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
@@ -14,46 +14,96 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 pub const SAMPLERATE: i32 = 22050;
 pub const TICKRATE: i32 = 60;
 
-// SDL key codes indexed by key value 0..35 (Key::Left=0 .. Key::A=10 plus the
-// letter range 10..35 produced arithmetically by map_keycode)
+// SDL3 keycodes are u32 (SDL_Keycode); the game's input mapping works in i32.
+fn keycode_i32(k: Keycode) -> i32 {
+    sdl3::sys::keycode::SDL_Keycode::from(k).0 as i32
+}
+
+// SDL keycodes indexed by key value 0..35 (Key::Left=0 .. Key::A=10 plus the
+// letter range 10..35 produced arithmetically by map_keycode). system_is_key
+// compares these against replay-scripted presses.
 static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
     [
-        Keycode::Left.into_i32(),
-        Keycode::Right.into_i32(),
-        Keycode::Space.into_i32(),
-        Keycode::Return.into_i32(),
-        Keycode::LShift.into_i32(),
-        Keycode::RShift.into_i32(),
-        Keycode::NUM_1.into_i32(),
-        Keycode::NUM_2.into_i32(),
-        Keycode::NUM_3.into_i32(),
-        Keycode::NUM_4.into_i32(),
-        Keycode::NUM_5.into_i32(),
-        Keycode::NUM_6.into_i32(),
-        Keycode::NUM_7.into_i32(),
-        Keycode::NUM_8.into_i32(),
-        Keycode::NUM_9.into_i32(),
-        Keycode::NUM_0.into_i32(),
-        Keycode::A.into_i32(),
-        Keycode::B.into_i32(),
-        Keycode::C.into_i32(),
-        Keycode::D.into_i32(),
-        Keycode::E.into_i32(),
-        Keycode::F.into_i32(),
-        Keycode::G.into_i32(),
-        Keycode::H.into_i32(),
-        Keycode::I.into_i32(),
-        Keycode::J.into_i32(),
-        Keycode::K.into_i32(),
-        Keycode::L.into_i32(),
-        Keycode::M.into_i32(),
-        Keycode::N.into_i32(),
-        Keycode::O.into_i32(),
-        Keycode::P.into_i32(),
-        Keycode::Q.into_i32(),
-        Keycode::R.into_i32(),
-        Keycode::S.into_i32(),
-        Keycode::T.into_i32(),
+        keycode_i32(Keycode::Left),
+        keycode_i32(Keycode::Right),
+        keycode_i32(Keycode::Space),
+        keycode_i32(Keycode::Return),
+        keycode_i32(Keycode::LShift),
+        keycode_i32(Keycode::RShift),
+        keycode_i32(Keycode::_1),
+        keycode_i32(Keycode::_2),
+        keycode_i32(Keycode::_3),
+        keycode_i32(Keycode::_4),
+        keycode_i32(Keycode::_5),
+        keycode_i32(Keycode::_6),
+        keycode_i32(Keycode::_7),
+        keycode_i32(Keycode::_8),
+        keycode_i32(Keycode::_9),
+        keycode_i32(Keycode::_0),
+        keycode_i32(Keycode::A),
+        keycode_i32(Keycode::B),
+        keycode_i32(Keycode::C),
+        keycode_i32(Keycode::D),
+        keycode_i32(Keycode::E),
+        keycode_i32(Keycode::F),
+        keycode_i32(Keycode::G),
+        keycode_i32(Keycode::H),
+        keycode_i32(Keycode::I),
+        keycode_i32(Keycode::J),
+        keycode_i32(Keycode::K),
+        keycode_i32(Keycode::L),
+        keycode_i32(Keycode::M),
+        keycode_i32(Keycode::N),
+        keycode_i32(Keycode::O),
+        keycode_i32(Keycode::P),
+        keycode_i32(Keycode::Q),
+        keycode_i32(Keycode::R),
+        keycode_i32(Keycode::S),
+        keycode_i32(Keycode::T),
+    ]
+});
+
+// Parallel scancode table for the same 36 keys: SDL3's keyboard state is
+// scancode-indexed and the crate's keycode->scancode conversion is unsafe, so
+// held-key polling uses this table directly instead.
+static SDL_SCANCODES: LazyLock<[Scancode; 36]> = LazyLock::new(|| {
+    [
+        Scancode::Left,
+        Scancode::Right,
+        Scancode::Space,
+        Scancode::Return,
+        Scancode::LShift,
+        Scancode::RShift,
+        Scancode::_1,
+        Scancode::_2,
+        Scancode::_3,
+        Scancode::_4,
+        Scancode::_5,
+        Scancode::_6,
+        Scancode::_7,
+        Scancode::_8,
+        Scancode::_9,
+        Scancode::_0,
+        Scancode::A,
+        Scancode::B,
+        Scancode::C,
+        Scancode::D,
+        Scancode::E,
+        Scancode::F,
+        Scancode::G,
+        Scancode::H,
+        Scancode::I,
+        Scancode::J,
+        Scancode::K,
+        Scancode::L,
+        Scancode::M,
+        Scancode::N,
+        Scancode::O,
+        Scancode::P,
+        Scancode::Q,
+        Scancode::R,
+        Scancode::S,
+        Scancode::T,
     ]
 });
 
@@ -167,9 +217,8 @@ pub fn system_is_key(key: i32) -> i32 {
         let pump = pump
             .as_ref()
             .expect("system_is_key called before run() initialised SDL");
-        let keycode = Keycode::from_i32(sym).expect("unknown SDL keycode");
-        let scancode = Scancode::from_keycode(keycode).expect("keycode without scancode");
-        pump.keyboard_state().is_scancode_pressed(scancode) as i32
+        pump.keyboard_state()
+            .is_scancode_pressed(SDL_SCANCODES[key as usize]) as i32
     })
 }
 
@@ -183,18 +232,22 @@ pub fn system_border(index: i32) {
 
 // ---- Private SDL helpers ----------------------------------------------------
 
-// SDL calls this on its audio thread with the whole output buffer; we fill it
-// one stereo frame at a time. The sdl2 crate generates the required
-// `unsafe extern "C"` trampoline internally, so this callback itself is safe.
+// SDL calls this on its audio thread whenever the output stream needs more
+// data; we fill a buffer one stereo frame at a time and hand it to the stream.
+// The sdl3 crate generates the required `unsafe extern "C"` trampoline
+// internally, so this callback itself is safe.
 struct SdlAudioCallback;
 
-impl AudioCallback for SdlAudioCallback {
-    type Channel = i16;
-
-    fn callback(&mut self, out: &mut [i16]) {
-        for frame in out.as_chunks_mut::<2>().0 {
+impl AudioCallback<i16> for SdlAudioCallback {
+    fn callback(&mut self, stream: &mut AudioStream, requested: i32) {
+        // `requested` is the number of interleaved i16 samples SDL wants
+        // (SDL3's additional_amount is in bytes; the crate divides by the
+        // sample size).
+        let mut buf = vec![0i16; requested.max(0) as usize];
+        for frame in buf.as_chunks_mut::<2>().0 {
             audio_output(frame);
         }
+        let _ = stream.put_data_i16(&buf);
     }
 }
 
@@ -302,7 +355,7 @@ fn system_get_event() -> bool {
                 repeat: false,
                 ..
             }) => {
-                set_game_input(map_keycode(keycode.into_i32()));
+                set_game_input(map_keycode(keycode_i32(keycode)));
                 true
             }
             Some(_) => true,
@@ -313,18 +366,18 @@ fn system_get_event() -> bool {
 // Map an SDL keycode to the game's one-shot input (gameInput) for a keydown.
 // Shared by live play and replay, so scripted presses map exactly like real ones.
 pub(crate) fn map_keycode(sym: i32) -> i32 {
-    let k1 = Keycode::NUM_1.into_i32();
-    let ka = Keycode::A.into_i32();
+    let k1 = keycode_i32(Keycode::_1);
+    let ka = keycode_i32(Keycode::A);
 
-    if sym == Keycode::Return.into_i32() {
+    if sym == keycode_i32(Keycode::Return) {
         Key::Enter as i32
-    } else if sym == Keycode::Escape.into_i32() {
+    } else if sym == keycode_i32(Keycode::Escape) {
         Key::Escape as i32
-    } else if sym == Keycode::Pause.into_i32() || sym == Keycode::Tab.into_i32() {
+    } else if sym == keycode_i32(Keycode::Pause) || sym == keycode_i32(Keycode::Tab) {
         Key::Pause as i32
-    } else if sym == Keycode::LAlt.into_i32() || sym == Keycode::RAlt.into_i32() {
+    } else if sym == keycode_i32(Keycode::LAlt) || sym == keycode_i32(Keycode::RAlt) {
         Key::Mute as i32
-    } else if sym >= k1 && sym <= Keycode::NUM_4.into_i32() {
+    } else if sym >= k1 && sym <= keycode_i32(Keycode::_4) {
         Key::K1 as i32 + (sym - k1)
     } else if matches!(sym - ka, 4 | 8 | 15 | 17 | 19 | 22 | 24) {
         // e i p r t w y
@@ -335,26 +388,6 @@ pub(crate) fn map_keycode(sym: i32) -> i32 {
 }
 
 // ---- Entry point ------------------------------------------------------------
-
-// Monotonic millisecond clock. TimerSubsystem::ticks() returns u32 ms since
-// SDL init and wraps every ~49.7 days, so accumulate wrapping deltas into a
-// u64 (the pre-safe-API port called SDL_GetTicks64, which is already u64).
-struct Clock {
-    last: u32,
-    total: u64,
-}
-
-impl Clock {
-    fn new() -> Self {
-        Clock { last: 0, total: 0 }
-    }
-
-    fn now(&mut self, ticks: u32) -> u64 {
-        self.total += ticks.wrapping_sub(self.last) as u64;
-        self.last = ticks;
-        self.total
-    }
-}
 
 // Wall-clock pacer arithmetic as pure functions, so unit tests can pin the
 // cadence and the no-catch-up behavior (see the main loop in run()). Both
@@ -394,68 +427,62 @@ pub fn run() {
     }
 
     // SDL init ----------------------------------------------------------------
-    let sdl = sdl2::init().expect("SDL init");
-    sdl2::hint::set("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
+    let sdl = sdl3::init().expect("SDL init");
+    sdl3::hint::set("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
 
     let video = sdl.video().expect("SDL video subsystem");
-    let mode = video.desktop_display_mode(0).expect("desktop display mode");
+    let mode = video.displays().expect("list displays")[0]
+        .get_mode()
+        .expect("desktop display mode");
 
     let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
     let multiply = video_viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
     let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
 
     // Window and renderer -----------------------------------------------------
+    // SDL3 dropped SDL_WINDOW_FULLSCREEN_DESKTOP: plain fullscreen is
+    // borderless at the desktop resolution, which is what we want.
     let window = video
         .window("Jet-Set Willy", 0, 0)
         .position_centered()
-        .fullscreen_desktop()
+        .fullscreen()
         .build()
         .expect("create window");
-    let mut canvas = window
-        .into_canvas()
-        .accelerated()
-        .present_vsync()
-        .target_texture()
-        .build()
-        .expect("create canvas");
+    // SDL3 dropped the renderer flags: create_renderer picks an accelerated
+    // vsync renderer by default where supported. Pacing is wall-clock (see
+    // the main loop), so vsync is only for tear-free output, never timing.
+    let mut canvas = sdl3::render::create_renderer(window, None).expect("create renderer");
 
-    sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "2");
+    sdl3::hint::set("SDL_RENDER_SCALE_QUALITY", "2");
     let texture_creator = canvas.texture_creator();
     let mut target = texture_creator
         .create_texture_target(
-            PixelFormatEnum::ARGB8888,
+            PixelFormat::ARGB8888,
             (WIDTH * multiply) as u32,
             (HEIGHT * multiply) as u32,
         )
         .expect("create target texture");
-    sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
+    sdl3::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
     let mut texture = texture_creator
-        .create_texture_streaming(PixelFormatEnum::ARGB8888, WIDTH as u32, HEIGHT as u32)
+        .create_texture_streaming(PixelFormat::ARGB8888, WIDTH as u32, HEIGHT as u32)
         .expect("create streaming texture");
 
     sdl.mouse().show_cursor(false);
 
     // Audio -------------------------------------------------------------------
-    // 22050 Hz stereo S16 (i16 Channel = native-endian S16SYS), 256-sample
-    // buffers, pull-based via the AudioCallback above.
+    // 22050 Hz stereo S16 (i16 Channel = native-endian S16SYS), pull-based via
+    // the AudioCallback above. SDL3 dropped the fixed sample-buffer size from
+    // the spec; the callback is asked for whatever the stream needs.
     let audio = sdl.audio().expect("SDL audio subsystem");
-    let audio_device = audio
-        .open_playback(
-            None,
-            &AudioSpecDesired {
-                freq: Some(SAMPLERATE),
-                channels: Some(2),
-                samples: Some(256),
-            },
-            |_spec| SdlAudioCallback,
-        )
-        .expect("open audio device");
-    audio_device.resume();
+    let spec = AudioSpec::new(Some(SAMPLERATE), Some(2), Some(AudioFormat::s16_sys()));
+    let audio_stream = audio
+        .open_playback_stream::<SdlAudioCallback, i16>(&spec, SdlAudioCallback)
+        .expect("open audio stream");
+    audio_stream.resume().expect("resume audio stream");
 
-    // Events, keyboard, timer, RNG ----------------------------------------------
+    // Events, keyboard, RNG ---------------------------------------------------
     let event_pump = sdl.event_pump().expect("SDL event pump");
     EVENT_PUMP.with(|p| *p.borrow_mut() = Some(event_pump));
-    let timer = sdl.timer().expect("SDL timer subsystem");
 
     // Seed from the wall clock, like the C original's srand(time(NULL)).
     let now = std::time::SystemTime::now()
@@ -497,13 +524,12 @@ pub fn run() {
     // clock, dropping any backlog: if the loop stalled (e.g. the window was
     // unfocused and vsync blocked present()), the game resumes at 60 Hz instead
     // of bursting at full speed. Deliberate deviation from the C original.
-    let mut clock = Clock::new();
     let mut frame_time: u64 = 0;
     while GAME_RUNNING.load(Relaxed) {
-        while pacer_should_wait(frame_time, clock.now(timer.ticks())) {
-            timer.delay(1);
+        while pacer_should_wait(frame_time, sdl3::timer::ticks()) {
+            sdl3::timer::delay(1);
         }
-        frame_time = next_frame_time(clock.now(timer.ticks()));
+        frame_time = next_frame_time(sdl3::timer::ticks());
 
         let frame = timer_update(&mut timer_frame);
 
@@ -529,19 +555,19 @@ pub fn run() {
             })
             .expect("render target support");
         canvas
-            .copy(&target, None, Some(viewport))
+            .copy(&target, None, viewport)
             .expect("copy target to window");
         canvas.present();
     }
 
     // Teardown: SDL_Quit and friends run via Drop when sdl, canvas, the
-    // textures, and the audio device go out of scope.
+    // textures, and the audio stream go out of scope.
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sdl2::keyboard::Keycode as Kc;
+    use sdl3::keyboard::Keycode as Kc;
 
     // Pin the SDL-keycode -> game-input contract that live play and replay
     // share through map_keycode. Written against named Keycode constants, so
@@ -549,29 +575,22 @@ mod tests {
     // the same physical key must produce the same game input.
     #[test]
     fn map_keycode_pins_special_keys() {
-        assert_eq!(map_keycode(Kc::Return.into_i32()), Key::Enter as i32);
-        assert_eq!(map_keycode(Kc::Escape.into_i32()), Key::Escape as i32);
-        assert_eq!(map_keycode(Kc::Pause.into_i32()), Key::Pause as i32);
-        assert_eq!(map_keycode(Kc::Tab.into_i32()), Key::Pause as i32);
-        assert_eq!(map_keycode(Kc::LAlt.into_i32()), Key::Mute as i32);
-        assert_eq!(map_keycode(Kc::RAlt.into_i32()), Key::Mute as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::Return)), Key::Enter as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::Escape)), Key::Escape as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::Pause)), Key::Pause as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::Tab)), Key::Pause as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::LAlt)), Key::Mute as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::RAlt)), Key::Mute as i32);
     }
 
     #[test]
     fn map_keycode_pins_digits() {
-        let base = Kc::NUM_1.into_i32();
+        let base = keycode_i32(Kc::_1);
         for i in 0..4 {
             assert_eq!(map_keycode(base + i), Key::K1 as i32 + i, "digit {i}");
         }
-        for kc in [
-            Kc::NUM_0,
-            Kc::NUM_5,
-            Kc::NUM_6,
-            Kc::NUM_7,
-            Kc::NUM_8,
-            Kc::NUM_9,
-        ] {
-            assert_eq!(map_keycode(kc.into_i32()), Key::Else as i32);
+        for kc in [Kc::_0, Kc::_5, Kc::_6, Kc::_7, Kc::_8, Kc::_9] {
+            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else as i32);
         }
     }
 
@@ -581,7 +600,7 @@ mod tests {
         // Key::Else.
         let mapped = [4, 8, 15, 17, 19, 22, 24]; // e i p r t w y
         for offset in 0..26 {
-            let sym = Kc::A.into_i32() + offset;
+            let sym = keycode_i32(Kc::A) + offset;
             let expected = if mapped.contains(&offset) {
                 Key::A as i32 + offset
             } else {
@@ -595,7 +614,7 @@ mod tests {
     fn map_keycode_pins_movement_keys_to_else() {
         // Held movement keys are polled via system_is_key, not one-shot input.
         for kc in [Kc::Left, Kc::Right, Kc::Space, Kc::LShift, Kc::RShift] {
-            assert_eq!(map_keycode(kc.into_i32()), Key::Else as i32);
+            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else as i32);
         }
     }
 
@@ -631,19 +650,5 @@ mod tests {
         let stalled = t0 + 5000; // e.g. window unfocused for 5 s
         assert!(!pacer_should_wait(ft, stalled)); // no burst of catch-up frames
         assert_eq!(next_frame_time(stalled), stalled * TICKRATE as u64 + 1000);
-    }
-
-    #[test]
-    fn clock_accumulates_wrapping_ticks() {
-        let mut clock = Clock::new();
-        assert_eq!(clock.now(100), 100);
-        assert_eq!(clock.now(250), 250);
-        // The u32 millisecond clock wraps every ~49.7 days; the delta across
-        // the wrap must accumulate as the small elapsed value.
-        let mut clock = Clock {
-            last: 0xFFFF_FFF0,
-            total: 0xFFFF_FFF0,
-        };
-        assert_eq!(clock.now(0x10), 0xFFFF_FFF0u64 + 0x20);
     }
 }

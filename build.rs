@@ -1,11 +1,10 @@
 use std::process::Command;
 
 fn main() {
-    // No C is compiled anymore — the whole game is Rust. We still link SDL2,
-    // which game_main.rs calls via raw FFI for the window and audio setup.
-    // probe_library emits the cargo:rustc-link-{search,lib} directives as a
-    // side effect.
-    pkg_config::probe_library("sdl2").unwrap();
+    // No C is compiled by this crate — the whole game is Rust. SDL3 is linked
+    // by the sdl3 crate's bundled build (sdl3-sys compiles SDL3 from source and
+    // emits the link directives itself), so there is no system SDL package to
+    // probe for anymore.
 
     // Datestamped version string, exposed to Rust as env!("BUILD") and shown on
     // the loader screen.

@@ -39,7 +39,9 @@ use crate::game_main::{
     set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
 use crate::misc::{Timer, VIDEO_COLOUR, timer_set};
-use sdl2::sys::SDL_KeyCode as K;
+// SDL3's SDLK_* constants (SDL_Keycode, a u32 newtype); letters and digits
+// are still their ASCII codes, so script key names map exactly as before.
+use sdl3::sys::keycode as K;
 use std::io::Write;
 
 struct Press {
@@ -84,7 +86,7 @@ fn keycode(name: &str) -> Option<i32> {
             };
         }
     };
-    Some(named as i32)
+    Some(named.0 as i32)
 }
 
 fn parse_script(text: &str) -> Result<Script, String> {
