@@ -27,8 +27,10 @@ fn die_drawer() {
 }
 
 fn die_ticker() {
-    set_die_level(die_level() - 1);
+    // Upstream 7c1aed3: check before decrementing so dieLevel never falls
+    // below zero (the old post-decrement left it at -1 on the final frame).
     if die_level() > 0 {
+        set_die_level(die_level() - 1);
         return;
     }
 
