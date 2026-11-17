@@ -394,7 +394,17 @@ fn system_get_event() -> bool {
                 repeat: false,
                 ..
             }) => {
-                set_game_input(map_keycode(keycode_i32(keycode)));
+                let sym = keycode_i32(keycode);
+                // Swallow the window key and GUI chords before they become
+                // game input (see swallow_keydown).
+                let state = pump.keyboard_state();
+                let gui_held = state.is_scancode_pressed(Scancode::LGui)
+                    || state.is_scancode_pressed(Scancode::RGui);
+                set_game_input(if swallow_keydown(sym, gui_held) {
+                    Key::None as i32
+                } else {
+                    map_keycode(sym)
+                });
                 true
             }
             // Upstream 69070b9: any joystick button is "fire" (and a one-shot
@@ -436,6 +446,22 @@ fn system_get_event() -> bool {
             Some(_) => true,
         }
     })
+}
+
+// The window-manager ("Super"/GUI) keys. The game has no binding for them
+// (map_keycode maps them to Key::Else).
+fn is_gui_keycode(sym: i32) -> bool {
+    sym == keycode_i32(Keycode::LGui) || sym == keycode_i32(Keycode::RGui)
+}
+
+// A keydown is swallowed when it is itself a GUI key, or when any GUI key is
+// currently held (the chord case — e.g. Super+Tab reaching us because the WM
+// let it through). Deliberate deviation from upstream, which lets every key
+// reach the responder: there, any unrecognised input while paused calls
+// Game_Pause(0) via Cheat_Disabled, so a stray Super press would unpause the
+// game (and Super+Tab would toggle pause).
+fn swallow_keydown(sym: i32, gui_held: bool) -> bool {
+    gui_held || is_gui_keycode(sym)
 }
 
 // Map an SDL keycode to the game's one-shot input (gameInput) for a keydown.
@@ -802,6 +828,31 @@ mod tests {
         for k in [Key::Enter, Key::K1, Key::K2, Key::K3, Key::K4] {
             assert_eq!(map_keycode(SDL_KEYS[k as usize]), k as i32);
         }
+    }
+
+    // The window-manager key and any chord containing it must never reach the
+    // game: upstream's Cheat_Disabled unpauses on any unrecognised input, so a
+    // leaked Super press (or Super+Tab, which maps to Key::Pause) would
+    // otherwise pause/unpause the game from under the WM.
+    #[test]
+    fn gui_keycodes_and_chords_are_swallowed() {
+        let lgui = keycode_i32(Kc::LGui);
+        let rgui = keycode_i32(Kc::RGui);
+        assert!(is_gui_keycode(lgui));
+        assert!(is_gui_keycode(rgui));
+        assert!(!is_gui_keycode(keycode_i32(Kc::A)));
+        assert!(!is_gui_keycode(keycode_i32(Kc::Tab)));
+        // A bare window key is swallowed even with no other GUI key held...
+        assert!(swallow_keydown(lgui, false));
+        assert!(swallow_keydown(rgui, false));
+        // ...and any key is swallowed while a GUI key is held (chords).
+        assert!(swallow_keydown(keycode_i32(Kc::Tab), true));
+        assert!(swallow_keydown(keycode_i32(Kc::Escape), true));
+        assert!(swallow_keydown(keycode_i32(Kc::A), true));
+        // Normal keys pass through when no GUI key is held.
+        assert!(!swallow_keydown(keycode_i32(Kc::Tab), false));
+        assert!(!swallow_keydown(keycode_i32(Kc::A), false));
+        assert!(!swallow_keydown(keycode_i32(Kc::Return), false));
     }
 
     #[test]

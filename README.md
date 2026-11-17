@@ -70,6 +70,13 @@ If you'd like to play JSW in a window instead of fullscreen, use this flag
 cargo run -- --windowed
 ```
 
+### Super (GUI) Key Exempted from Unpausing
+
+If you are in fullscreen mode and you pause the game with <TAB> and then you try
+to jump to another window or workspace using the Super/GUI key, you don't want
+that key unpausing your paused game, so we're exempting GUI operations from
+unpausing.
+
 ![JetSet Willy title screen](images/JetSetWilly-Title.gif)
 
 ## Controls

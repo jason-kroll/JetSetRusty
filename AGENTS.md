@@ -128,6 +128,8 @@ The game moved from SDL2 (`sdl2` crate 0.38, system libsdl2 via pkg-config) to S
 - `5729eb8` — SDL2 scale-quality hint; SDL3 side already pinned to `ScaleMode::Nearest`.
 - Pure refactors/housekeeping: `static` keywords, renames, system.c→main.c merge, licence headers, data-table reformats (`92c0cc1`, `1d3fb33`, `6494cea`, `6c534d2`), VS/Debian/images/.gitkeep.
 
+Deliberate deviations *beyond* upstream (not ports of any commit): the `--windowed`/`--items` dev flags (see *Build & Run*), and the window-manager key plus any chord containing it is swallowed in `system_get_event` via `swallow_keydown` (`game_main.rs`). Upstream lets every key reach the responder, where `Cheat_Disabled` calls `Game_Pause(0)` on any unrecognised input — so a stray Super press in fullscreen would unpause a paused game (and Super+Tab would toggle pause). The game has no binding for the GUI keys, so swallowing them loses nothing. Replay is unaffected: scripts can't name GUI keys.
+
 ### Lints
 
 `CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. There are no `static mut`s left, but if one ever reappears, beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build (`4e36bf1`).
