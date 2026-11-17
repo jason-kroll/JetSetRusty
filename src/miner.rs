@@ -302,12 +302,9 @@ fn move_left_right() {
         miner.frame = 3;
     }
 
-    // Apply vertical movement from ramps
-    if miner.y + y < 0 {
-        drop(miner);
-        game_change_level(Direction::Above as i32);
-        return;
-    }
+    // Apply vertical movement from ramps. Upstream 941841d: no early
+    // change-level here when y + y would go negative — Miner_Ticker's
+    // `y < 0` check catches it on the next pass, as in the original.
     miner.y += y;
     miner.tile += offset;
 }
