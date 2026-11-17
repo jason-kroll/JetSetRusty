@@ -1,0 +1,23 @@
+# Room transitions: three scripted directions on foot. Willy starts at the
+# foot of First Landing's staircase (level 28) and holds Right: the ramps
+# carry him up step-by-step until the final step pushes miner.y negative
+# (miner.rs ramp block + Miner_Ticker's y<0 check, upstream 941841d) ->
+# game_change_level(Above) -> Top Landing (34). He keeps walking right
+# across Top Landing to its right edge -> Right -> The Bathroom (33).
+# Back in First Landing, he walks into the stairwell hole (cols 20-21 of
+# the bottom floor) -> the tile+64 lookups leave the map -> Below ->
+# Main Stairway (22), landing on its first floor. Robots are dodged
+# throughout: the y=96 sweeper in First Landing never crosses the climb
+# path, Top Landing's sweeper starts behind the walk at equal speed, and
+# the run ends long before Main Stairway's y=24 patrol could return.
+frames 1350
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 28   # First Landing
+360 set miner 32 104   # on the bottom floor, left of the staircase foot
+360 right 560      # walk right: up the ramps (y goes negative at the top)
+                   # -> Above -> Top Landing, across it -> Right -> The Bathroom
+930 set level 28   # back to First Landing for the below leg
+950 set miner 100 104  # on the bottom floor, left of the stairwell hole
+970 right 200      # walk right into the hole (cols 20-21) -> fall
+                   # -> Below -> Main Stairway, lands on its floor
