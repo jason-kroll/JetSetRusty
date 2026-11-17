@@ -71,6 +71,10 @@ cargo run --release
 
 Only Linux is tested at the moment.
 
+Fresh clones need `git config core.hooksPath .githooks` once to enable the
+repo's hooks — `pre-commit` runs `cargo build` and blocks the commit if the
+build fails.
+
 ![JetSet Willy level 1](images/JetSetWilly-Level1.png)
 
 ## The original C

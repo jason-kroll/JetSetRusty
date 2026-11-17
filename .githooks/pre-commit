@@ -1,0 +1,10 @@
+#!/bin/sh
+echo "Running cargo build before commit..."
+cargo build 2>&1
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Build failed — commit blocked. Fix the build first."
+    exit 1
+fi
+echo "✅ Build passed — proceeding with commit."
+exit 0
