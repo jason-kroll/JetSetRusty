@@ -16,18 +16,21 @@ possibly three if you're using shift), and you will transport.
 you don't have to keep running to the first landing every time you want to test
 something.
 
+See the canonical [src/levels.rs](/src/levels.rs) to confirm indexing if you
+like (notice that we're a bit off-by-one in the beginning).
+
 | No. | Name                             | Teleport |
 |:---:|:---------------------------------|:--------:|
-|  0  | On a Branch Over the Drive       |    0     |
-|  1  | The Off Licence                  |    1     |
-|  2  | The Bridge                       |    2     |
-|  3  | Under the MegaTree               |    3     |
-|  4  | At the Foot of the MegaTree      |    4     |
-|  5  | The Drive                        |    5     |
-|  6  | The Security Guard               |    6     |
-|  7  | Entrance to Hades                |    7     |
-|  8  | Cuckoo's Nest                    |    8     |
-|  9  | Inside the MegaTrunk             |    9     |
+|  0  | The Off Licence                  |    1     |
+|  1  | The Bridge                       |    2     |
+|  2  | Under the MegaTree               |    3     |
+|  3  | At the Foot of the MegaTree      |    4     |
+|  4  | The Drive                        |    5     |
+|  5  | The Security Guard               |    6     |
+|  6  | Entrance to Hades                |    7     |
+|  7  | Cuckoo's Nest                    |    8     |
+|  8  | Inside the MegaTrunk             |    9     |
+|  9  | On a Branch Over the Drive       |    0     |
 | 10  | The Front Door                   |    a     |
 | 11  | The Hall                         |    b     |
 | 12  | Tree Top                         |    c     |
@@ -40,7 +43,7 @@ something.
 | 19  | The Forgotten Abbey              |    j     |
 | 20  | Ballroom East                    |    k     |
 | 21  | Ballroom West                    |    l     |
-| 22  | To the Kitchens    Main Stairway |    m     |
+| 22  | To the Kitchens / Main Stairway  |    m     |
 | 23  | The Kitchen                      |    n     |
 | 24  | West of Kitchen                  |    o     |
 | 25  | Cold Store                       |    p     |
@@ -69,10 +72,10 @@ something.
 | 47  | Nomen Luni                       |    H     |
 | 48  | The Wine Cellar                  |    I     |
 | 49  | Watch Tower                      |    J     |
-| 50  | Tool  Shed                       |    K     |
+| 50  | Tool Shed                        |    K     |
 | 51  | Back Stairway                    |    L     |
 | 52  | Back Door                        |    M     |
-| 53  | West  Wing                       |    N     |
+| 53  | West Wing                        |    N     |
 | 54  | West Bedroom                     |    O     |
 | 55  | West Wing Roof                   |    P     |
 | 56  | Above the West Bedroom           |    Q     |
