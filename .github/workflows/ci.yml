@@ -26,16 +26,18 @@ jobs:
 
       # SDL3 is compiled from source by sdl3-sys, so cmake + gcc are required
       # even though no system SDL package is needed. SDL's cmake configure
-      # hard-errors without X11 or Wayland dev libraries (the ubuntu-latest
-      # runner image ships neither), so install those too. (Audio backends
-      # stay off — the smoke-run uses SDL_AUDIODRIVER=dummy.)
+      # FATAL_ERRORs on the ubuntu-latest runner image (which ships no X11
+      # or Wayland dev libraries at all) unless the full X11 extension set is
+      # present — CheckX11 requires the pkg-config modules x11 xext xcursor
+      # xi xfixes xrandr xrender xscrnsaver xtst — so install all of them.
+      # (Audio backends stay off; the smoke-run uses SDL_AUDIODRIVER=dummy.)
       - name: Install build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake \
-            libx11-dev libxext-dev libxfixes-dev libxrandr-dev libxcursor-dev \
-            libxi-dev libxss-dev libwayland-dev libxkbcommon-dev \
-            libdbus-1-dev libudev-dev
+            libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev \
+            libxrandr-dev libxrender-dev libxss-dev libxtst-dev \
+            libwayland-dev libxkbcommon-dev libdbus-1-dev libudev-dev
 
       - uses: Swatinem/rust-cache@v2 # caches ~/.cargo + target/; without this
       # every run recompiles SDL3 from source (minutes)
