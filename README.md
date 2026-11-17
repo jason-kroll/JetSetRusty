@@ -35,6 +35,18 @@ These are all features of fawtytoo's version, preserved in the port:
   effects with **stereo panning**. All sound comes from a square-wave synth
   for that retro "beepy" sound.
 
+## Known Differences
+
+So far we have deviated a touch from the C original. Due to how timing was
+calculated, if you tabbed away from JSW while playing and then came back, it
+would run fast for a bit. This seems undesireable so we changed it. (Actually in
+the latest upstream original, syncing is now done as per 90b5421 "Rely on VSYNC
+alone" which is fast all the time on my laptop, so I don't think we want to copy
+that.)
+
+Also, the 1984 original has this nice room called \[ that we can't get to. I
+haven't decided what to do about that yet, but it really should be reachable.
+
 ![JetSet Willy title screen](images/JetSetWilly-Title.gif)
 
 ## Controls
