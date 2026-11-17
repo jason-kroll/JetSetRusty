@@ -113,6 +113,7 @@ The game moved from SDL2 (`sdl2` crate 0.38, system libsdl2 via pkg-config) to S
 - `SDL_WINDOW_FULLSCREEN_DESKTOP` and the renderer flags (`accelerated`/`present_vsync`/`target_texture`) are gone; plain `fullscreen()` is borderless at desktop resolution and `create_renderer` picks accelerated+vsync by default.
 - `SDL_GetTicks` is u64 in SDL3 (the old u32-wrap `Clock` accumulator is gone); audio specs have no fixed sample-buffer size — the `AudioCallback` fills whatever the stream requests.
 - Held-key polling uses a parallel `SDL_SCANCODES` table because SDL3's keyboard state is scancode-indexed and the crate's keycode→scancode conversion is `unsafe` (the crate stays zero-`unsafe`).
+- Joystick support (ported from upstream `69070b9`) uses the `JoystickSubsystem`: events enabled, first device opened at startup, later devices via `JoyDeviceAdded`. `JoyAxisMotion` on axis 0 beyond ±255 is left/right, any `JoyButtonDown` is fire (jump / start / a one-shot `Key::Else` input). The state lives in a thread-local `JOY_STATE` cell that stays zero in replay mode, so goldens are unaffected.
 - Keycode *values* are unchanged from SDL2, so `map_keycode`'s arithmetic and the replay scripts are untouched — all golden hashes survived the migration byte-identical.
 
 ### Lints

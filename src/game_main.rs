@@ -1,8 +1,10 @@
 use crate::common::{Event, HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport};
 use sdl3::EventPump;
+use sdl3::JoystickSubsystem;
 use sdl3::audio::{AudioCallback, AudioFormat, AudioSpec, AudioStream};
 use sdl3::event::Event as SdlEvent;
+use sdl3::joystick::{Joystick, JoystickId};
 use sdl3::keyboard::{Keycode, Scancode};
 use sdl3::pixels::{Color, PixelFormat};
 use sdl3::rect::Rect;
@@ -181,6 +183,12 @@ thread_local! {
     // In replay mode, the SDL keycodes the script is holding down this frame;
     // system_is_key reads this instead of SDL's keyboard state. None = live play.
     static REPLAY_HELD: RefCell<Option<Vec<i32>>> = const { RefCell::new(None) };
+    // Upstream joyState[3]: [left, right, fire] (fire = any joystick button).
+    // Set from joystick events in live play; stays zero in replay mode, where
+    // the SDL event loop never runs, so replays are unaffected.
+    static JOY_STATE: Cell<[i32; 3]> = const { Cell::new([0; 3]) };
+    static JOYSTICK: RefCell<Option<Joystick>> = const { RefCell::new(None) };
+    static JOY_SUBSYSTEM: RefCell<Option<JoystickSubsystem>> = const { RefCell::new(None) };
 }
 
 static BORDER_INDEX: AtomicUsize = AtomicUsize::new(0);
@@ -220,6 +228,37 @@ pub fn system_is_key(key: i32) -> i32 {
         pump.keyboard_state()
             .is_scancode_pressed(SDL_SCANCODES[key as usize]) as i32
     })
+}
+
+// Joystick state polled by the game (upstream System_IsJoyLeft/Right/Fire).
+pub(crate) fn system_is_joy_left() -> i32 {
+    JOY_STATE.with(|s| s.get()[0])
+}
+pub(crate) fn system_is_joy_right() -> i32 {
+    JOY_STATE.with(|s| s.get()[1])
+}
+pub(crate) fn system_is_joy_fire() -> i32 {
+    JOY_STATE.with(|s| s.get()[2])
+}
+
+fn set_joy_state(left: i32, right: i32, fire: i32) {
+    JOY_STATE.with(|s| s.set([left, right, fire]));
+}
+
+// Open a joystick if none is open yet (startup + hotplug), as upstream's
+// SDL_JoystickOpen(0) plus event-driven open.
+fn open_joystick(id: JoystickId) {
+    let already_open = JOYSTICK.with(|j| j.borrow().is_some());
+    if already_open {
+        return;
+    }
+    JOY_SUBSYSTEM.with(|sub| {
+        if let Some(sub) = sub.borrow().as_ref()
+            && let Ok(j) = sub.open(id)
+        {
+            JOYSTICK.with(|jh| *jh.borrow_mut() = Some(j));
+        }
+    });
 }
 
 pub fn system_set_pixel(pos: i32, index: i32) {
@@ -358,6 +397,42 @@ fn system_get_event() -> bool {
                 set_game_input(map_keycode(keycode_i32(keycode)));
                 true
             }
+            // Upstream 69070b9: any joystick button is "fire" (and a one-shot
+            // KEY_ELSE input); axis 0 beyond +/-255 is left/right.
+            Some(SdlEvent::JoyButtonDown { .. }) => {
+                set_joy_state(
+                    JOY_STATE.with(|s| s.get()[0]),
+                    JOY_STATE.with(|s| s.get()[1]),
+                    1,
+                );
+                set_game_input(Key::Else as i32);
+                true
+            }
+            Some(SdlEvent::JoyButtonUp { .. }) => {
+                set_joy_state(
+                    JOY_STATE.with(|s| s.get()[0]),
+                    JOY_STATE.with(|s| s.get()[1]),
+                    0,
+                );
+                true
+            }
+            Some(SdlEvent::JoyAxisMotion {
+                axis_idx: 0, value, ..
+            }) => {
+                let (left, right) = if value < -255 {
+                    (1, 0)
+                } else if value > 255 {
+                    (0, 1)
+                } else {
+                    (0, 0)
+                };
+                set_joy_state(left, right, JOY_STATE.with(|s| s.get()[2]));
+                true
+            }
+            Some(SdlEvent::JoyDeviceAdded { which, .. }) => {
+                open_joystick(which);
+                true
+            }
             Some(_) => true,
         }
     })
@@ -489,9 +564,22 @@ pub fn run() {
         .expect("open audio stream");
     audio_stream.resume().expect("resume audio stream");
 
-    // Events, keyboard, RNG ---------------------------------------------------
+    // Events, keyboard, joystick, RNG -----------------------------------------
     let event_pump = sdl.event_pump().expect("SDL event pump");
     EVENT_PUMP.with(|p| *p.borrow_mut() = Some(event_pump));
+
+    // Joystick (upstream 69070b9): SDL_INIT_JOYSTICK + event state enabled,
+    // then open the first joystick if one is already connected. Devices
+    // plugged in later arrive as JoyDeviceAdded and are opened there.
+    if let Ok(joy) = sdl.joystick() {
+        joy.set_joystick_events_enabled(true);
+        if let Some(first) = joy.joysticks().ok().and_then(|ids| ids.first().copied())
+            && let Ok(j) = joy.open(first)
+        {
+            JOYSTICK.with(|jh| *jh.borrow_mut() = Some(j));
+        }
+        JOY_SUBSYSTEM.with(|s| *s.borrow_mut() = Some(joy));
+    }
 
     // Seed from the wall clock, like the C original's srand(time(NULL)).
     let now = std::time::SystemTime::now()

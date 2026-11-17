@@ -59,6 +59,9 @@ haven't decided what to do about that yet, but it really should be reachable.
 | Alt | Music on/off |
 | Esc | Quit to title |
 
+A joystick/gamepad also works (as in the C original): stick left/right walks,
+any button jumps or starts the game from the title screen.
+
 ### Cheat mode
 
 Type the cheat code just like in the original. Once it's active, hold a level

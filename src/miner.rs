@@ -13,7 +13,9 @@ use crate::die::die_action;
 use crate::game::{
     Direction, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
 };
-use crate::game_main::{set_action, system_is_key};
+use crate::game_main::{
+    set_action, system_is_joy_fire, system_is_joy_left, system_is_joy_right, system_is_key,
+};
 use crate::levels::{TileType, level_erase_item, level_get_tile_ramp, level_get_tile_type};
 use crate::misc::{Timer, timer_set, timer_update};
 use crate::video::{video_draw_miner, video_draw_sprite};
@@ -314,13 +316,15 @@ fn update_dir(convey_dir: i32) {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut dir = 0;
 
-    if (system_is_key(Key::Left as i32) != 0 || convey_dir == C_LEFT)
+    // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
+    if (system_is_key(Key::Left as i32) != 0 || system_is_joy_left() != 0 || convey_dir == C_LEFT)
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         dir += 1;
     }
 
     if system_is_key(Key::Right as i32) != 0
+        || system_is_joy_right() != 0
         || convey_dir == C_RIGHT
         || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
     {
@@ -345,7 +349,7 @@ fn update_dir(convey_dir: i32) {
         }
     }
 
-    if system_is_key(Key::Jump as i32) != 0
+    if (system_is_key(Key::Jump as i32) != 0 || system_is_joy_fire() != 0)
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         miner.air = 1;

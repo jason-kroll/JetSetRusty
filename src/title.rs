@@ -15,7 +15,7 @@ use crate::game::GameMode;
 
 use crate::video::{video_cycle_colours, video_write, video_write_large};
 
-use crate::game_main::{do_nothing, do_quit, system_border};
+use crate::game_main::{do_nothing, do_quit, system_border, system_is_joy_fire};
 
 const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;
@@ -146,7 +146,8 @@ fn do_title_drawer() {
 }
 
 fn do_title_responder() {
-    if game_input() == Key::Enter as i32 {
+    // Upstream 69070b9: joystick fire starts the game like Enter.
+    if game_input() == Key::Enter as i32 || system_is_joy_fire() != 0 {
         set_action(Some(game_start));
     } else if game_input() == Key::Escape as i32 {
         do_quit();
