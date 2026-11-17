@@ -15,13 +15,13 @@ cargo run             # run the game
 cargo test            # golden-frame regression tests (see *Regression tests*)
 ```
 
-**Required system libraries:** `libsdl2-dev build-essential`
+**Required tools:** `build-essential cmake` — no system SDL package is needed.
 
-`build.rs` links SDL2 via pkg-config (SDL2_mixer was never used and is no longer linked; all sound comes from the `audio.rs` synth) and sets `env!("BUILD")` to a datestamped version string used in the loader screen. **No C is compiled** — the game is 100% Rust.
+SDL3 comes from the `sdl3` crate's `build-from-source-static` feature: `sdl3-sys` compiles SDL 3.x from source and links it statically, so a fresh clone builds on any Linux (including distros without `libsdl3-dev`, e.g. Ubuntu/Pop!_OS 24.04) and the binary has no runtime SDL dependency. The cost is a slower first build. `build.rs` no longer probes pkg-config; it only sets `env!("BUILD")` to a datestamped version string used in the loader screen. **No C is compiled by this crate** — the game is 100% Rust (all sound comes from the `audio.rs` synth; SDL2_mixer was never used).
 
 ## Architecture
 
-The C→Rust port is **complete: the game is 100% Rust** (no C is compiled), and as of the latest commits the shared mutable state has been consolidated into a single Rust-owned `GAME_STATE` (a `LazyLock<GameState>`). The transitional C-ABI globals (`cglobals.rs` plus the `miner.rs` globals) — and finally `cheatEnabled` (commit `0546a8e`) — have **all been dissolved**, and the two-world sync layer that mirrored them has been deleted (see *Migration status* below). Both the entry point (`main.rs`) and the main loop (`game_main.rs::run`) live in Rust; `game_main.rs` owns SDL2 window/audio setup and drives the loop via four global function pointers:
+The C→Rust port is **complete: the game is 100% Rust** (no C is compiled), and as of the latest commits the shared mutable state has been consolidated into a single Rust-owned `GAME_STATE` (a `LazyLock<GameState>`). The transitional C-ABI globals (`cglobals.rs` plus the `miner.rs` globals) — and finally `cheatEnabled` (commit `0546a8e`) — have **all been dissolved**, and the two-world sync layer that mirrored them has been deleted (see *Migration status* below). Both the entry point (`main.rs`) and the main loop (`game_main.rs::run`) live in Rust; `game_main.rs` owns SDL3 window/audio setup and drives the loop via four global function pointers:
 
 ```
 Action    — current game state handler (runs once per frame, then sets itself to do_nothing)
@@ -37,7 +37,7 @@ These are `thread_local! Cell`s defined in `game_main.rs` behind safe accessors 
 | Module | Role |
 |--------|------|
 | `main.rs` | Entry point — calls `game_main::run()` |
-| `game_main.rs` | SDL2 init and teardown via the `sdl2` crate's safe API (`Sdl`/`Canvas`/textures/`EventPump`/`open_playback`/`TimerSubsystem`), main loop (wall-clock 60 Hz pacer — see *Frame pacing*), audio callback (`AudioCallback` impl → `audio_output`), keyboard polling, the four dispatcher slots. Owns `FRAMEBUFFER` (see *Graphics Model*) and `game_frame()`, the per-tick body shared by live play and replay. |
+| `game_main.rs` | SDL3 init/teardown via the `sdl3` crate's safe API (`Sdl`/`Canvas`/textures/`EventPump`/`open_playback_stream`; timer via the `sdl3::timer` free fns), main loop (wall-clock 60 Hz pacer — see *Frame pacing*), audio callback (`AudioCallback` impl → `audio_output`), keyboard polling, the four dispatcher slots. Owns `FRAMEBUFFER` (see *Graphics Model*) and `game_frame()`, the per-tick body shared by live play and replay. |
 | `replay.rs` | Headless deterministic replay (`jetsetrusty --replay <script>`) for the regression tests: scripted input, fixed RNG seed, lockstep audio, per-frame FNV-1a hashes of video and audio. No SDL. |
 | `common.rs` | `WIDTH=256`, `HEIGHT=192`, `Key` enum, `Event` type alias (`Option<fn()>`) |
 | `video.rs` | Full rendering engine — `videoPixel` buffer, sprite drawing, two character sets (8px/128-char and 16px/96-char) |
@@ -66,7 +66,7 @@ These are `thread_local! Cell`s defined in `game_main.rs` behind safe accessors 
 
 The teardown that followed deleted the vestigial scaffolding: the orphaned `cglobals.rs`, the empty `c_*` placeholder block in `common.rs`, the `sync_c_to_rust`/`sync_rust_to_c` bridges and their 34 call sites, the `{ }` scopes that existed only to drop mutex guards before a sync call, and the stale two-world comments (`robots.rs` header, `game.rs`). Scopes that still matter were kept — e.g. `game_change_level` drops the `miner` guard before `game_init_room()`, because `miner_save` locks `GAME_STATE.miner` itself.
 
-The C-ABI shed is **complete**: there are no `#[unsafe(no_mangle)]` items, no `static mut`, and no `unsafe extern "C"` call decls left in `src/`. All former extern-decl entry points (`level_ticker`/`level_init`, `rope_ticker`/`rope_init`, `miner_*`, `robots_*`, `video_*`, `system_*`, …) are plain `pub fn`s imported with `use`. `Event` is `Option<fn()>`. SDL is used entirely through the `sdl2` crate's safe API, and libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator, pinned to libc's exact sequence by unit tests plus the golden replays), so the crate contains zero `unsafe`. The `#[repr(i32)]`/`#[repr(C)]` attributes on `Key`, `Colour`, `Pixel`, `Miner`, `Timer`, and the game enums are gone too — nothing C-facing needs them. The C-style names are gone as well: every identifier is idiomatic snake_case and the crate has **zero `allow` attributes** (comments still cite the C original's names where that helps parity).
+The C-ABI shed is **complete**: there are no `#[unsafe(no_mangle)]` items, no `static mut`, and no `unsafe extern "C"` call decls left in `src/`. All former extern-decl entry points (`level_ticker`/`level_init`, `rope_ticker`/`rope_init`, `miner_*`, `robots_*`, `video_*`, `system_*`, …) are plain `pub fn`s imported with `use`. `Event` is `Option<fn()>`. SDL is used entirely through the `sdl3` crate's safe API, and libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator, pinned to libc's exact sequence by unit tests plus the golden replays), so the crate contains zero `unsafe`. The `#[repr(i32)]`/`#[repr(C)]` attributes on `Key`, `Colour`, `Pixel`, `Miner`, `Timer`, and the game enums are gone too — nothing C-facing needs them. The C-style names are gone as well: every identifier is idiomatic snake_case and the crate has **zero `allow` attributes** (comments still cite the C original's names where that helps parity).
 
 Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The complete original C/SDL2 implementation lives, buildable, in **`reference/c-original/`**: a pristine snapshot of upstream `github.com/fawtytoo/JetSetWilly` at this repo's `db7fc50` import, with its own `Makefile` (`make` there builds it with gcc + libSDL2 — no mixer). It is **not compiled by Cargo** and is reference only; see `reference/c-original/PROVENANCE.md`. The exact *as-transcribed* version of any ported module stays in git history (e.g. `git show <pre-port-commit>:src/robots.c`).
 
@@ -80,7 +80,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### FFI Conventions
 
-There is no FFI left in our code — the crate contains zero `unsafe`. SDL is used entirely through the `sdl2` crate's safe high-level API (`sdl2::init()`, `Sdl::video()/audio()/event_pump()/timer()`, `Canvas` + `Texture::with_lock`, `EventPump::poll_event` + `keyboard_state`, `AudioSubsystem::open_playback` with an `AudioCallback` impl — the crate generates the required `extern "C"` audio trampoline internally, so the only `unsafe` anywhere is inside the `sdl2` crate itself). libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator; replay determinism is preserved because unit tests there pin reference vectors captured from the real libc `rand`, and the golden replays confirm it in-game).
+There is no FFI left in our code — the crate contains zero `unsafe`. SDL is used entirely through the `sdl3` crate's safe high-level API (`sdl3::init()`, `Sdl::video()/audio()/event_pump()`, `render::create_renderer` → `Canvas` + `Texture::with_lock`/`set_blend_mode`/`set_scale_mode`, `EventPump::poll_event` + `keyboard_state`, `AudioSubsystem::open_playback_stream` with an `AudioCallback` impl that pushes samples via `put_data_i16`, and `sdl3::timer::ticks()`/`delay()` — the crate generates the required `extern "C"` audio trampoline internally, so the only `unsafe` anywhere is inside the `sdl3` crate itself). See *SDL3 port notes* below for the behavior changes vs SDL2 that we pin explicitly. libc `rand`/`srand` is vendored in safe Rust in `src/rng.rs` (glibc's TYPE_3 generator; replay determinism is preserved because unit tests there pin reference vectors captured from the real libc `rand`, and the golden replays confirm it in-game).
 
 Everything else is Rust-to-Rust and idiomatically named: there are no `allow` attributes anywhere in `src/`, and nothing is exported or called through a C ABI. When adding code, prefer safe Rust types at module boundaries.
 
@@ -94,7 +94,7 @@ Everything else is Rust-to-Rust and idiomatically named: there are no `allow` at
 
 ### Audio Model
 
-- `audio_output` is called from `game_main.rs`'s `AudioCallback` impl on SDL's audio thread (22050 Hz, stereo i16, 256-sample buffers). The audio thread paces itself by sample consumption, independent of the frame loop
+- `audio_output` is called from `game_main.rs`'s `AudioCallback` impl on SDL's audio thread (22050 Hz, stereo i16; SDL3 streams have no fixed buffer size — the callback fills the requested sample count and pushes it with `put_data_i16`). The audio thread paces itself by sample consumption, independent of the frame loop
 - 8 channels: indices 0–2 are SFX slots, 3–7 are music channels
 - Square wave oscillator: MSB of `phase` (u32) selects between two amplitude values
 - Music scores are `&[i16]` slices with events encoded as `(channel | type, note, duration)` triplets; `EV_END` terminates and either loops (`MUS_PLAY`) or stops (`MUS_STOP`)
@@ -102,7 +102,18 @@ Everything else is Rust-to-Rust and idiomatically named: there are no `allow` at
 
 ### Frame pacing
 
-`game_main.rs::run` throttles the main loop with a **wall-clock pacer** adapted from C's `System_StartFrame`: each iteration sets `frame_time = now + 1000` and spins on `TimerSubsystem::delay(1)` until the millisecond clock (`ticks() * TICKRATE`, unwrapped into a u64 via a small accumulating `Clock` since `ticks()` is u32 and wraps every ~49.7 days) catches up — 60 iterations/second, one game tick each (`timer_set(&timer_frame, TICKRATE, TICKRATE)`). **Deliberate deviation from C:** the original does `time += 1000` and accumulates a backlog after any loop stall, then bursts at full speed to catch up (e.g. after alt-tabbing out and back, when vsync blocks `present()` while unfocused — the music keeps playing because the audio thread is independent). We drop the backlog instead, so the game resumes at 60 Hz rather than fast-forwarding. The renderer still requests `PRESENTVSYNC` for tear-free output, but **do not rely on vsync for timing**: many drivers/compositors (XWayland, Wayland, driver overrides) silently ignore it, and an earlier vsync-paced port ran the game many times too fast while the music stayed correct (fixed in `5b91ebb`).
+`game_main.rs::run` throttles the main loop with a **wall-clock pacer** adapted from C's `System_StartFrame`: each iteration sets `frame_time = now + 1000` and spins on `sdl3::timer::delay(1)` until the millisecond clock (`sdl3::timer::ticks() * TICKRATE`, already u64 in SDL3) catches up — 60 iterations/second, one game tick each (`timer_set(&timer_frame, TICKRATE, TICKRATE)`). The arithmetic lives in pure fns (`pacer_should_wait`/`next_frame_time`) pinned by unit tests. **Deliberate deviation from C:** the original does `time += 1000` and accumulates a backlog after any loop stall, then bursts at full speed to catch up (e.g. after alt-tabbing out and back, when vsync blocks `present()` while unfocused — the music keeps playing because the audio thread is independent). We drop the backlog instead, so the game resumes at 60 Hz rather than fast-forwarding. The renderer still defaults to vsync for tear-free output (SDL3 has no `PRESENTVSYNC` flag; `create_renderer` enables it where supported), but **do not rely on vsync for timing**: many drivers/compositors (XWayland, Wayland, driver overrides) silently ignore it, and an earlier vsync-paced port ran the game many times too fast while the music stayed correct (fixed in `5b91ebb`).
+
+### SDL3 port notes
+
+The game moved from SDL2 (`sdl2` crate 0.38, system libsdl2 via pkg-config) to SDL3 (`sdl3` crate 0.22, `build-from-source-static`, SDL 3.4.x). Behavior changes vs SDL2 that we handle explicitly in `game_main.rs`:
+
+- Alpha-format textures default to `BLENDMODE_BLEND` in SDL3 (SDL2: NONE). `present_frame` leaves the alpha byte untouched, so we set `BlendMode::None` on both textures — otherwise the game image vanishes and only the border color shows.
+- New textures inherit the renderer's scale mode, which defaults to LINEAR in SDL3; the `SDL_RENDER_SCALE_QUALITY` hint is deprecated and ignored. We set `ScaleMode::Nearest` on both textures to keep the upscale pixel-crisp.
+- `SDL_WINDOW_FULLSCREEN_DESKTOP` and the renderer flags (`accelerated`/`present_vsync`/`target_texture`) are gone; plain `fullscreen()` is borderless at desktop resolution and `create_renderer` picks accelerated+vsync by default.
+- `SDL_GetTicks` is u64 in SDL3 (the old u32-wrap `Clock` accumulator is gone); audio specs have no fixed sample-buffer size — the `AudioCallback` fills whatever the stream requests.
+- Held-key polling uses a parallel `SDL_SCANCODES` table because SDL3's keyboard state is scancode-indexed and the crate's keycode→scancode conversion is `unsafe` (the crate stays zero-`unsafe`).
+- Keycode *values* are unchanged from SDL2, so `map_keycode`'s arithmetic and the replay scripts are untouched — all golden hashes survived the migration byte-identical.
 
 ### Lints
 
@@ -122,7 +133,7 @@ The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian g
 
 ## Debugging
 
-No C is compiled and our code contains zero `unsafe`; valgrind still guards the raw SDL calls inside the `sdl2` crate:
+No C is compiled by our crate and it contains zero `unsafe`; valgrind still guards the raw SDL calls inside the `sdl3`/`sdl3-sys` crates:
 
 ```sh
 valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40

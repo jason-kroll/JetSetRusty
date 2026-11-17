@@ -62,11 +62,13 @@ skip entering codes, press any key during the "JetSet Willy Loading" sequence.
 
 ## Building
 
-You need a Rust toolchain (edition 2024) and the SDL2 development library:
+You need a Rust toolchain (edition 2024), a C compiler, and cmake. SDL3 is
+built from source by the `sdl3` crate and linked statically, so no system SDL
+package is required:
 
 ```sh
-sudo apt install libsdl2-dev build-essential   # Debian/Ubuntu
-cargo run --release
+sudo apt install build-essential cmake   # Debian/Ubuntu
+cargo run --release    # the first build compiles SDL3 itself; takes a few minutes
 ```
 
 Only Linux is tested at the moment.
