@@ -6,7 +6,7 @@ use sdl3::event::Event as SdlEvent;
 use sdl3::keyboard::{Keycode, Scancode};
 use sdl3::pixels::{Color, PixelFormat};
 use sdl3::rect::Rect;
-use sdl3::render::{BlendMode, Texture};
+use sdl3::render::{BlendMode, ScaleMode, Texture};
 use std::cell::{Cell, RefCell};
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
@@ -453,7 +453,6 @@ pub fn run() {
     // the main loop), so vsync is only for tear-free output, never timing.
     let mut canvas = sdl3::render::create_renderer(window, None).expect("create renderer");
 
-    sdl3::hint::set("SDL_RENDER_SCALE_QUALITY", "2");
     let texture_creator = canvas.texture_creator();
     let mut target = texture_creator
         .create_texture_target(
@@ -462,15 +461,20 @@ pub fn run() {
             (HEIGHT * multiply) as u32,
         )
         .expect("create target texture");
-    sdl3::hint::set("SDL_RENDER_SCALE_QUALITY", "0");
     let mut texture = texture_creator
         .create_texture_streaming(PixelFormat::ARGB8888, WIDTH as u32, HEIGHT as u32)
         .expect("create streaming texture");
-    // SDL3 defaults alpha-format textures to BLENDMODE_BLEND (SDL2 used NONE),
-    // but present_frame leaves the alpha byte untouched (zero), so blending
-    // would erase the game image. Restore the SDL2 semantics explicitly.
+    // Two SDL3 behavior changes vs SDL2, restored explicitly here:
+    // - alpha-format textures default to BLENDMODE_BLEND (SDL2: NONE), but
+    //   present_frame leaves the alpha byte untouched (zero), so blending
+    //   would erase the game image.
+    // - new textures inherit the renderer's scale mode, which defaults to
+    //   LINEAR in SDL3; the SDL_RENDER_SCALE_QUALITY hint the C original used
+    //   is deprecated and ignored. NEAREST keeps the upscale pixel-crisp.
     target.set_blend_mode(BlendMode::None);
     texture.set_blend_mode(BlendMode::None);
+    target.set_scale_mode(ScaleMode::Nearest);
+    texture.set_scale_mode(ScaleMode::Nearest);
 
     sdl.mouse().show_cursor(false);
 
