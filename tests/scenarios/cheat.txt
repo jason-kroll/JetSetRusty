@@ -1,0 +1,29 @@
+# Cheat mode ("writetyper"): on the floor of First Landing (level 28, miner
+# y==104) type the code word one keypress at a time — a stray 'x' mid-word must
+# not advance or reset the position. After the 10th letter cheat mode enables
+# (Maria/cheat guardians drawn, responder switches to cheat_enabled). Then hold
+# a level key and tap Enter to teleport (5 -> The Drive, level 4). Escape to the
+# title and start again: the cheat persists, so 3+Enter teleports straight to
+# Under the MegaTree (level 2) without retyping the code.
+frames 1200
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 28   # First Landing
+360 set miner 150 104   # stand on the floor; x=150 stays clear of the y=96 robot
+400 w 1
+405 r 1
+410 i 1
+412 x 1            # wrong letter: ignored, sequence continues
+415 t 1
+420 e 1
+425 t 1
+430 y 1
+435 p 1
+440 e 1
+445 r 1            # "writetyper" complete -> cheat mode on
+500 5 30           # hold 5 (selects level 5)
+510 enter 1        # Enter while 5 is held -> teleport to level 4 (The Drive)
+700 escape         # back to the title screen
+800 enter          # start a new game (The Bathroom) — cheat still enabled
+900 3 30           # hold 3
+910 enter 1        # -> teleport to level 2 (Under the MegaTree)
