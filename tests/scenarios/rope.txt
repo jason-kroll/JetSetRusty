@@ -1,0 +1,12 @@
+# Rope swing: On the Roof (level 18) has a rope hanging at x=128. Willy stands
+# on the platform below; the swinging rope sweeps into him and he grabs on
+# (rope.rs), swings across the room, then moves along the rope both ways and
+# jumps off.
+frames 1000
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+340 set level 18   # On the Roof (Willy placed at the left edge)
+400 set miner 124 84   # platform under the rope anchor; the rope grabs him
+500 right 60       # move along the rope
+650 left 60        # and back the other way
+800 space 1        # jump off the rope
