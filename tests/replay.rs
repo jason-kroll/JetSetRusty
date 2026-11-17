@@ -190,6 +190,14 @@ fn fuzz() {
     check("fuzz");
 }
 
+// One seeded fuzz scenario per level: sweep-00 .. sweep-59 (levels are 0-based).
+#[test]
+fn sweep() {
+    for level in 0..60 {
+        check(&format!("sweep-{level:02}"));
+    }
+}
+
 // ---- Tests of the harness: comparison logic ----------------------------------
 
 const A: &str = "000000 aaaa 1111\n000001 bbbb 2222\n000002 cccc 3333\n";
