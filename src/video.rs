@@ -383,9 +383,9 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 }
 
 // miner.c still needs this
-pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> i32 {
+pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
     let attr = [0x8i32, 0x8, 0x8, 0x1];
-    let mut die = 0i32;
+    let mut die = false;
 
     let mut pos = pos & !7;
     let y0 = pos / WIDTH;
@@ -399,7 +399,7 @@ pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> i32 {
         for _ in 0..16 {
             if word & 1 != 0 {
                 if video_get_pixel(&mut pixels, pixel) & B_ROBOT as i32 != 0 {
-                    die = 1;
+                    die = true;
                 }
                 pixels[pixel as usize].point |= B_WILLY | 1;
                 video_set_pixel(&mut pixels, pixel, ink as u8);

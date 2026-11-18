@@ -1,4 +1,4 @@
-use crate::audio::{MUS_PLAY, audio_music, audio_music_playing};
+use crate::audio::{audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::game::{GAME_STATE, game_action, game_draw_status, game_game_reset};
 use crate::game_main::{
@@ -220,7 +220,7 @@ fn do_title_init() {
     set_text_frame(-1);
     set_colour_cycle(1);
 
-    audio_music(MUS_TITLE, MUS_PLAY);
+    audio_music(MUS_TITLE, true);
 
     set_ticker(Some(do_title_ticker));
 }

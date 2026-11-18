@@ -646,8 +646,7 @@ pub fn miner_drawer() {
         ((miner.y + offset) << 8) | miner.x,
         &MINER_SPRITE[row],
         GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
-    ) != 0
-    {
+    ) {
         set_action(Some(die_action));
         return;
     }

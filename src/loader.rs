@@ -1,4 +1,4 @@
-use crate::audio::{MUS_PLAY, audio_music, audio_music_playing};
+use crate::audio::{audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
     set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
@@ -92,7 +92,7 @@ fn do_loader_drawer1() {
         &build_with_ink[..],
     );
 
-    audio_music(MUS_LOADER, MUS_PLAY);
+    audio_music(MUS_LOADER, true);
     set_drawer(Some(do_loader_drawer2));
 }
 

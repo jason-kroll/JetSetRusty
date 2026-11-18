@@ -374,7 +374,7 @@ pub fn game_game_reset() {
 
     // audio_music(MUS_GAME, gameMusic)
     let music = game.music.load(Ordering::Relaxed);
-    audio_music(MUS_GAME, music as i32);
+    audio_music(MUS_GAME, music);
 }
 
 pub fn game_cheat_enabled() {

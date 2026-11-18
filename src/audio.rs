@@ -546,7 +546,7 @@ pub fn audio_play(playing: bool) {
     s.music_channels = if playing { NCHANNELS } else { NSFX };
 }
 
-pub fn audio_music(music: i32, playing: i32) {
+pub fn audio_music(music: i32, playing: bool) {
     {
         let mut s = AUDIO_STATE.lock().unwrap();
         s.music_index = music as usize;
@@ -561,7 +561,7 @@ pub fn audio_music(music: i32, playing: i32) {
         s.samples_music = 0;
         timer_set(&mut s.timer_music, SAMPLERATE, TICKRATE);
     }
-    audio_play(playing == MUS_PLAY);
+    audio_play(playing);
 }
 
 pub fn audio_init() {
