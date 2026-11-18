@@ -5117,10 +5117,9 @@ pub fn level_init() {
         let mut item: u8 = 0;
         LEVEL_TILE.with(|tiles| {
             let mut tiles = tiles.borrow_mut();
-            for cell in 0..LEVEL_TILES {
+            for (cell, t) in tiles.iter_mut().enumerate() {
                 let last_data = level.data[cell] as usize;
                 let info = &level.info[last_data];
-                let t = &mut tiles[cell];
 
                 t.tile_type = info.tile_type;
                 t.gfx = level.gfx[last_data];

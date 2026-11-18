@@ -206,7 +206,7 @@ fn do_rope_drawer() {
         let pos = y * WIDTH + x;
 
         // Check for Willy collision
-        let pixel_val = video_get_pixel(&mut pixels, pos);
+        let pixel_val = video_get_pixel(&pixels[pos as usize]);
         let willy_rope_zero = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
             GAME_STATE.miner_willy_rope.store(seg, Ordering::Relaxed);

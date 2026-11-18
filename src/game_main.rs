@@ -527,19 +527,15 @@ pub(crate) struct DevFlags {
 
 pub(crate) fn parse_flags(args: &[String]) -> DevFlags {
     let mut flags = DevFlags::default();
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--windowed" {
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        if arg == "--windowed" {
             flags.windowed = true;
-            i += 1;
-        } else if args[i] == "--items" {
+        } else if arg == "--items" {
             // A missing or unparseable value still consumes the slot.
-            if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<i32>().ok()) {
+            if let Some(v) = args.next().and_then(|s| s.parse::<i32>().ok()) {
                 flags.items = Some(v);
             }
-            i += 2;
-        } else {
-            i += 1;
         }
     }
     flags

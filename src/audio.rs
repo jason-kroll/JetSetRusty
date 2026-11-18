@@ -350,8 +350,8 @@ fn channel_pan(ch: &mut Channel, pan: usize) {
 }
 
 fn music_reset(s: &mut AudioState) {
-    for i in 0..NMUSIC {
-        let ch = &mut s.channels[MUSIC_CH[i]];
+    for &ch_idx in MUSIC_CH.iter() {
+        let ch = &mut s.channels[ch_idx];
         ch.do_phase = None;
         ch.left[2] = 0;
         ch.right[2] = 0;
