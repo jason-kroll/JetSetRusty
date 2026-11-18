@@ -390,7 +390,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 
 // miner.c still needs this
 pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
-    let attr = [0x8i32, 0x8, 0x8, 0x1];
+    let attr = [0x8u8, 0x8, 0x8, 0x1];
     let mut die = false;
 
     let mut pos = pos & !7;
@@ -409,7 +409,7 @@ pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
                     die = true;
                 }
                 pixel.point |= B_WILLY | 1;
-                video_set_pixel(pixel, p, ink as u8);
+                video_set_pixel(pixel, p, ink);
             }
         }
         pos += WIDTH;

@@ -5,7 +5,7 @@ use crate::video::{
     VIDEO_PIXEL, buf_index, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel,
 };
 use std::cell::Cell;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 
 const ROPE_SEGS: i32 = 33;
 
@@ -126,7 +126,7 @@ struct RopeState {
     hold: AtomicBool,
     x: AtomicI32,
     side: AtomicI32,
-    ink: AtomicI32,
+    ink: AtomicU8,
 }
 
 impl Default for RopeState {
@@ -137,7 +137,7 @@ impl Default for RopeState {
             hold: AtomicBool::new(false),
             x: AtomicI32::new(0),
             side: AtomicI32::new(0),
-            ink: AtomicI32::new(0),
+            ink: AtomicU8::new(0),
         }
     }
 }
@@ -148,7 +148,7 @@ static ROPE: RopeState = RopeState {
     hold: AtomicBool::new(false),
     x: AtomicI32::new(0),
     side: AtomicI32::new(0),
-    ink: AtomicI32::new(0),
+    ink: AtomicU8::new(0),
 };
 
 // ----------------------------------------------------------------------------
@@ -188,7 +188,7 @@ const B_WILLY: i32 = 4;
 
 fn do_rope_drawer() {
     let data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
-    let ink = ROPE.ink.load(Ordering::Relaxed) as u8;
+    let ink = ROPE.ink.load(Ordering::Relaxed);
 
     let mut x = ROPE.x.load(Ordering::Relaxed) * 8;
     let mut y: i32 = 0;
