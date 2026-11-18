@@ -46,7 +46,7 @@ pub(crate) fn die_ticker() {
         0x0,
         0x0,
     );
-    miner_restore();
+    miner_restore(&mut GAME_STATE.miner.lock().unwrap());
     audio_reduce_music_speed();
     queue_pending(Pending::Enter(Screen::Game(GamePhase::Init)));
 }

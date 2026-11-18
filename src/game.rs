@@ -191,8 +191,9 @@ impl GameState {
 // Game functions
 //
 // Runs exactly once as the Game(Init) phase's ticker: it sets up the room,
-// then moves the phase to Play (or PausedDrawOnce when paused).
-pub fn game_init_room() {
+// then moves the phase to Play (or PausedDrawOnce when paused). Takes the
+// miner explicitly — callers hold the one miner lock for the whole call.
+pub fn game_init_room(miner: &mut Miner) {
     level_init();
     robots_init();
     rope_init();
@@ -204,7 +205,7 @@ pub fn game_init_room() {
     let border_value = game.level_border.lock().unwrap()[current_level as usize];
     system_border(u8::try_from(border_value).expect("border palette index"));
 
-    miner_save();
+    miner_save(miner);
 
     // Write to GAME_STATE
     game.miner_attr_split.store(6, Ordering::Relaxed);
@@ -409,71 +410,64 @@ pub fn game_cheat_enabled() {
     robots_draw_cheat();
 }
 
-pub fn game_change_level(dir: Direction) {
+pub fn game_change_level(dir: Direction, miner: &mut Miner) {
     let game = &*GAME_STATE;
 
     // int level = level_dir(dir)
     let level = level_dir(dir);
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
-    if dir == Direction::Above {
-        let mut miner = game.miner.lock().unwrap();
-        if (level == THEDRIVE && miner.x > 22 && miner.x < 32)
-            || (level == FIRSTLANDING && miner.x > 182)
-        {
-            // minerWilly.air = 2; return
-            miner.air = 2;
-            return;
-        }
+    if dir == Direction::Above
+        && ((level == THEDRIVE && miner.x > 22 && miner.x < 32)
+            || (level == FIRSTLANDING && miner.x > 182))
+    {
+        // minerWilly.air = 2; return
+        miner.air = 2;
+        return;
     }
 
     // gameLevel = level
     game.level.store(level, Ordering::Relaxed);
 
     // Update minerWilly based on direction
-    // Scoped so the miner guard drops before game_init_room() (miner_save
-    // locks GAME_STATE.miner itself).
-    {
-        let mut miner = game.miner.lock().unwrap();
-        match dir {
-            Direction::Above => {
-                // minerWilly.y = 13 * 8 = 104
-                miner.y = 13 * 8;
-                // minerWilly.x = (minerWilly.tile & 31) * 8
-                miner.x = (miner.tile & 31) * 8;
-                // minerWilly.tile = 13 * 32 + (minerWilly.tile & 31)
-                miner.tile = 13 * 32 + (miner.tile & 31);
-                // minerWilly.align = 4
-                miner.align = 4;
-                // minerWilly.air = 0
-                miner.air = 0;
+    match dir {
+        Direction::Above => {
+            // minerWilly.y = 13 * 8 = 104
+            miner.y = 13 * 8;
+            // minerWilly.x = (minerWilly.tile & 31) * 8
+            miner.x = (miner.tile & 31) * 8;
+            // minerWilly.tile = 13 * 32 + (minerWilly.tile & 31)
+            miner.tile = 13 * 32 + (miner.tile & 31);
+            // minerWilly.align = 4
+            miner.align = 4;
+            // minerWilly.air = 0
+            miner.air = 0;
+        }
+        Direction::Right => {
+            // minerWilly.x = 0
+            miner.x = 0;
+            // minerWilly.tile &= ~31
+            miner.tile &= !31;
+        }
+        Direction::Below => {
+            // if (minerWilly.air < 11) { minerWilly.air = 2; }
+            if miner.air < 11 {
+                miner.air = 2;
             }
-            Direction::Right => {
-                // minerWilly.x = 0
-                miner.x = 0;
-                // minerWilly.tile &= ~31
-                miner.tile &= !31;
-            }
-            Direction::Below => {
-                // if (minerWilly.air < 11) { minerWilly.air = 2; }
-                if miner.air < 11 {
-                    miner.air = 2;
-                }
-                // minerWilly.y = 0
-                miner.y = 0;
-                // minerWilly.tile &= 31
-                miner.tile &= 31;
-            }
-            Direction::Left => {
-                // minerWilly.x = 30 * 8 = 240
-                miner.x = 30 * 8;
-                // minerWilly.tile |= 30
-                miner.tile |= 30;
-            }
+            // minerWilly.y = 0
+            miner.y = 0;
+            // minerWilly.tile &= 31
+            miner.tile &= 31;
+        }
+        Direction::Left => {
+            // minerWilly.x = 30 * 8 = 240
+            miner.x = 30 * 8;
+            // minerWilly.tile |= 30
+            miner.tile |= 30;
         }
     }
 
-    game_init_room();
+    game_init_room(miner);
 }
 
 pub fn do_draw_once() {
@@ -700,8 +694,7 @@ mod tests {
         let game = &*GAME_STATE;
         let above = Direction::Above;
 
-        // Set current room + Willy's x (tile kept consistent). Drops the
-        // miner lock before returning — never hold it across game_change_level.
+        // Set current room + Willy's x (tile kept consistent).
         let setup = |level: i32, x: i32| {
             game.level.store(level, Relaxed);
             let mut m = game.miner.lock().unwrap();
@@ -710,32 +703,36 @@ mod tests {
             m.tile = 13 * 32 + (x / 8);
             m.air = 0;
         };
+        let change = |dir: Direction| {
+            let mut m = game.miner.lock().unwrap();
+            game_change_level(dir, &mut m);
+        };
 
         // Guarded: entering The Drive from below with 22 < x < 32 is blocked.
         setup(45, 25);
-        game_change_level(above);
+        change(above);
         assert_eq!(game.level.load(Relaxed), 45);
         assert_eq!(game.miner.lock().unwrap().air, 2);
 
         // Guarded: entering First Landing from below with x > 182 is blocked.
         setup(22, 200);
-        game_change_level(above);
+        change(above);
         assert_eq!(game.level.load(Relaxed), 22);
         assert_eq!(game.miner.lock().unwrap().air, 2);
 
         // Boundaries are strict: x == 22 and x == 182 are NOT blocked.
         setup(45, 22);
-        game_change_level(above);
+        change(above);
         assert_eq!(game.level.load(Relaxed), THEDRIVE); // 4
         assert_eq!(game.miner.lock().unwrap().y, 104); // Above branch repositions
 
         setup(22, 182);
-        game_change_level(above);
+        change(above);
         assert_eq!(game.level.load(Relaxed), FIRSTLANDING); // 28
 
         // Unguarded plain Above transition: First Landing (28) -> Top Landing (34).
         setup(28, 40);
-        game_change_level(above);
+        change(above);
         assert_eq!(game.level.load(Relaxed), 34);
     }
 }

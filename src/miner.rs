@@ -157,8 +157,7 @@ thread_local! {
     static MINER_STORE: RefCell<Miner> = const { RefCell::new(MINER_ZERO) };
 }
 
-pub fn miner_restore() {
-    let mut miner = GAME_STATE.miner.lock().unwrap();
+pub fn miner_restore(miner: &mut Miner) {
     MINER_STORE.with(|s| {
         let s = s.borrow();
         miner.x = s.x;
@@ -173,8 +172,7 @@ pub fn miner_restore() {
     });
 }
 
-pub fn miner_save() {
-    let miner = GAME_STATE.miner.lock().unwrap();
+pub fn miner_save(miner: &Miner) {
     MINER_STORE.with(|s| {
         let mut s = s.borrow_mut();
         s.x = miner.x;
@@ -391,8 +389,7 @@ fn move_left_right() {
         }
 
         if miner.x == 30 * 8 {
-            drop(miner);
-            game_change_level(Direction::Right);
+            game_change_level(Direction::Right, &mut miner);
             return;
         }
 
@@ -420,8 +417,7 @@ fn move_left_right() {
         }
 
         if miner.x == 0 {
-            drop(miner);
-            game_change_level(Direction::Left);
+            game_change_level(Direction::Left, &mut miner);
             return;
         }
 
@@ -506,8 +502,7 @@ fn do_miner_ticker() {
             level_get_tile_type(t, air, jump)
         }) {
             JumpOutcome::Above => {
-                drop(miner);
-                game_change_level(Direction::Above);
+                game_change_level(Direction::Above, &mut miner);
                 return;
             }
             JumpOutcome::BumpHead { y, tile } => {
@@ -553,8 +548,7 @@ fn do_miner_ticker() {
         let (air, jump) = (miner.air, miner.jump);
         match ground_check(miner.tile, air, &|t| level_get_tile_type(t, air, jump)) {
             GroundOutcome::Below => {
-                drop(miner);
-                game_change_level(Direction::Below);
+                game_change_level(Direction::Below, &mut miner);
                 return;
             }
             GroundOutcome::HarmPass => {
@@ -601,10 +595,9 @@ fn do_miner_ticker() {
 pub fn miner_ticker() {
     do_miner_ticker();
 
-    let miner = GAME_STATE.miner.lock().unwrap();
+    let mut miner = GAME_STATE.miner.lock().unwrap();
     if miner.y < 0 {
-        drop(miner);
-        game_change_level(Direction::Above);
+        game_change_level(Direction::Above, &mut miner);
     }
 }
 
@@ -665,9 +658,8 @@ pub fn miner_init() {
     miner.align = 4;
     miner.move_ = 0;
     miner.air = 0;
+    miner_save(&miner);
     drop(miner);
-
-    miner_save();
 }
 
 #[cfg(test)]

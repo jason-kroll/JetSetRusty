@@ -132,7 +132,10 @@ pub(crate) fn run_pending() {
             }
         }
         Pending::StartGame => crate::title::game_start(),
-        Pending::ReinitRoom => crate::game::game_init_room(),
+        Pending::ReinitRoom => {
+            let mut miner = crate::game::GAME_STATE.miner.lock().unwrap();
+            crate::game::game_init_room(&mut miner);
+        }
     }
 }
 
@@ -156,7 +159,10 @@ pub(crate) fn run_ticker() {
         Screen::Codes => crate::codes::do_codes_ticker(),
         Screen::Title(TitlePhase::Init) => crate::title::do_title_init(),
         Screen::Title(TitlePhase::Scroll) => crate::title::do_title_ticker(),
-        Screen::Game(GamePhase::Init) => crate::game::game_init_room(),
+        Screen::Game(GamePhase::Init) => {
+            let mut miner = crate::game::GAME_STATE.miner.lock().unwrap();
+            crate::game::game_init_room(&mut miner);
+        }
         Screen::Game(GamePhase::Play) => crate::game::do_game_ticker(),
         Screen::Game(GamePhase::Pause) => crate::game::do_pause_ticker(),
         Screen::Die(DiePhase::Init) => crate::die::die_init(),
