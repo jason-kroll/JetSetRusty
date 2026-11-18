@@ -124,10 +124,6 @@ pub struct GameState {
     pub mode: AtomicU8,
     pub music: AtomicBool,
 
-    // How to use enums in Atomics:
-    // MY_ENUM.store(MyEnum::B as i32, Ordering::Release);
-    // let val = MyEnum::from_repr(MY_ENUM.load(Ordering::Acquire)).unwrap();
-
     // Less frequent, needs interior mutability, mutex-protected fields (more expensive)
     pub level_border: Mutex<[i32; 60]>,
     pub score_clock: Mutex<[u8; 3]>,
