@@ -70,12 +70,32 @@ fn set_do_clock_update(f: Event) {
 
 // Probably a lot of functions go here!
 // Enums (from game.h)
-#[derive(Debug, Clone, Copy, PartialEq)]
+//
+// The derived PartialOrd is the C enum's declaration order
+// (GM_NORMAL < GM_MARIA < GM_RUNNING < GM_TOILET) — what the original's
+// `gameMode < GM_RUNNING` integer comparisons meant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum GameMode {
     Normal = 0,
     Maria,
     Running,
     Toilet,
+}
+
+impl GameMode {
+    fn from_u8(v: u8) -> GameMode {
+        match v {
+            0 => GameMode::Normal,
+            1 => GameMode::Maria,
+            2 => GameMode::Running,
+            3 => GameMode::Toilet,
+            // set_mode is the only writer, and the replay script's
+            // `set mode` accepts only the four names, so anything else means
+            // someone bypassed the accessor. Fail loudly rather than run the
+            // game on a silently wrong mode.
+            _ => unreachable!("GAME_STATE.mode stores GameMode discriminants only"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,7 +141,9 @@ pub struct GameState {
     // Atomic caches for level_get_tile_type to avoid deadlocks
     pub miner_air: AtomicI32,
     pub miner_jump: AtomicI32,
-    pub mode: AtomicU8,
+    // GameMode discriminant, written only by set_mode; the field is private
+    // to force the typed accessors (mode()/set_mode()) on every user.
+    mode: AtomicU8,
     pub music: AtomicBool,
 
     // Less frequent, needs interior mutability, mutex-protected fields (more expensive)
@@ -158,13 +180,26 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     miner_willy_rope: AtomicI32::new(0),
     miner_air: AtomicI32::new(0),
     miner_jump: AtomicI32::new(0),
-    mode: AtomicU8::new(0),
+    mode: AtomicU8::new(GameMode::Normal as u8),
     // C: `int gameMusic = MUS_PLAY;` — music on by default.
     music: AtomicBool::new(true),
     score_clock: Mutex::new([0, 7, 0]), // 7:00 AM
     score_items: Mutex::new(0),
     timer: Mutex::new(Timer::default()),
 });
+
+// Typed accessors over the mode byte — the end of C's `gameMode = GM_MARIA`
+// and `gameMode < GM_RUNNING` integer handling. Same Relaxed atomic as
+// before; only the API is typed.
+impl GameState {
+    pub fn mode(&self) -> GameMode {
+        GameMode::from_u8(self.mode.load(Ordering::Relaxed))
+    }
+
+    pub fn set_mode(&self, m: GameMode) {
+        self.mode.store(m as u8, Ordering::Relaxed);
+    }
+}
 
 // Game functions
 //
@@ -211,8 +246,7 @@ pub fn game_init_room() {
 pub fn game_pause(state: bool) {
     let game = &*GAME_STATE;
 
-    if (game.game_paused.load(Ordering::Relaxed) != 0) == state
-        || game.mode.load(Ordering::Relaxed) >= GameMode::Running as u8
+    if (game.game_paused.load(Ordering::Relaxed) != 0) == state || game.mode() >= GameMode::Running
     {
         return;
     }
@@ -290,7 +324,7 @@ pub fn do_game_drawer() {
         game_draw_lives();
     }
 
-    if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
+    if game.mode() == GameMode::Toilet {
         return;
     }
 
@@ -476,7 +510,7 @@ pub fn do_game_ticker() {
     // Inactivity check: pause after 5 minutes when music stopped
     if !game.music.load(Ordering::Relaxed) {
         let old = game.inactivity_timer.fetch_add(1, Ordering::Relaxed);
-        if old == 256 * 5 && game.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
+        if old == 256 * 5 && game.mode() < GameMode::Running {
             game_pause(true);
             return;
         }
@@ -502,7 +536,7 @@ pub fn do_game_ticker() {
     robots_ticker();
 
     // GM_TOILET mode: return to title after timeout
-    if game.mode.load(Ordering::Relaxed) == GameMode::Toilet as u8 {
+    if game.mode() == GameMode::Toilet {
         let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
         if old_ticks == 256 {
             set_action(Some(title_action));
@@ -514,13 +548,13 @@ pub fn do_game_ticker() {
     miner_ticker();
 
     // GM_RUNNING mode
-    if game.mode.load(Ordering::Relaxed) == GameMode::Running as u8 {
+    if game.mode() == GameMode::Running {
         let mut miner = game.miner.lock().unwrap();
         miner.frame |= 1;
 
         if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
             drop(miner);
-            game.mode.store(GameMode::Toilet as u8, Ordering::Relaxed);
+            game.set_mode(GameMode::Toilet);
             robots_flush();
             game.clock_ticks.store(0, Ordering::Relaxed);
         }
@@ -528,13 +562,11 @@ pub fn do_game_ticker() {
     }
 
     // GM_MARIA mode: check for victory
-    if game.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
-        && game.level.load(Ordering::Relaxed) == MASTERBEDROOM
-    {
+    if game.mode() == GameMode::Maria && game.level.load(Ordering::Relaxed) == MASTERBEDROOM {
         // Guard drops at the end of this if-block, before Rope_Ticker.
         let miner = game.miner.lock().unwrap();
         if miner.air == 0 && miner.x == 40 {
-            game.mode.store(GameMode::Running as u8, Ordering::Relaxed);
+            game.set_mode(GameMode::Running);
         }
     }
 
@@ -558,7 +590,7 @@ pub fn game_got_item() {
 
     // if (--itemCount == 0) { gameMode = GM_MARIA; }
     if game.item_count.fetch_sub(1, Ordering::Relaxed) == 1 {
-        game.mode.store(GameMode::Maria as u8, Ordering::Relaxed);
+        game.set_mode(GameMode::Maria);
     }
 
     // audio_pan_x = minerWilly.x
@@ -593,7 +625,7 @@ pub fn clock_ticker() {
         clock[1] += 1;
         if clock[1] == 12 {
             clock[2] = 1 - clock[2];
-            if (clock[2] == 0) && (game.mode.load(Ordering::Relaxed) < GameMode::Maria as u8) {
+            if (clock[2] == 0) && (game.mode() < GameMode::Maria) {
                 set_action(Some(gameover_action));
             }
         } else if clock[1] == 13 {
@@ -661,6 +693,38 @@ pub fn game_action() {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering::Relaxed;
+
+    // The C original compares the mode as an int (`gameMode < GM_RUNNING`):
+    // the derived PartialOrd must keep game.h's declaration order.
+    #[test]
+    fn game_mode_ordering_matches_the_c_enum() {
+        assert!(GameMode::Normal < GameMode::Maria);
+        assert!(GameMode::Maria < GameMode::Running);
+        assert!(GameMode::Running < GameMode::Toilet);
+    }
+
+    // set_mode writes the discriminant; mode() reads it back typed.
+    #[test]
+    fn mode_accessors_round_trip_every_variant() {
+        for m in [
+            GameMode::Normal,
+            GameMode::Maria,
+            GameMode::Running,
+            GameMode::Toilet,
+        ] {
+            GAME_STATE.set_mode(m);
+            assert_eq!(GAME_STATE.mode(), m);
+        }
+        GAME_STATE.set_mode(GameMode::Normal);
+    }
+
+    // A foreign byte can only appear if some future code bypasses
+    // set_mode; the original C would silently play on the wrong mode.
+    #[test]
+    #[should_panic(expected = "discriminants only")]
+    fn mode_from_a_foreign_byte_panics() {
+        GameMode::from_u8(7);
+    }
 
     #[test]
     fn change_level_above_guard() {

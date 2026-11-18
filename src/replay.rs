@@ -35,6 +35,7 @@
 
 use crate::audio::{audio_init, audio_output};
 use crate::common::{HEIGHT, WIDTH};
+use crate::game::GameMode;
 use crate::game_main::{
     SAMPLERATE, TICKRATE, border_index, game_frame, game_running, map_keycode, seed_rng,
     set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
@@ -54,7 +55,7 @@ struct Press {
 enum SetOp {
     ItemCount(i32),
     Level(i32),
-    Mode(u8),
+    Mode(GameMode),
     Miner(i32, i32),
     Lives(i32),
 }
@@ -116,10 +117,10 @@ fn parse_script(text: &str) -> Result<Script, String> {
                         SetOp::Level(val.parse::<i32>().map_err(|_| err("expected an integer"))?)
                     }
                     "mode" => SetOp::Mode(match *val {
-                        "normal" => 0,
-                        "maria" => 1,
-                        "running" => 2,
-                        "toilet" => 3,
+                        "normal" => GameMode::Normal,
+                        "maria" => GameMode::Maria,
+                        "running" => GameMode::Running,
+                        "toilet" => GameMode::Toilet,
                         _ => return Err(err("mode must be normal|maria|running|toilet")),
                     }),
                     "lives" => {
@@ -233,7 +234,7 @@ pub fn main(args: &[String]) -> i32 {
                         GAME_STATE.level.store(*v, Relaxed);
                         set_ticker(Some(crate::game::game_init_room));
                     }
-                    SetOp::Mode(m) => GAME_STATE.mode.store(*m, Relaxed),
+                    SetOp::Mode(m) => GAME_STATE.set_mode(*m),
                     SetOp::Lives(v) => GAME_STATE.lives.store(*v, Relaxed),
                     SetOp::Miner(x, y) => {
                         let mut miner = GAME_STATE.miner.lock().unwrap();

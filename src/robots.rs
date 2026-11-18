@@ -1299,7 +1299,7 @@ pub fn robots_init() {
         // Once Maria has been dealt with, the Master Bedroom robots (her two
         // colour layers) are gone.
         if GAME_STATE.level.load(Ordering::Relaxed) == MASTERBEDROOM
-            && GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Maria as u8
+            && GAME_STATE.mode() == GameMode::Maria
         {
             for robot in &mut robots[..2] {
                 robot.do_move = do_move_nothing;

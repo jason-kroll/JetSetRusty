@@ -88,9 +88,7 @@ fn game_start() {
         robots_draw_cheat();
     }
 
-    GAME_STATE
-        .mode
-        .store(GameMode::Normal as u8, Ordering::Relaxed);
+    GAME_STATE.set_mode(GameMode::Normal);
     GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
     game_action();

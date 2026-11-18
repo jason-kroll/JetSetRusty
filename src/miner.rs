@@ -410,7 +410,7 @@ fn move_left_right() {
         miner.x += 8;
         miner.tile += 1;
         miner.frame = 0;
-    } else if GAME_STATE.mode.load(Ordering::Relaxed) != GameMode::Running as u8 {
+    } else if GAME_STATE.mode() != GameMode::Running {
         if miner.frame > 0 {
             miner.frame -= 1;
             return;
@@ -454,7 +454,7 @@ fn update_dir(convey_dir: i32) {
 
     // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
     if (system_is_key(Key::Left as i32) || system_is_joy_left() || convey_dir == C_LEFT)
-        && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
+        && GAME_STATE.mode() < GameMode::Running
     {
         dir += 1;
     }
@@ -462,7 +462,7 @@ fn update_dir(convey_dir: i32) {
     if system_is_key(Key::Right as i32)
         || system_is_joy_right()
         || convey_dir == C_RIGHT
-        || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
+        || GAME_STATE.mode() == GameMode::Running
     {
         dir += 2;
     }
@@ -486,7 +486,7 @@ fn update_dir(convey_dir: i32) {
     }
 
     if (system_is_key(Key::Jump as i32) || system_is_joy_fire())
-        && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
+        && GAME_STATE.mode() < GameMode::Running
     {
         miner.air = 1;
         miner.jump = 0;
