@@ -29,10 +29,3 @@ pub enum Key {
     Else,
     None,
 }
-
-// Globals defined in game_main.rs, re-exported here for convenience
-pub use crate::game_main::{do_nothing, do_quit, system_rnd, system_set_pixel};
-
-// The screen-state Action entry points, defined in their own modules
-pub use crate::levels::level_set_border;
-pub use crate::title::title_action;

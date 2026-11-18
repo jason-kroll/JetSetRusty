@@ -5,7 +5,7 @@ use crate::audio::{
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::gameover_action;
-use crate::levels::{level_dir, level_drawer, level_ticker};
+use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
 use crate::video::{
@@ -18,8 +18,6 @@ use crate::common::{
     Key,
     // Constant(s)
     WIDTH,
-    // C functions
-    level_set_border,
 };
 
 use crate::game_main::{

@@ -2,10 +2,11 @@
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{HEIGHT, WIDTH};
-use crate::common::{do_nothing, do_quit, system_rnd, title_action};
 use crate::game_main::{
-    game_input, set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
+    do_nothing, do_quit, game_input, set_action, set_drawer, set_responder, set_ticker,
+    system_border, system_rnd, video_flash,
 };
+use crate::title::title_action;
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;

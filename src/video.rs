@@ -1,4 +1,5 @@
-use crate::common::{HEIGHT, WIDTH, system_set_pixel};
+use crate::common::{HEIGHT, WIDTH};
+use crate::game_main::system_set_pixel;
 
 use std::sync::LazyLock;
 use std::sync::Mutex;
