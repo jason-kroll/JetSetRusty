@@ -10,6 +10,31 @@ locally, one commit per phase, imperative mood, no type prefix, with the
 trailer. Gates after every phase: `cargo fmt --check`,
 `cargo clippy --all-targets -- -D warnings`, `cargo test`.
 
+## Status: COMPLETE (2026-11-17)
+
+Five commits, all gates green after each (fmt, clippy `-D warnings`, 23
+golden replays byte-identical; unit tests 46 -> 49):
+
+- `afe308b` Phase 1 — GameMode accessors, Eq + PartialOrd, from_u8 unreachable
+- `dc857c7` Phase 2 — TileType PartialOrd, typed ground probes
+- `5457f08` Phase 3a — Key discriminants pinned to C numbering
+- `2ce7d61` Phase 3b — typed Key through the input pipeline
+- `1bc00a8` Phase 4 — Sfx and MusicScore enums
+
+Implementation deviations from D3, discovered mid-3b (also recorded in the
+3b commit message):
+
+- Range patterns (`Key::A..=Key::Z`) and int-to-enum casts (`x as Key`)
+  do not exist in stable Rust, so `letter()` keeps its offset arithmetic
+  inside one method and `from_letter` is a lookup table, `#[cfg(test)]`
+  (it has no production caller).
+- The letters the original never produces — KEY_U, KEY_V, KEY_X, KEY_Z —
+  have no variant: rustc's dead_code lint fails `-D warnings` on them, and
+  the allow/expect routes violate the crate's zero-suppression policy
+  (`#[expect]` also misfires across cfg(test) targets). W and Y stay
+  pinned at their C KEY_W/KEY_Y values (38, 40) so the letter offsets in
+  `letter()` remain correct.
+
 ## Verified facts (checked against the source and the C original)
 
 ### Inventory of the pattern (as of 1e6f831)
