@@ -6,7 +6,7 @@
 # never completes the word (its first letter 'e' != 'w' at position 0), so
 # cheat stays off and 5+Enter does not teleport. Then the full word typed
 # contiguously enables cheat mode (Maria/cheat guardians drawn, responder
-# switches to cheat_enabled), and holding a level key + Enter teleports
+# returns the level-select handler), and holding a level key + Enter teleports
 # (5 -> The Drive, level 4). Escape to the title and start again: the cheat
 # persists, so 3+Enter teleports straight to Under the MegaTree (level 2)
 # without retyping the code.
