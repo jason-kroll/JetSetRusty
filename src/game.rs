@@ -88,6 +88,20 @@ pub enum Direction {
     Left,
 }
 
+impl Direction {
+    /// Codes 0..=3 in declaration order (Above is pinned at 0); anything
+    /// else is None.
+    pub fn from_i32(v: i32) -> Option<Direction> {
+        const ALL: [Direction; 4] = [
+            Direction::Above,
+            Direction::Right,
+            Direction::Below,
+            Direction::Left,
+        ];
+        ALL.get(v as usize).copied()
+    }
+}
+
 // miner struct (from game.h)
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Miner {
@@ -263,9 +277,9 @@ pub fn do_game_responder() {
 
     let input = game_input();
 
-    match input {
-        x if x == Key::Pause as i32 => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
-        x if x == Key::Mute as i32 => {
+    match Key::from_key_code(input) {
+        Key::Pause => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
+        Key::Mute => {
             let new_music = if game.music.load(Ordering::Relaxed) == 0 {
                 1
             } else {
@@ -274,7 +288,7 @@ pub fn do_game_responder() {
             game.music.store(new_music, Ordering::Relaxed);
             audio_play(new_music as i32);
         }
-        x if x == Key::Escape as i32 => set_action(Some(title_action)),
+        Key::Escape => set_action(Some(title_action)),
         _ => {
             if let Some(handler) = cheat_responder() {
                 handler();
@@ -414,7 +428,7 @@ pub fn game_change_level(dir: i32) {
     let level = level_dir(dir as usize);
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
-    if dir == Direction::Above as i32 {
+    if Direction::from_i32(dir) == Some(Direction::Above) {
         let mut miner = game.miner.lock().unwrap();
         if (level == THEDRIVE && miner.x > 22 && miner.x < 32)
             || (level == FIRSTLANDING && miner.x > 182)
@@ -433,8 +447,8 @@ pub fn game_change_level(dir: i32) {
     // locks GAME_STATE.miner itself).
     {
         let mut miner = game.miner.lock().unwrap();
-        match dir {
-            x if x == Direction::Above as i32 => {
+        match Direction::from_i32(dir) {
+            Some(Direction::Above) => {
                 // minerWilly.y = 13 * 8 = 104
                 miner.y = 13 * 8;
                 // minerWilly.x = (minerWilly.tile & 31) * 8
@@ -446,13 +460,13 @@ pub fn game_change_level(dir: i32) {
                 // minerWilly.air = 0
                 miner.air = 0;
             }
-            x if x == Direction::Right as i32 => {
+            Some(Direction::Right) => {
                 // minerWilly.x = 0
                 miner.x = 0;
                 // minerWilly.tile &= ~31
                 miner.tile &= !31;
             }
-            x if x == Direction::Below as i32 => {
+            Some(Direction::Below) => {
                 // if (minerWilly.air < 11) { minerWilly.air = 2; }
                 if miner.air < 11 {
                     miner.air = 2;
@@ -462,13 +476,13 @@ pub fn game_change_level(dir: i32) {
                 // minerWilly.tile &= 31
                 miner.tile &= 31;
             }
-            x if x == Direction::Left as i32 => {
+            Some(Direction::Left) => {
                 // minerWilly.x = 30 * 8 = 240
                 miner.x = 30 * 8;
                 // minerWilly.tile |= 30
                 miner.tile |= 30;
             }
-            _ => {}
+            None => {}
         }
     }
 

@@ -15,7 +15,8 @@ const NCHANNELS: usize = 8;
 const NMUSIC: usize = 5;
 const NSFX: usize = 3;
 
-const EV_NOTEON: i16 = 0x10;
+const EV_NOTE_OFF: i16 = 0x00;
+const EV_NOTE_ON: i16 = 0x10;
 const EV_END: i16 = 0x40;
 
 pub const MUS_STOP: i32 = 0;
@@ -361,6 +362,14 @@ fn music_reset(s: &mut AudioState) {
     s.music_clock = 0;
 }
 
+// EV_NOTE_OFF: silence one score channel
+fn music_note_off(s: &mut AudioState, ch: usize) {
+    let channel = &mut s.channels[MUSIC_CH[ch]];
+    channel.do_phase = None;
+    channel.left[2] = 0;
+    channel.right[2] = 0;
+}
+
 // ---- public API -------------------------------------------------------------
 
 pub fn audio_reduce_music_speed() {
@@ -452,14 +461,14 @@ pub fn audio_output(output: &mut [i16; 2]) {
                     let ch = (data & 0x0f) as usize;
 
                     match data & 0xf0 {
-                        x if x == EV_NOTEON => {
+                        EV_NOTE_ON => {
                             let note = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32
                                 + s.music_pitch;
                             s.cur_music_idx += 1;
                             s.channels[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
                             s.channels[MUSIC_CH[ch]].do_phase = Some(do_phase_fn);
                         }
-                        x if x == EV_END => {
+                        EV_END => {
                             let playing = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
                             AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
                             music_reset(&mut s);
@@ -470,13 +479,10 @@ pub fn audio_output(output: &mut [i16; 2]) {
                             }
                             continue;
                         }
-                        _ => {
-                            // EV_NOTEOFF
-                            let ch_ref = &mut s.channels[MUSIC_CH[ch]];
-                            ch_ref.do_phase = None;
-                            ch_ref.left[2] = 0;
-                            ch_ref.right[2] = 0;
-                        }
+                        EV_NOTE_OFF => music_note_off(&mut s, ch),
+                        // Unknown type nibble: C's switch has no default case,
+                        // but the port has always silenced here too
+                        _ => music_note_off(&mut s, ch),
                     }
 
                     let time = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
