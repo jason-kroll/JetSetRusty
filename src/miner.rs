@@ -319,13 +319,12 @@ fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(usize) -> TileType) ->
     let t0 = lookup(tile as usize);
     let t1 = lookup((tile + 1) as usize);
     if t0 == TileType::Harm || t1 == TileType::Harm {
-        if air == 1 && (t0 as i32 <= TileType::Space as i32 || t1 as i32 <= TileType::Space as i32)
-        {
+        if air == 1 && (t0 <= TileType::Space || t1 <= TileType::Space) {
             return GroundOutcome::HarmPass;
         }
         return GroundOutcome::Die;
     }
-    if t0 as i32 > TileType::Space as i32 || t1 as i32 > TileType::Space as i32 {
+    if t0 > TileType::Space || t1 > TileType::Space {
         if air >= 12 {
             return GroundOutcome::Die;
         }

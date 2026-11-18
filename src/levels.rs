@@ -9,7 +9,9 @@ const LEVEL_W: usize = 32;
 const LEVEL_HEIGHT: usize = 16;
 const LEVEL_TILES: usize = LEVEL_W * LEVEL_HEIGHT; // 32 * 16 is 512
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// PartialOrd derives the C declaration order — what the physics meant by
+// `tile > T_SPACE as int`: Item < Space < everything floor-like < Harm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum TileType {
     Item,
     Space,
