@@ -1,4 +1,4 @@
-use crate::common::{Event, HEIGHT, Key, WIDTH};
+use crate::common::{HEIGHT, Key, WIDTH};
 use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport, windowed_size};
 use sdl3::EventPump;
 use sdl3::JoystickSubsystem;
@@ -110,48 +110,176 @@ static SDL_SCANCODES: LazyLock<[Scancode; 36]> = LazyLock::new(|| {
 });
 
 use crate::audio::{audio_init, audio_output};
-use crate::loader::loader_action;
 
 // libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
 // generator, pinned to libc's exact sequence by tests there), so no libc FFI
 // remains in the crate.
 
 // ---- Dispatcher state -------------------------------------------------------
-// The four Event slots plus gameInput/videoFlash. All are main-thread only
-// (the SDL audio callback never touches them), so thread-local Cells are
-// sound and need no unsafe. This replaces the old #[no_mangle] static mut
-// globals from the C port.
+// The four dispatch slots plus gameInput/videoFlash. The slots are typed
+// enums, not C's EVENT fn pointers: each variant names the handler to run
+// and its `run` method matches the variant to the real function, so the
+// compiler sees every handler. All are main-thread only (the SDL audio
+// callback never touches them), so thread-local Cells are sound and need
+// no unsafe. This replaces the old #[no_mangle] static mut globals from
+// the C port.
+
+/// The ACTION slot: a one-shot command consumed at the start of a frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Action {
+    None,
+    Loader,
+    Codes,
+    Title,
+    Game,
+    GameStart,
+    GameInitRoom,
+    Die,
+    GameOver,
+}
+
+impl Action {
+    fn run(self) {
+        match self {
+            Action::None => {}
+            Action::Loader => crate::loader::loader_action(),
+            Action::Codes => crate::codes::codes_action(),
+            Action::Title => crate::title::title_action(),
+            Action::Game => crate::game::game_action(),
+            Action::GameStart => crate::title::game_start(),
+            Action::GameInitRoom => crate::game::game_init_room(),
+            Action::Die => crate::die::die_action(),
+            Action::GameOver => crate::gameover::gameover_action(),
+        }
+    }
+}
+
+/// The RESPONDER slot: the current screen's input handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Responder {
+    None,
+    Noop,
+    Loader,
+    Codes,
+    Title,
+    Game,
+}
+
+impl Responder {
+    fn run(self) {
+        match self {
+            Responder::None | Responder::Noop => {}
+            Responder::Loader => crate::loader::do_loader_responder(),
+            Responder::Codes => crate::codes::do_codes_responder(),
+            Responder::Title => crate::title::do_title_responder(),
+            Responder::Game => crate::game::do_game_responder(),
+        }
+    }
+}
+
+/// The TICKER slot: the current screen's logic handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Ticker {
+    None,
+    Noop,
+    Loader,
+    Codes,
+    TitleInit,
+    Title,
+    GameInitRoom,
+    Game,
+    Pause,
+    DieInit,
+    Die,
+    GameOverInit,
+    GameOver,
+}
+
+impl Ticker {
+    fn run(self) {
+        match self {
+            Ticker::None | Ticker::Noop => {}
+            Ticker::Loader => crate::loader::do_loader_ticker(),
+            Ticker::Codes => crate::codes::do_codes_ticker(),
+            Ticker::TitleInit => crate::title::do_title_init(),
+            Ticker::Title => crate::title::do_title_ticker(),
+            Ticker::GameInitRoom => crate::game::game_init_room(),
+            Ticker::Game => crate::game::do_game_ticker(),
+            Ticker::Pause => crate::game::do_pause_ticker(),
+            Ticker::DieInit => crate::die::die_init(),
+            Ticker::Die => crate::die::die_ticker(),
+            Ticker::GameOverInit => crate::gameover::gameover_init(),
+            Ticker::GameOver => crate::gameover::gameover_ticker(),
+        }
+    }
+}
+
+/// The DRAWER slot: the current screen's render handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Drawer {
+    None,
+    Noop,
+    Loader1,
+    Loader2,
+    Loader3,
+    Codes,
+    Title,
+    Game,
+    DrawOnce,
+    Pause,
+    Die,
+    GameOver,
+}
+
+impl Drawer {
+    fn run(self) {
+        match self {
+            Drawer::None | Drawer::Noop => {}
+            Drawer::Loader1 => crate::loader::do_loader_drawer1(),
+            Drawer::Loader2 => crate::loader::do_loader_drawer2(),
+            Drawer::Loader3 => crate::loader::do_loader_drawer3(),
+            Drawer::Codes => crate::codes::do_codes_drawer(),
+            Drawer::Title => crate::title::do_title_drawer(),
+            Drawer::Game => crate::game::do_game_drawer(),
+            Drawer::DrawOnce => crate::game::do_draw_once(),
+            Drawer::Pause => crate::game::do_pause_drawer(),
+            Drawer::Die => crate::die::die_drawer(),
+            Drawer::GameOver => crate::gameover::gameover_drawer(),
+        }
+    }
+}
+
 thread_local! {
-    static ACTION: Cell<Event> = const { Cell::new(Some(loader_action)) };
-    static RESPONDER: Cell<Event> = const { Cell::new(None) };
-    static TICKER: Cell<Event> = const { Cell::new(None) };
-    static DRAWER: Cell<Event> = const { Cell::new(None) };
+    static ACTION: Cell<Action> = const { Cell::new(Action::Loader) };
+    static RESPONDER: Cell<Responder> = const { Cell::new(Responder::None) };
+    static TICKER: Cell<Ticker> = const { Cell::new(Ticker::None) };
+    static DRAWER: Cell<Drawer> = const { Cell::new(Drawer::None) };
     static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
     static VIDEO_FLASH: Cell<i32> = const { Cell::new(0) };
 }
 
-pub(crate) fn set_action(f: Event) {
-    ACTION.with(|c| c.set(f));
+pub(crate) fn set_action(a: Action) {
+    ACTION.with(|c| c.set(a));
 }
-pub(crate) fn action() -> Event {
+pub(crate) fn action() -> Action {
     ACTION.with(Cell::get)
 }
-pub(crate) fn set_responder(f: Event) {
-    RESPONDER.with(|c| c.set(f));
+pub(crate) fn set_responder(r: Responder) {
+    RESPONDER.with(|c| c.set(r));
 }
-pub(crate) fn responder() -> Event {
+pub(crate) fn responder() -> Responder {
     RESPONDER.with(Cell::get)
 }
-pub(crate) fn set_ticker(f: Event) {
-    TICKER.with(|c| c.set(f));
+pub(crate) fn set_ticker(t: Ticker) {
+    TICKER.with(|c| c.set(t));
 }
-pub(crate) fn ticker() -> Event {
+pub(crate) fn ticker() -> Ticker {
     TICKER.with(Cell::get)
 }
-pub(crate) fn set_drawer(f: Event) {
-    DRAWER.with(|c| c.set(f));
+pub(crate) fn set_drawer(d: Drawer) {
+    DRAWER.with(|c| c.set(d));
 }
-pub(crate) fn drawer() -> Event {
+pub(crate) fn drawer() -> Drawer {
     DRAWER.with(Cell::get)
 }
 pub(crate) fn set_game_input(key: Key) {
@@ -199,15 +327,17 @@ static REPLAY_MODE: AtomicBool = AtomicBool::new(false);
 // without collecting every item.
 pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
-// ---- Exported C-facing functions --------------------------------------------
+// ---- Exported helpers -------------------------------------------------------
 
+// Still used as the DO_CLOCK_UPDATE slot's off value (game.rs) until the
+// sub-slot phase replaces it.
 pub fn do_nothing() {}
 
 pub fn do_quit() {
     GAME_RUNNING.store(false, Relaxed);
-    // Setting these to None is equivalent to do_nothing — fire() is a no-op on None.
-    set_drawer(None);
-    set_ticker(None);
+    // Clearing the slots: run() is a no-op on the None variants.
+    set_drawer(Drawer::None);
+    set_ticker(Ticker::None);
 }
 
 pub fn system_rnd() -> i32 {
@@ -350,30 +480,25 @@ fn present_frame(texture: &mut Texture) {
         .expect("lock streaming texture");
 }
 
-// Call an Event's function pointer if it is set.
-fn fire(event: Event) {
-    if let Some(f) = event {
-        f();
-    }
-}
-
 // Run one game tick: the Action, then each pending input through the
 // Responder, then the Ticker and Drawer. `next_input` yields each input event
 // queued since the last tick (Key::None for events that aren't game input) and
 // None once the queue is empty. Shared by live play and replay so both run the
-// exact same frame logic.
+// exact same frame logic. The four slots are read at exactly these points, in
+// this order — a write to a later slot from an earlier phase is visible later
+// in the same frame, and a write to ACTION only on the next frame.
 pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<Key>) {
-    fire(action());
+    action().run();
     while let Some(input) = next_input() {
         set_game_input(input);
         if game_input() != Key::None {
-            fire(responder());
+            responder().run();
         }
     }
     // As in live play, where the final (empty) poll leaves gameInput at None.
     set_game_input(Key::None);
-    fire(ticker());
-    fire(drawer());
+    ticker().run();
+    drawer().run();
     toggle_video_flash(timer_update(timer_flash));
 }
 

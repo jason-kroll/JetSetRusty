@@ -1,13 +1,11 @@
 use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
+    Action, Drawer, Responder, Ticker, set_action, set_drawer, set_responder, set_ticker,
+    system_border, video_flash,
 };
 use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
-use crate::codes::codes_action;
-use crate::game_main::do_nothing;
-use crate::title::title_action;
 use std::cell::{Cell, RefCell};
 
 thread_local! {
@@ -17,11 +15,11 @@ thread_local! {
         const { RefCell::new(*b"\x01\x07\x02\x02JetSet Willy Loading\0") };
 }
 
-fn do_loader_responder() {
-    set_action(Some(title_action))
+pub(crate) fn do_loader_responder() {
+    set_action(Action::Title)
 }
 
-fn do_loader_ticker() {
+pub(crate) fn do_loader_ticker() {
     LOADER_TEXT.with(|t| {
         let mut text = t.borrow_mut();
         if video_flash() {
@@ -35,16 +33,16 @@ fn do_loader_ticker() {
     // Matches C's post-increment: transition when value was 256
     let ticks = LOADER_TICKS.with(Cell::get);
     if ticks == 256 {
-        set_action(Some(codes_action));
+        set_action(Action::Codes);
     }
     LOADER_TICKS.with(|c| c.set(ticks + 1));
 }
 
-fn do_loader_drawer3() {
+pub(crate) fn do_loader_drawer3() {
     LOADER_TEXT.with(|t| video_write_large(6 * 8, 11 * 8, &t.borrow()[..]));
 }
 
-fn do_loader_drawer2() {
+pub(crate) fn do_loader_drawer2() {
     if audio_music_playing() {
         return;
     }
@@ -64,12 +62,12 @@ fn do_loader_drawer2() {
 
     do_loader_drawer3();
 
-    set_responder(Some(do_loader_responder));
-    set_ticker(Some(do_loader_ticker));
-    set_drawer(Some(do_loader_drawer3));
+    set_responder(Responder::Loader);
+    set_ticker(Ticker::Loader);
+    set_drawer(Drawer::Loader3);
 }
 
-fn do_loader_drawer1() {
+pub(crate) fn do_loader_drawer1() {
     system_border(0x1);
     video_pixel_paper_fill(0, WIDTH * HEIGHT, 0x1);
 
@@ -90,10 +88,10 @@ fn do_loader_drawer1() {
     );
 
     audio_music(MusicScore::Loader, true);
-    set_drawer(Some(do_loader_drawer2));
+    set_drawer(Drawer::Loader2);
 }
 
 pub fn loader_action() {
-    set_drawer(Some(do_loader_drawer1));
-    set_action(Some(do_nothing));
+    set_drawer(Drawer::Loader1);
+    set_action(Action::None);
 }

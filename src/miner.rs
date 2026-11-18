@@ -9,12 +9,11 @@
 
 use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
-use crate::die::die_action;
 use crate::game::{
     Direction, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
 };
 use crate::game_main::{
-    set_action, system_is_joy_fire, system_is_joy_left, system_is_joy_right, system_is_key,
+    Action, set_action, system_is_joy_fire, system_is_joy_left, system_is_joy_right, system_is_key,
 };
 use crate::levels::{TileType, level_erase_item, level_get_tile_ramp, level_get_tile_type};
 use crate::misc::{Timer, timer_set, timer_update};
@@ -570,7 +569,7 @@ fn do_miner_ticker() {
                 return;
             }
             GroundOutcome::Die => {
-                set_action(Some(die_action));
+                set_action(Action::Die);
                 return;
             }
             GroundOutcome::Land { convey_dir } => {
@@ -639,7 +638,7 @@ pub fn miner_drawer() {
         &MINER_SPRITE[row],
         GAME_STATE.miner_attr_split.load(Ordering::Relaxed),
     ) {
-        set_action(Some(die_action));
+        set_action(Action::Die);
         return;
     }
 
@@ -647,7 +646,7 @@ pub fn miner_drawer() {
     let mut adj = 1;
     for _ in 0..align {
         if level_get_tile_type(tile) == TileType::Harm {
-            set_action(Some(die_action));
+            set_action(Action::Die);
             return;
         }
         tile += adj;

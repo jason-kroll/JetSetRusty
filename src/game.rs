@@ -2,7 +2,6 @@
 use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
-use crate::gameover::gameover_action;
 use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
@@ -19,7 +18,8 @@ use crate::common::{
 };
 
 use crate::game_main::{
-    TICKRATE, do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
+    Action, Drawer, Responder, TICKRATE, Ticker, do_nothing, set_action, set_drawer, set_responder,
+    set_ticker, system_border,
 };
 use crate::levels::level_init;
 use crate::miner::{
@@ -28,7 +28,6 @@ use crate::miner::{
 use crate::misc::{timer_set, timer_update};
 use crate::robots::{robots_draw_cheat, robots_drawer, robots_flush, robots_init, robots_ticker};
 use crate::rope::rope_init;
-use crate::title::title_action;
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
@@ -230,14 +229,14 @@ pub fn game_init_room() {
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
-    // Ticker, Drawer, Action: the Event function-pointer globals
+    // Ticker, Drawer, Action slots
     if game.game_paused.load(Ordering::Relaxed) != 0 {
-        set_ticker(Some(do_nothing));
-        set_drawer(Some(do_draw_once));
+        set_ticker(Ticker::Noop);
+        set_drawer(Drawer::DrawOnce);
     } else {
-        set_ticker(Some(do_game_ticker));
+        set_ticker(Ticker::Game);
     }
-    set_action(Some(do_nothing));
+    set_action(Action::None);
 }
 
 pub fn game_pause(state: bool) {
@@ -253,16 +252,16 @@ pub fn game_pause(state: bool) {
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         if game.cheat_enabled.load(Ordering::Relaxed) {
-            set_ticker(Some(do_nothing));
-            set_drawer(Some(do_nothing));
+            set_ticker(Ticker::Noop);
+            set_drawer(Drawer::Noop);
         } else {
-            set_ticker(Some(do_pause_ticker));
-            set_drawer(Some(do_pause_drawer));
+            set_ticker(Ticker::Pause);
+            set_drawer(Drawer::Pause);
         }
         audio_play(false);
     } else {
-        set_ticker(Some(do_game_ticker));
-        set_drawer(Some(do_game_drawer));
+        set_ticker(Ticker::Game);
+        set_drawer(Drawer::Game);
         audio_play(game.music.load(Ordering::Relaxed));
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -293,7 +292,7 @@ pub fn do_game_responder() {
             game.music.store(new_music, Ordering::Relaxed);
             audio_play(new_music);
         }
-        Key::Escape => set_action(Some(title_action)),
+        Key::Escape => set_action(Action::Title),
         _ => {
             if let Some(handler) = cheat_responder() {
                 handler();
@@ -409,9 +408,9 @@ pub fn game_cheat_enabled() {
         // gameFrame = 1
         game.frame.store(true, Ordering::Relaxed);
 
-        // Ticker = do_nothing; Drawer = do_nothing;
-        set_ticker(Some(do_nothing));
-        set_drawer(Some(do_nothing));
+        // Ticker = noop; Drawer = noop;
+        set_ticker(Ticker::Noop);
+        set_drawer(Drawer::Noop);
 
         // game_draw_status(); system_border(levelBorder[gameLevel])
         game_draw_status();
@@ -499,7 +498,7 @@ pub fn game_change_level(dir: Direction) {
 pub fn do_draw_once() {
     do_game_drawer();
 
-    set_drawer(Some(do_nothing));
+    set_drawer(Drawer::Noop);
 }
 
 pub fn do_game_ticker() {
@@ -537,7 +536,7 @@ pub fn do_game_ticker() {
     if game.mode() == GameMode::Toilet {
         let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
         if old_ticks == 256 {
-            set_action(Some(title_action));
+            set_action(Action::Title);
         }
         return;
     }
@@ -624,7 +623,7 @@ pub fn clock_ticker() {
         if clock[1] == 12 {
             clock[2] = 1 - clock[2];
             if (clock[2] == 0) && (game.mode() < GameMode::Maria) {
-                set_action(Some(gameover_action));
+                set_action(Action::GameOver);
             }
         } else if clock[1] == 13 {
             clock[1] = 1;
@@ -680,11 +679,11 @@ pub fn game_draw_status() {
 }
 
 pub fn game_action() {
-    set_responder(Some(do_game_responder));
-    // Runs once next frame, inits the room, then installs do_game_ticker and
-    // sets Action = do_nothing. Matches C's `Ticker = Game_InitRoom`.
-    set_ticker(Some(game_init_room));
-    set_drawer(Some(do_game_drawer));
+    set_responder(Responder::Game);
+    // Runs once next frame, inits the room, then installs the game ticker and
+    // clears Action. Matches C's `Ticker = Game_InitRoom`.
+    set_ticker(Ticker::GameInitRoom);
+    set_drawer(Drawer::Game);
 }
 
 #[cfg(test)]

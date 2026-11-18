@@ -2,7 +2,8 @@ use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::game::{GAME_STATE, game_action, game_draw_status, game_game_reset};
 use crate::game_main::{
-    game_input, set_action, set_drawer, set_responder, set_ticker, video_flash,
+    Action, Drawer, Responder, Ticker, game_input, set_action, set_drawer, set_responder,
+    set_ticker, video_flash,
 };
 use crate::levels::{level_item_count, level_restore_items};
 use crate::miner::miner_init;
@@ -15,7 +16,7 @@ use crate::game::GameMode;
 
 use crate::video::{video_cycle_colours, video_write, video_write_large};
 
-use crate::game_main::{do_nothing, do_quit, system_border, system_is_joy_fire};
+use crate::game_main::{do_quit, system_border, system_is_joy_fire};
 
 const THEBATHROOM: i32 = 33;
 
@@ -64,7 +65,7 @@ static TEXT_END: i32 = (TEXT_TICKER.len() - 33) as i32;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
-fn game_start() {
+pub(crate) fn game_start() {
     video_pixel_fill(128 * WIDTH, 64 * WIDTH);
 
     game_game_reset();
@@ -93,7 +94,7 @@ fn game_start() {
     game_action();
 }
 
-fn do_title_ticker() {
+pub(crate) fn do_title_ticker() {
     if audio_music_playing() {
         if video_flash() {
             set_text_jsw_byte(1, b'\x0b');
@@ -117,10 +118,10 @@ fn do_title_ticker() {
         return;
     }
 
-    set_action(Some(title_action));
+    set_action(Action::Title);
 }
 
-fn do_title_drawer() {
+pub(crate) fn do_title_drawer() {
     if audio_music_playing() {
         for &tile in TITLE_JSW.iter().take(100) {
             TEXT_JSW.with(|t| {
@@ -142,17 +143,17 @@ fn do_title_drawer() {
     );
 }
 
-fn do_title_responder() {
+pub(crate) fn do_title_responder() {
     // Upstream 69070b9: joystick fire starts the game like Enter.
     if game_input() == Key::Enter || system_is_joy_fire() {
-        set_action(Some(game_start));
+        set_action(Action::GameStart);
     } else if game_input() == Key::Escape {
         do_quit();
     }
 }
 
 // b"" byte-string literals carry the interior nul bytes these control strings need
-fn do_title_init() {
+pub(crate) fn do_title_init() {
     system_border(0x0);
     video_pixel_fill(0, WIDTH * HEIGHT);
 
@@ -219,12 +220,12 @@ fn do_title_init() {
 
     audio_music(MusicScore::Title, true);
 
-    set_ticker(Some(do_title_ticker));
+    set_ticker(Ticker::Title);
 }
 
 pub fn title_action() {
-    set_responder(Some(do_title_responder));
-    set_ticker(Some(do_title_init));
-    set_drawer(Some(do_title_drawer));
-    set_action(Some(do_nothing));
+    set_responder(Responder::Title);
+    set_ticker(Ticker::TitleInit);
+    set_drawer(Drawer::Title);
+    set_action(Action::None);
 }

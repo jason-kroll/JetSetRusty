@@ -1,14 +1,13 @@
 use crate::audio::{Sfx, audio_play, audio_sfx};
 use crate::common::WIDTH;
 use crate::game_main::{
-    do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
+    Action, Drawer, Responder, Ticker, set_action, set_drawer, set_responder, set_ticker,
+    system_border,
 };
 use crate::miner::miner_draw_sprite;
 use crate::video::video_pixel_fill;
 use std::cell::{Cell, RefCell};
 
-// External functions
-use crate::title::title_action;
 use crate::video::{video_draw_sprite, video_pixel_paper_fill, video_write_large};
 
 static PLINTH_SPRITE: [u16; 16] = [
@@ -46,7 +45,7 @@ fn set_text_over_byte(i: usize, v: u8) {
     TEXT_OVER.with(|t| t.borrow_mut()[i] = v);
 }
 
-fn gameover_drawer() {
+pub(crate) fn gameover_drawer() {
     let ticks = boot_ticks();
     if ticks <= 96 {
         video_draw_sprite((ticks & 126) * WIDTH + 15 * 8, &BOOT_SPRITE, 0x0, 0x7);
@@ -61,7 +60,7 @@ fn gameover_drawer() {
     TEXT_OVER.with(|t| video_write_large(18 * 8, 6 * 8, &t.borrow()[..]));
 }
 
-fn gameover_ticker() {
+pub(crate) fn gameover_ticker() {
     let mut c = boot_ticks() >> 2;
 
     set_text_game_byte(3, (c & 0x7) as u8);
@@ -86,10 +85,10 @@ fn gameover_ticker() {
         return;
     }
 
-    set_action(Some(title_action));
+    set_action(Action::Title);
 }
 
-fn gameover_init() {
+pub(crate) fn gameover_init() {
     system_border(0x0);
     video_pixel_fill(0, 128 * WIDTH);
     // Upstream 783d7c1: draw Willy via Miner_DrawSprite with index 2.
@@ -100,12 +99,12 @@ fn gameover_init() {
     audio_play(false);
     audio_sfx(Sfx::Gameover);
 
-    set_ticker(Some(gameover_ticker));
+    set_ticker(Ticker::GameOver);
 }
 
 pub fn gameover_action() {
-    set_responder(Some(do_nothing));
-    set_ticker(Some(gameover_init));
-    set_drawer(Some(gameover_drawer));
-    set_action(Some(do_nothing));
+    set_responder(Responder::Noop);
+    set_ticker(Ticker::GameOverInit);
+    set_drawer(Drawer::GameOver);
+    set_action(Action::None);
 }

@@ -37,7 +37,7 @@ use crate::audio::{audio_init, audio_output};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game::GameMode;
 use crate::game_main::{
-    SAMPLERATE, TICKRATE, border_index, game_frame, game_running, map_keycode, seed_rng,
+    SAMPLERATE, TICKRATE, Ticker, border_index, game_frame, game_running, map_keycode, seed_rng,
     set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
 };
 use crate::misc::{Timer, VIDEO_COLOUR, timer_set};
@@ -232,7 +232,7 @@ pub fn main(args: &[String]) -> i32 {
                             miner.tile &= !31;
                         }
                         GAME_STATE.level.store(*v, Relaxed);
-                        set_ticker(Some(crate::game::game_init_room));
+                        set_ticker(Ticker::GameInitRoom);
                     }
                     SetOp::Mode(m) => GAME_STATE.set_mode(*m),
                     SetOp::Lives(v) => GAME_STATE.lives.store(*v, Relaxed),

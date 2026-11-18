@@ -3,10 +3,9 @@
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
-    do_nothing, do_quit, game_input, set_action, set_drawer, set_responder, set_ticker,
-    system_border, system_rnd, video_flash,
+    Action, Drawer, Responder, Ticker, do_quit, game_input, set_action, set_drawer, set_responder,
+    set_ticker, system_border, system_rnd, video_flash,
 };
-use crate::title::title_action;
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
@@ -132,7 +131,7 @@ impl CodesState {
                     | self.code_val(3, 0);
 
                 if entered == self.needed {
-                    set_action(Some(title_action));
+                    set_action(Action::Title);
                     return;
                 }
 
@@ -176,11 +175,11 @@ impl CodesState {
 
         self.get_code();
 
-        set_responder(Some(do_codes_responder));
-        set_ticker(Some(do_codes_ticker));
-        set_drawer(Some(do_codes_drawer));
+        set_responder(Responder::Codes);
+        set_ticker(Ticker::Codes);
+        set_drawer(Drawer::Codes);
 
-        set_action(Some(do_nothing));
+        set_action(Action::None);
     }
 }
 
