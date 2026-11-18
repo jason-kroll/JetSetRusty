@@ -1,5 +1,7 @@
 use crate::common::{HEIGHT, Key, WIDTH};
-use crate::misc::{Timer, colour_rgb, timer_set, timer_update, video_viewport, windowed_size};
+use crate::misc::{
+    Timer, Viewport, colour_rgb, timer_set, timer_update, video_viewport, windowed_size,
+};
 use sdl3::EventPump;
 use sdl3::JoystickSubsystem;
 use sdl3::audio::{AudioCallback, AudioFormat, AudioSpec, AudioStream};
@@ -562,12 +564,15 @@ pub fn run() {
         .expect("desktop display mode");
 
     // The letterboxed viewport is recomputed every frame in the main loop from
-    // the window's current drawable size; `multiply` is the integer upscale of
-    // the game texture into the target texture below. Initialised from the
+    // the window's current drawable size: the multiply is the integer upscale
+    // of the game texture into the target texture below. Initialised from the
     // desktop mode — in `--windowed` mode the first loop iteration recomputes
     // it from the actual window size before anything is drawn.
-    let (mut vx, mut vy, mut vw, mut vh) = (0i32, 0i32, 0i32, 0i32);
-    let mut multiply = video_viewport(mode.w, mode.h, &mut vx, &mut vy, &mut vw, &mut vh);
+    // Initial multiply from the desktop mode (the loop below's target texture
+    // is created at this scale); the loop's per-frame letterbox re-fits the
+    // viewport anyway — in `--windowed` mode from the actual window size
+    // before anything is drawn — so the startup geometry is never read.
+    let (_, mut multiply) = video_viewport(mode.w, mode.h);
 
     // Window and renderer -----------------------------------------------------
     // SDL3 dropped SDL_WINDOW_FULLSCREEN_DESKTOP: plain fullscreen is
@@ -720,14 +725,13 @@ pub fn run() {
         let (win_w, win_h) = canvas
             .output_size()
             .unwrap_or_else(|_| canvas.window().size());
-        let new_multiply = video_viewport(
-            win_w as i32,
-            win_h as i32,
-            &mut vx,
-            &mut vy,
-            &mut vw,
-            &mut vh,
-        );
+        let (fit, new_multiply) = video_viewport(win_w as i32, win_h as i32);
+        let Viewport {
+            x: vx,
+            y: vy,
+            w: vw,
+            h: vh,
+        } = fit;
         if new_multiply != multiply {
             // The window crossed an integer-scale threshold: recreate the
             // upscale target at the new multiply (same SDL3 modes as below).

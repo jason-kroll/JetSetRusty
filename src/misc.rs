@@ -141,32 +141,41 @@ pub fn timer_update(timer: &mut Timer) -> i32 {
 
 // External --------------------------------------------------------------------
 
-pub fn video_viewport(
-    width: i32,
-    height: i32,
-    x: &mut i32,
-    y: &mut i32,
-    w: &mut i32,
-    h: &mut i32,
-) -> i32 {
-    if height * 4 / 3 <= width {
+/// The per-frame letterbox: whatever the window size (fullscreen desktop or a
+/// reshaped `--windowed` window), the game area is centered and keeps the 4:3
+/// ratio of the full 272x208 screen (game area + 8px border), with the integer
+/// upscale clamped to >= 1. The `Viewport` x/y/w/h are the letterbox's pixel
+/// geometry; the returned multiply is the game texture's integer scale for the
+/// target texture. (Pure — the C original wrote five out-params through
+/// pointers; the shape lives in the tests as the pinned tuple.)
+pub struct Viewport {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+pub fn video_viewport(width: i32, height: i32) -> (Viewport, i32) {
+    let (w, h) = if height * 4 / 3 <= width {
         // landscape
-        *h = (HEIGHT * height) / (HEIGHT + 16) as f32 as i32;
-        *w = *h * 4 / 3;
+        let h = (HEIGHT * height) / (HEIGHT + 16);
+        (h * 4 / 3, h)
     } else {
         // portrait
-        *w = (WIDTH * width) / (WIDTH + 16) as f32 as i32;
-        *h = *w * 3 / 4;
-    }
+        let w = (WIDTH * width) / (WIDTH + 16);
+        (w, w * 3 / 4)
+    };
 
-    *x = (width - *w) / 2;
-    *y = (height - *h) / 2;
+    let viewport = Viewport {
+        x: (width - w) / 2,
+        y: (height - h) / 2,
+        w,
+        h,
+    };
 
-    let mut multiply = *h / HEIGHT;
-    if multiply < 1 {
-        multiply = 1;
-    }
-    multiply
+    let multiply = (viewport.h / HEIGHT).max(1);
+
+    (viewport, multiply)
 }
 
 // Initial size for a `--windowed` window: the largest integer scale (up to 4)
@@ -192,11 +201,11 @@ pub fn windowed_size(display_w: i32, display_h: i32) -> (i32, i32) {
 mod tests {
     use super::*;
 
-    // video_viewport as a pure (x, y, w, h, multiply) tuple.
+    // video_viewport as a pure tuple — the same shape the fn returns; these
+    // pin the exact arithmetic.
     fn vp(width: i32, height: i32) -> (i32, i32, i32, i32, i32) {
-        let (mut x, mut y, mut w, mut h) = (0, 0, 0, 0);
-        let m = video_viewport(width, height, &mut x, &mut y, &mut w, &mut h);
-        (x, y, w, h, m)
+        let (viewport, m) = video_viewport(width, height);
+        (viewport.x, viewport.y, viewport.w, viewport.h, m)
     }
 
     // video_viewport is the per-frame letterbox: whatever the window size
