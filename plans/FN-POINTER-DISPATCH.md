@@ -18,7 +18,26 @@ Mistral Vibe <vibe@mistral.ai>` trailer. Gates after every phase:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test` (all golden replays + unit tests), `cargo build`.
 
-## Status: PENDING REVIEW
+## Status: REVIEWED — ready to execute
+
+Review of the previous draft fixed: stale line citations, the missing
+drawer-slot one-shot, the cheat-responder consultation, the initial state,
+and the verification greps (details folded in below). Line citations were
+re-verified against the tree on this plan's date and may drift ±20 lines —
+grep by symbol first, trust the number second.
+
+## Start here (read before touching anything)
+
+1. `game_main.rs:125-128` — the four `Cell<Event>` slots (ACTION starts
+   `Some(loader_action)`; the other three start `None`); accessors
+   `135-164`; `fire()` at `354`; `game_frame` at `365` (the four read
+   points are inside it, `365-390`).
+2. The deferral rules in *Hard invariant* below — the whole risk of this
+   plan lives in *when* a write becomes visible.
+3. AGENTS.md's dispatcher paragraphs (see *AGENTS.md* near the end).
+4. CONVENTIONS.md's repo gates (no `Rc<RefCell<_>>` where a restructure
+   works; the `Cell` used here is a `Copy` struct in one thread, which is
+   allowed — reads copy out, writes copy in).
 
 ## Why
 
@@ -34,17 +53,18 @@ this is a single `enum` state value matched in one place.
 
 | Site | Current shape | Files |
 |------|---------------|-------|
-| Main dispatcher | `Cell<Event>` × 4 + `fire()`; `game_frame` runs action → responder per input → ticker → drawer | `game_main.rs:124-160,353-377` |
+| Main dispatcher | `Cell<Event>` × 4 + `fire()`; `game_frame` runs action → responder per input → ticker → drawer | `game_main.rs:125-128,135-164,354,365-390` |
 | `Event` type alias | `pub type Event = Option<fn()>` | `common.rs:6` |
-| Screen installs | `loader_action`, `codes_action`, `title_action`, `game_action`, `game_start`, `die_action`, `gameover_action` + one-shot `set_action(do_nothing)` | `loader.rs`, `codes.rs`, `title.rs`, `game.rs`, `die.rs`, `gameover.rs` |
+| Screen installs (as ACTION values) | `loader_action`, `codes_action`, `title_action`, `game_start`, `die_action` (written from `miner.rs:573,642,650`), `gameover_action` + one-shot `set_action(Some(do_nothing))` | `loader.rs:21,38,98`, `codes.rs:135,183`, `title.rs:120,148,229`, `game.rs:240,296,540,627`, `die.rs:55-70`, `gameover.rs:73-78` |
 | Transitions from deep code | `set_action(title_action/gameover_action/die_action/game_init_room)` | `game.rs:296,540,627`, `miner.rs:573,642,650`, `cheat.rs:85`, `loader.rs:21,38`, `codes.rs:135`, `title.rs:120,148`, `die.rs`, `gameover.rs` |
 | Pause sub-state | `game_pause` swaps ticker/drawer between game/pause variants | `game.rs:243-280` |
-| Replay poke | `set_ticker(Some(game_init_room))` for `set level` | `replay.rs:235` |
-| Rope slots | `ROPE_TICKER`/`ROPE_DRAWER: Cell<Event>`, read by `game.rs` | `rope.rs:159-172` |
-| Clock slot | `DO_CLOCK_UPDATE: Cell<Event>` (None / `do_draw_clock` / `do_nothing`) | `game.rs:57-66` |
-| Cheat handler choice | `cheat_responder() -> Event` | `cheat.rs:47` |
-| Robot vtables | `do_move: MoveFn`, `do_draw: DrawFn`, self-reassigned on bounce | `robots.rs:31-63,1146-1200,1280-1289` |
-| Audio flags/trampolines | `Channel.do_phase: Event` (pure on/off flag); `SfxInfo.do_sfx`/`do_play: Option<fn(&mut AudioState)>` | `audio.rs:58,72-73,302-345,520-521` |
+| Drawer one-shot | `do_draw_once` installed as DRAWER by `game_init_room`'s paused branch; consumed at the drawer read, then DRAWER back to `None` | `game.rs:236,499` |
+| Replay poke | `set_ticker(Some(game_init_room))` for `set level` | `replay.rs:117` (parse), `226-235` (apply) |
+| Rope slots | `ROPE_TICKER`/`ROPE_DRAWER: Cell<Event>`, read by `game.rs` via `rope::rope_ticker()`/`rope_drawer()` | `rope.rs:159-172`, read at `game.rs:328,572` |
+| Clock slot | `DO_CLOCK_UPDATE: Cell<Event>` (None / `do_draw_clock` / `do_nothing`) | `game.rs:58-65` |
+| Cheat handler choice | `cheat_responder() -> Event` picks code-entry vs level-select from `cheat_enabled` | `cheat.rs:47-51` |
+| Robot vtables | `do_move: MoveFn`, `do_draw: DrawFn`, self-reassigned on bounce | `robots.rs:32-84,1150-1189,1277-1294` |
+| Audio flags/trampolines | `Channel.do_phase: Event` (pure on/off flag; the fn body is empty); `SfxInfo.do_sfx`/`do_play: Option<fn(&mut AudioState)>` | `audio.rs:52-73,244-255,308-344,368-413,539-547` |
 
 ## Hard invariant: the frame-boundary timing must not move
 
@@ -60,7 +80,8 @@ this is a single `enum` state value matched in one place.
    `game_pause(true)` from `do_game_responder`); responder mutations apply
    to later inputs in the same loop.
 3. step 4: read+fire TICKER. Ticker mutations to DRAWER apply same frame,
-   to TICKER next frame.
+   to TICKER next frame (the `game_init_room` one-shot: init fires on
+   frame N, the game ticker takes over at frame N+1).
 4. step 5: read+fire DRAWER. Drawer mutations apply next frame
    (loader's drawer1→drawer2→drawer3 chain, `do_draw_once`).
 
@@ -81,6 +102,8 @@ differently in each case. The new design must keep both entry paths:
 `Pending::ReinitRoom` (consumed at step 1) vs. directly setting the game
 phase to `Init` (read at step 4 of the current frame, which is what
 `replay.rs`'s `set level` needs — it pokes before `game_frame` runs).
+The same reached-while-paused distinction is why `GamePhase` needs
+`PausedDrawOnce` when `game_init_room` runs paused (see below).
 
 ## Target design
 
@@ -106,12 +129,29 @@ enum Pending {             // the old ACTION slot, consumed at step 1
     ReinitRoom,            // game_init_room one-shot (cheat level select)
 }
 
-struct Dispatch { screen: Screen, pending: Pending }  // Copy
+struct Dispatch { screen: Screen, pending: Option<Pending> }  // Copy
 ```
 
-`dispatch.rs` exposes `dispatch() -> Dispatch`, `update(|&mut Dispatch|)`,
-`queue_pending(Pending)`, `set_screen(Screen)`, and derives the three
-handlers by matching `screen` — the single place a `Screen` is matched:
+Notes on the shapes:
+
+- `pending: Option<Pending>` rather than a `Pending::None` variant — no
+  bespoke `None` that shadows `Option::None`; the struct stays `Copy`.
+- The drawer one-shot becomes `GamePhase::PausedDrawOnce`, a *phase*, not
+  a `Pending`: it is consumed at step 5 (a `Pending` slot can only fire at
+  step 1, and tagging it with a step would duplicate the mechanism). The
+  dispatcher's drawer match for `PausedDrawOnce` runs the game drawer once
+  and transitions the phase to `Pause` — the old slot-clearing, same
+  frame. Reachable only via pause-during-play + a cheat level select
+  (`game_init_room`'s paused branch, `game.rs:234-238`).
+- The responder under `Screen::Game` consults `GAME_STATE.cheat_enabled`
+  (cheat.rs:47-51): `cheat_level_select` vs `cheat_code_entry` — both stay
+  in `cheat.rs`, chosen at the dispatch site's match arm.
+
+`dispatch.rs` exposes `with_dispatch(|d: &mut Dispatch|)`,
+`queue_pending(Pending)`, and `set_screen(Screen)` (the last two are
+exactly today's setters: same-frame install vs next-frame queue), and
+derives the three handlers by matching `screen` — the single place a
+`Screen` is matched:
 
 ```rust
 fn responder(d: &Dispatch) -> ... { match d.screen { ... } }
@@ -128,29 +168,47 @@ Screen *enter* work (e.g. `codes_action`'s drawing + `get_code`) becomes
 the body of consuming `Pending::Enter(screen)`; slot installs inside
 handlers become phase assignments (`screen = Screen::Loader(LoaderPhase::Bar)`).
 
+Initial state mirrors today's cells exactly: `pending =
+Some(Pending::Enter(Screen::Loader(LoaderPhase::Enter)))` — the ACTION
+slot starts `Some(loader_action)` — and `screen =
+Screen::Loader(LoaderPhase::Enter)` so both agree before the first
+`game_frame` (the pending enter is what actually installs; a synced
+initial screen is what step 4 reads, and consumers are pure lookups, so
+the redundancy is inert).
+
+`do_quit` shrinks to just `GAME_RUNNING.store(false, ..)`: the loop exits
+on the atomic, so the old `set_drawer(None)`/`set_ticker(None)` writes are
+vestigial in the enum world (drop them). `do_nothing` and `fire()`
+disappear.
+
 Thread-locality stays: the SDL audio callback never touches the dispatch
 state, so main-thread-only `Cell` is sound, same argument as today.
 `GAME_INPUT`/`VIDEO_FLASH` are plain data, not fn pointers — out of
-scope. `do_quit` stays a plain fn (it sets `GAME_RUNNING`); `do_nothing`
-and `fire()` disappear.
+scope. The SDL event plumbing (`use sdl3::event::Event as SdlEvent;`,
+`SdlEvent::` matches, `EventPump`, `JoyEvent`) is SDL's own, unrelated to
+`common.rs::Event` — it stays whatever this plan does.
 
 ## Phases (one commit each, all gates green after each)
 
 1. **Typed slots, mechanical swap.** Replace the four `Cell<Event>` with
-   four `Cell<TypedEnum>` (`Action`, `Responder`, `Ticker`, `Drawer` enums
-   whose variants enumerate today's fn values 1:1) — same read points in
-   `game_frame`, call sites renamed mechanically
-   (`set_action(Some(title_action))` → `set_action(Action::Title)`).
-   Goldens byte-identical. This alone removes the fn pointers from the
-   main dispatcher with zero behavioural surface.
+   four `Cell<TypedEnum>` (`Action`, `Responder`, `Ticker`, `Drawer`).
+   Each enum's variants enumerate today's fn values 1:1 *plus* the
+   None-equivalent each slot can hold (TICKER/DRAWER/RESPONDER start
+   `None`; ACTION starts `Some(Action::Loader)`). Same read points in
+   `game_frame`; rename sites mechanically:
+   `set_action(Some(title_action))` → `set_action(Action::Title)`;
+   `set_ticker(Some(f))` / `set_ticker(None)` → the variant naming `f`
+   / the None-equivalent. Goldens byte-identical. This alone removes the
+   fn pointers from the main dispatcher with zero behavioural surface.
 2. **Collapse to `Screen` + phases.** Merge the four slots into
    `Cell<Dispatch>` as above; handlers derived by matching `screen`.
-   Initial state mirrors `ACTION = loader_action`. Add the deferral unit
-   test. Goldens byte-identical.
+   Initial state as above. Add the deferral unit test. Goldens
+   byte-identical.
 3. **Sub-slots.** `rope.rs`: `ROPE_TICKER`/`ROPE_DRAWER` are only ever
    both-set-or-both-`do_nothing` → one `Cell<bool>` "rope active"; `game.rs`
    calls `rope::rope_tick()/rope_draw()` which internally no-op when
-   inactive. `game.rs` `DO_CLOCK_UPDATE` is None-vs-`do_draw_clock` →
+   inactive (the `rope_ticker_fn`/`rope_drawer_fn` thunk shims die with
+   them). `game.rs` `DO_CLOCK_UPDATE` is None-vs-`do_draw_clock` →
    `Cell<bool>` `clock_redraw`. `cheat.rs`: `cheat_responder() -> Event`
    → returns a `CheatHandler` enum matched at the call site in
    `do_game_responder`.
@@ -180,18 +238,35 @@ four global function pointers" living in `thread_local! Cell`s and that
 "`Event` is `Option<fn()>`, so an unset slot is `None`". That is a
 description of the C-ism being removed, not a rule — after this plan it
 will read "a single `Copy` `Dispatch { screen, pending }` state matched
-in the dispatcher". No commit-related instructions are affected.
+in the dispatcher". Replace exactly those two paragraphs (and the
+`Action    — current game state handler` four-slot table); no other
+AGENTS.md instructions are affected.
 
 ## Verification
 
 - `cargo test` after every phase: all golden replays (`idle`, `title`,
   `play`, `victory`, `death`, `gameover`, `rope`, `conveyors`, `cheat`,
   `harm`, `transitions`, `fuzz`, `sweep-00..59`) must pass byte-identical;
-  unit tests must pass (plus the new deferral test).
+  unit tests must pass (plus the new deferral test in phase 2).
 - `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`,
   `cargo build` after every phase.
-- `grep -rn "Event\|set_action\|set_ticker\|set_drawer\|set_responder" src/`
-  must be empty at the end (except doc comments saying they're gone).
+- Final greps at the end of phase 5 — each may match *only* the named
+  survivors, or the phase is not done:
+
+  ```sh
+  # 1. the Event alias and every setter slot: must be gone
+  grep -rnE '\b(Event|MoveFn|DrawFn|SfxHandler|do_nothing|do_phase_fn)\b' src/
+  #    sole survivor: game_main.rs's `use sdl3::event::Event as SdlEvent;`
+  # 2. today's setter names: must be gone (replaced by set_screen /
+  #    queue_pending in phase 2, by the phase-3/5 enums after)
+  grep -rnE '\bset_(action|ticker|drawer|responder)\b' src/
+  # 3. the audio trampolines' fn-pointer type: must be gone
+  grep -rn 'Option<fn' src/
+  ```
+
+  Anything else that matches (`event::Event` in comment text, e.g.
+  `game.rs:234`, `game.rs:680`, `rope.rs:154`) must be swept in phase 6
+  before the greps read clean — comment text counts.
 
 ## Risks
 
@@ -204,6 +279,12 @@ in the dispatcher". No commit-related instructions are affected.
   as today.
 - **Replay `set level`** must write the phase *directly* (step 4 same
   frame), not via `Pending` — called out above.
+- **Drawer one-shot** — the `PausedDrawOnce` phase fires at the same
+  step-5 read as today's `do_draw_once` and leaves the phase at `Pause`,
+  not `Play`: the old `set_drawer(None)` clear, named.
+- **Cheat responder** — `cheat_level_select` pauses unpause-only via
+  `game_pause(false)` on a non-advancing input (cheat.rs:66,119); the
+  enum's responder match must consult `cheat_enabled` identically.
 - **Audio trampolines** exist for mutex reentrancy; the enum match keeps
   the `&mut AudioState` argument passing unchanged.
 
