@@ -42,6 +42,119 @@ struct LevelData {
     pub item: [i32; 12],
 }
 
+// ---- level! DSL -----------------------------------------------------------------------
+//
+// LEVEL_DATA is transcribed from the C original's room tables, and the grid
+// half of it is the part nobody can review: the layout is 16x32 cells, but
+// `data: [i32; 512]` is a flat run that rustfmt rewraps at will, so no row is
+// visible in the source. The level! macro expands to exactly the same struct
+// but writes the room the way it is drawn:
+//
+//   - grid: one glyph per cell; '.' is tile 0, '1'-'9' the room's tile slots.
+//     A row that is not 32 cells, or a bad glyph, panics in the const parser —
+//     inside a static's constant evaluation that is a compile error.
+//   - tiles: the ten tile slots in order, pairing each slot's sprite with the
+//     attr/type that the flattened arrays kept apart (gfx[] and info[]). The
+//     index prefix is a review aid; the position in the list is what counts.
+//     `gfx *` is GFX_SPACE.
+//   - exits: map[] in Direction order. Space and the C original both read 0
+//     as "no exit" — the movement code only changes rooms on a nonzero cell
+//     — so `none` is exact.
+//   - items: the bare positions; the zero padding C wrote into item[] and the
+//     count it stored in itemCount are both derived.
+
+/// The const grid parser behind level!. '.' is tile 0, '1'-'9' are tiles 1-9;
+/// any other glyph, or a row that is not LEVEL_W cells wide, panics — in the
+/// static's constant evaluation, a compile error.
+const fn parse_grid(rows: [&'static str; LEVEL_HEIGHT]) -> [i32; LEVEL_TILES] {
+    let mut data = [0i32; LEVEL_TILES];
+    let mut r = 0;
+    while r < LEVEL_HEIGHT {
+        let row = rows[r].as_bytes();
+        if row.len() != LEVEL_W {
+            panic!("level! grid row is not 32 cells wide");
+        }
+        let mut c = 0;
+        while c < LEVEL_W {
+            data[r * LEVEL_W + c] = match row[c] {
+                b'.' => 0,
+                b'1'..=b'9' => (row[c] - b'0') as i32,
+                _ => panic!("level! grid glyph is not '.' or a digit 1-9"),
+            };
+            c += 1;
+        }
+        r += 1;
+    }
+    data
+}
+
+/// The [i32; 12] item list, zero-padded the way the flattened literal was.
+const fn item_positions(list: &[i32]) -> [i32; 12] {
+    if list.len() > 12 {
+        panic!("level! lists more than 12 item positions");
+    }
+    let mut item = [0i32; 12];
+    let mut i = 0;
+    while i < list.len() {
+        item[i] = list[i];
+        i += 1;
+    }
+    item
+}
+
+/// The count the flattened literal stored beside the padded list.
+const fn item_count_of(list: &[i32]) -> i32 {
+    list.len() as i32
+}
+
+/// `gfx *` — the blank sprite every unfilled slot shares.
+macro_rules! tile_gfx {
+    (*) => {
+        GFX_SPACE
+    };
+    ([$($glyph:literal),*]) => {
+        [$($glyph),*]
+    };
+}
+
+/// `exits x: none` — the flattened literal's zero, which no room transition
+/// ever reads as room 0.
+macro_rules! exit {
+    (none) => {
+        0
+    };
+    ($room:literal) => {
+        $room
+    };
+}
+
+macro_rules! level {
+    (
+        title: $title:literal,
+        exits {
+            above: $above:tt, right: $right:tt,
+            below: $below:tt, left: $left:tt $(,)?
+        },
+        tiles {
+            $($idx:literal : $kind:ident attr $attr:literal gfx $sprite:tt;)*
+        },
+        grid {
+            $($row:literal),* $(,)?
+        },
+        items [$($item:literal),* $(,)?],
+    ) => {
+        LevelData {
+            title: $title,
+            map: [exit!($above), exit!($right), exit!($below), exit!($left)],
+            data: parse_grid([$($row),*]),
+            gfx: [$(tile_gfx!($sprite)),*],
+            info: [$(LevelInfo { attr: $attr, tile_type: TileType::$kind }),*],
+            item_count: item_count_of(&[$($item),*]),
+            item: item_positions(&[$($item),*]),
+        }
+    };
+}
+
 static LEVEL_DATA: [LevelData; 60] = [
     // Level 0: The Off Licence
     LevelData {
@@ -2717,85 +2830,40 @@ static LEVEL_DATA: [LevelData; 60] = [
         item: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     },
     // Level 33: The Bathroom
-    LevelData {
+    level! {
         title: "The Bathroom",
-        map: [0, 0, 0, 34],
-        data: [
-            3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-            0, 0, 5, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 5, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 5, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
-            3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3,
-        ],
-        gfx: [
-            GFX_SPACE,
-            [31, 4, 10, 119, 135, 177, 170, 10],
-            [165, 0, 0, 0, 0, 0, 0, 255],
-            [31, 170, 0, 85, 248, 85, 0, 170],
-            [0, 64, 9, 100, 146, 45, 150, 255],
-            [3, 0, 12, 0, 48, 0, 192, 0],
-            GFX_SPACE,
-            GFX_SPACE,
-            GFX_SPACE,
-            GFX_SPACE,
-        ],
-        info: [
-            LevelInfo {
-                attr: 0x07,
-                tile_type: TileType::Space,
-            },
-            LevelInfo {
-                attr: 0x00,
-                tile_type: TileType::Item,
-            },
-            LevelInfo {
-                attr: 0x75,
-                tile_type: TileType::ConveyL,
-            },
-            LevelInfo {
-                attr: 0x16,
-                tile_type: TileType::Solid,
-            },
-            LevelInfo {
-                attr: 0x26,
-                tile_type: TileType::Floor,
-            },
-            LevelInfo {
-                attr: 0x07,
-                tile_type: TileType::RampR,
-            },
-            LevelInfo {
-                attr: 0x00,
-                tile_type: TileType::Space,
-            },
-            LevelInfo {
-                attr: 0x00,
-                tile_type: TileType::Space,
-            },
-            LevelInfo {
-                attr: 0x00,
-                tile_type: TileType::Space,
-            },
-            LevelInfo {
-                attr: 0x00,
-                tile_type: TileType::Space,
-            },
-        ],
-        item_count: 1,
-        item: [439, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        exits { above: none, right: none, below: none, left: 34 },
+        tiles {
+            0: Space   attr 0x07  gfx *;
+            1: Item    attr 0x00  gfx [31, 4, 10, 119, 135, 177, 170, 10];
+            2: ConveyL attr 0x75  gfx [165, 0, 0, 0, 0, 0, 0, 255];
+            3: Solid   attr 0x16  gfx [31, 170, 0, 85, 248, 85, 0, 170];
+            4: Floor   attr 0x26  gfx [0, 64, 9, 100, 146, 45, 150, 255];
+            5: RampR   attr 0x07  gfx [3, 0, 12, 0, 48, 0, 192, 0];
+            6: Space   attr 0x00  gfx *;
+            7: Space   attr 0x00  gfx *;
+            8: Space   attr 0x00  gfx *;
+            9: Space   attr 0x00  gfx *;
+        },
+        grid {
+            "33............................33",
+            "33............................33",
+            "33............................33",
+            "..............................33",
+            "..............................33",
+            "44444444444444..5344444444444433",
+            "3..............5.3............33",
+            "3.............5..3............33",
+            "3............5...3............33",
+            "3...........5....3............33",
+            "3..........5.....3............33",
+            "3.........5......3............33",
+            "3........5.......3............33",
+            "......444.....................33",
+            "....................2222......33",
+            "44444444444444444444444444444433",
+        },
+        items [439],
     },
     // Level 34: Top Landing
     LevelData {
@@ -5150,6 +5218,51 @@ pub fn level_init() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- level! const parsers ----------------------------------------------------
+
+    const EMPTY_ROW: &str = "................................"; // 4 x 8 cells
+
+    #[test]
+    fn parse_grid_maps_glyphs_to_tile_slots() {
+        let mut rows = [EMPTY_ROW; 16];
+        rows[3] = concat!(".......", "5", "........................"); // 7+1+24 cells
+        rows[7] = concat!("1", "..............................", "9"); // 1+30+1 cells
+
+        let grid = parse_grid(rows);
+
+        assert_eq!(grid.iter().filter(|&&v| v != 0).count(), 3);
+        assert_eq!(grid[3 * LEVEL_W + 7], 5);
+        assert_eq!(grid[7 * LEVEL_W], 1);
+        assert_eq!(grid[7 * LEVEL_W + 31], 9);
+        assert_eq!(grid[0], 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "32 cells")]
+    fn parse_grid_rejects_a_short_row() {
+        let mut rows = [EMPTY_ROW; 16];
+        rows[0] = concat!("........", "........", "........", "......."); // 31 cells
+        parse_grid(rows);
+    }
+
+    #[test]
+    #[should_panic(expected = "glyph")]
+    fn parse_grid_rejects_unknown_glyphs() {
+        let mut rows = [EMPTY_ROW; 16];
+        rows[15] = concat!("......", "x", "........................."); // 6+1+25 cells
+        parse_grid(rows);
+    }
+
+    #[test]
+    fn item_helpers_count_and_pad() {
+        assert_eq!(item_count_of(&[439]), 1);
+        assert_eq!(item_count_of(&[]), 0);
+        assert_eq!(
+            item_positions(&[439]),
+            [439, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+    }
 
     #[test]
     fn solid_floor_is_solid_only_at_jump_start() {
