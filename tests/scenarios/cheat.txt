@@ -1,12 +1,15 @@
 # Cheat mode ("writetyper"): on the floor of First Landing (level 28, miner
 # y==104) the code word must be typed contiguously — C parity: any mismatch
-# (wrong letter, wrong room, wrong y) resets cheatPos to 0. So "writ" + stray
-# 'x' + "etyper" does NOT enable cheat (the x resets, then 'e' != 'w'), and a
-# 5+Enter while cheat is off does not teleport. Retyping the full word enables
-# cheat mode (Maria/cheat guardians drawn, the responder returns the level-select handler);
-# then hold a level key and tap Enter to teleport (5 -> The Drive, level 4).
-# Escape to the title and start again: the cheat persists, so 3+Enter
-# teleports straight to Under the MegaTree (level 2) without retyping the code.
+# resets cheatPos to 0. Three probes each type "writ" (position 4) and then
+# cause one mismatch — a stray 'x', the wrong room (set level 33), and being
+# off the floor (miner y=88) — followed by "etyper". With the reset, "etyper"
+# never completes the word (its first letter 'e' != 'w' at position 0), so
+# cheat stays off and 5+Enter does not teleport. Then the full word typed
+# contiguously enables cheat mode (Maria/cheat guardians drawn, responder
+# switches to cheat_enabled), and holding a level key + Enter teleports
+# (5 -> The Drive, level 4). Escape to the title and start again: the cheat
+# persists, so 3+Enter teleports straight to Under the MegaTree (level 2)
+# without retyping the code.
 frames 1200
 100 space          # skip the code card
 300 enter          # start the game (The Bathroom, room 33)
@@ -15,14 +18,20 @@ frames 1200
 400 w 1
 405 r 1
 410 i 1
-415 t 1
-420 x 1            # wrong letter: resets the code-word position
-425 e 1
-430 t 1
-435 y 1
-440 p 1
-445 e 1
-450 r 1            # "etyper" after the reset -> cheat still off
+415 t 1            # "writ" -> code-word position 4
+420 x 1            # stray letter -> resets position to 0
+430 set level 33   # wrong room ...
+431 i 1            # ... keypress here -> resets position to 0
+432 set level 28   # back to First Landing
+440 set miner 150 88   # off the floor (y != 104) ...
+441 t 1            # ... keypress here -> resets position to 0
+442 set miner 150 104   # back on the floor
+450 e 1
+455 t 1
+460 y 1
+465 p 1
+470 e 1
+475 r 1            # "etyper" after the resets -> cheat still off
 500 5 30           # hold 5 ...
 510 enter 1        # ... + Enter: no teleport while cheat is off
 560 w 1
