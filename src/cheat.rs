@@ -62,6 +62,8 @@ pub fn cheat_disabled() {
         || pos >= CHEAT_CODE.len()
         || CHEAT_CODE[pos] != (game_input() - Key::A as i32 + b'a' as i32) as u8
     {
+        // Matches C: any mismatch resets the code-word position
+        CHEAT_POS.store(0, Ordering::Relaxed);
         game_pause(false);
         return;
     }

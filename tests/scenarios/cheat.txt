@@ -1,10 +1,12 @@
 # Cheat mode ("writetyper"): on the floor of First Landing (level 28, miner
-# y==104) type the code word one keypress at a time — a stray 'x' mid-word must
-# not advance or reset the position. After the 10th letter cheat mode enables
-# (Maria/cheat guardians drawn, responder switches to cheat_enabled). Then hold
-# a level key and tap Enter to teleport (5 -> The Drive, level 4). Escape to the
-# title and start again: the cheat persists, so 3+Enter teleports straight to
-# Under the MegaTree (level 2) without retyping the code.
+# y==104) the code word must be typed contiguously — C parity: any mismatch
+# (wrong letter, wrong room, wrong y) resets cheatPos to 0. So "writ" + stray
+# 'x' + "etyper" does NOT enable cheat (the x resets, then 'e' != 'w'), and a
+# 5+Enter while cheat is off does not teleport. Retyping the full word enables
+# cheat mode (Maria/cheat guardians drawn, responder switches to cheat_enabled);
+# then hold a level key and tap Enter to teleport (5 -> The Drive, level 4).
+# Escape to the title and start again: the cheat persists, so 3+Enter
+# teleports straight to Under the MegaTree (level 2) without retyping the code.
 frames 1200
 100 space          # skip the code card
 300 enter          # start the game (The Bathroom, room 33)
@@ -13,17 +15,29 @@ frames 1200
 400 w 1
 405 r 1
 410 i 1
-412 x 1            # wrong letter: ignored, sequence continues
 415 t 1
-420 e 1
-425 t 1
-430 y 1
-435 p 1
-440 e 1
-445 r 1            # "writetyper" complete -> cheat mode on
-500 5 30           # hold 5 (selects level 5)
-510 enter 1        # Enter while 5 is held -> teleport to level 4 (The Drive)
-700 escape         # back to the title screen
-800 enter          # start a new game (The Bathroom) — cheat still enabled
-900 3 30           # hold 3
-910 enter 1        # -> teleport to level 2 (Under the MegaTree)
+420 x 1            # wrong letter: resets the code-word position
+425 e 1
+430 t 1
+435 y 1
+440 p 1
+445 e 1
+450 r 1            # "etyper" after the reset -> cheat still off
+500 5 30           # hold 5 ...
+510 enter 1        # ... + Enter: no teleport while cheat is off
+560 w 1
+565 r 1
+570 i 1
+575 t 1
+580 e 1
+585 t 1
+590 y 1
+595 p 1
+600 e 1
+605 r 1            # full contiguous "writetyper" -> cheat mode on
+650 5 30           # hold 5 (selects level 5)
+660 enter 1        # Enter while 5 is held -> teleport to level 4 (The Drive)
+800 escape         # back to the title screen
+900 enter          # start a new game (The Bathroom) — cheat still enabled
+1000 3 30          # hold 3
+1010 enter 1       # -> teleport to level 2 (Under the MegaTree)
