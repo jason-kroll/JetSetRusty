@@ -261,6 +261,13 @@ static CHAR_SET_LARGE: [[u16; 8]; 96] = [
     [2032, 3096, 6604, 4644, 4644, 6476, 3096, 2032],
 ];
 
+/// Checked conversion from the game-logic i32 pixel domain to a buffer
+/// index: a negative position is a bug, not data, so fail loudly here
+/// instead of wrapping to ~2^64 and panicking obscurely at the index.
+pub(crate) fn buf_index(pos: i32) -> usize {
+    usize::try_from(pos).expect("negative buffer index")
+}
+
 fn video_set_pixel(pixel: &mut Pixel, pos: i32, ink: u8) {
     pixel.ink = ink;
     system_set_pixel(pos, ink as i32);
@@ -295,7 +302,7 @@ pub fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for p in pos..pos + size {
-        let pixel = &mut pixels[p as usize];
+        let pixel = &mut pixels[buf_index(p)];
         if (pixel.point & 1) == 0 {
             video_set_pixel(pixel, p, ink);
         }
@@ -306,7 +313,7 @@ pub fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
 pub fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
-        let pixel = &mut pixels[p as usize];
+        let pixel = &mut pixels[buf_index(p)];
         if (pixel.point & 1) != 0 {
             video_set_pixel(pixel, p, ink);
         }
@@ -316,7 +323,7 @@ pub fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
 pub fn video_pixel_fill(pos: i32, size: i32) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
-        let pixel = &mut pixels[p as usize];
+        let pixel = &mut pixels[buf_index(p)];
         pixel.point = 0;
         video_set_pixel(pixel, p, 0x0);
     }
@@ -328,7 +335,7 @@ pub fn video_draw_rope_seg(pos: i32, ink: u8) {
 }
 
 pub fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
-    let pixel = &mut pixels[pos as usize];
+    let pixel = &mut pixels[buf_index(pos)];
     pixel.point = 1;
     video_set_pixel(pixel, pos, ink);
 }
@@ -340,19 +347,19 @@ pub fn video_draw_arrow(pos: i32, dir: i32) {
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    pixels[pos as usize].point |= B_ROBOT | 1;
-    video_set_pixel(&mut pixels[pos as usize], pos, 7);
-    pixels[(pos + 6) as usize].point |= B_ROBOT | 1;
-    video_set_pixel(&mut pixels[(pos + 6) as usize], pos + 6, 7);
+    pixels[buf_index(pos)].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels[buf_index(pos)], pos, 7);
+    pixels[buf_index(pos + 6)].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels[buf_index(pos + 6)], pos + 6, 7);
     pos += width;
-    pixels[(pos + width) as usize].point |= B_ROBOT | 1;
-    video_set_pixel(&mut pixels[(pos + width) as usize], pos + width, 7);
-    pixels[(pos + width + 6) as usize].point |= B_ROBOT | 1;
-    video_set_pixel(&mut pixels[(pos + width + 6) as usize], pos + width + 6, 7);
+    pixels[buf_index(pos + width)].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels[buf_index(pos + width)], pos + width, 7);
+    pixels[buf_index(pos + width + 6)].point |= B_ROBOT | 1;
+    video_set_pixel(&mut pixels[buf_index(pos + width + 6)], pos + width + 6, 7);
     pos -= dir;
     for i in 0..8 {
         let p = pos + i;
-        let pixel = &mut pixels[p as usize];
+        let pixel = &mut pixels[buf_index(p)];
         pixel.point |= B_ROBOT | 1;
         video_set_pixel(pixel, p, 7);
     }
@@ -368,7 +375,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
         for bit in 0..8 {
             let d = (byte >> bit) & B_LEVEL;
             let p = pos - bit;
-            let pixel = &mut pixels[p as usize];
+            let pixel = &mut pixels[buf_index(p)];
             pixel.point = d;
             video_set_pixel(pixel, p, colour[d as usize]);
         }
@@ -392,7 +399,7 @@ pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
         for bit in 0..16 {
             if ((word >> bit) & 1) != 0 {
                 let p = pos - bit;
-                let pixel = &mut pixels[p as usize];
+                let pixel = &mut pixels[buf_index(p)];
                 if (pixel.point & B_ROBOT) != 0 {
                     die = true;
                 }
@@ -416,7 +423,7 @@ pub fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
         for bit in 0..16 {
             if ((word >> bit) & 1) != 0 {
                 let p = pos - bit;
-                let pixel = &mut pixels[p as usize];
+                let pixel = &mut pixels[buf_index(p)];
                 pixel.point |= B_ROBOT | 1;
                 video_set_pixel(pixel, p, ink);
             }
@@ -448,7 +455,7 @@ pub fn video_draw_sprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) {
         for bit in 0..16 {
             let d = (word >> bit) & 1;
             let p = pos - bit;
-            let pixel = &mut pixels[p as usize];
+            let pixel = &mut pixels[buf_index(p)];
             pixel.point = d as u8;
             video_set_pixel(pixel, p, colour[d as usize]);
         }
@@ -495,7 +502,7 @@ pub fn video_write_large(x: i32, y: i32, text: &[u8]) {
                 let start = pos + x;
                 for row in 0..CHAR_HEIGHT_LARGE as i32 {
                     let p = start + row * WIDTH;
-                    let pixel = &mut pixels[p as usize];
+                    let pixel = &mut pixels[buf_index(p)];
                     let bit = ((line >> row) & 1) as usize;
                     video_set_pixel(pixel, p, ink[bit]);
                 }
@@ -545,7 +552,7 @@ pub fn video_write(pos: i32, text: &[u8]) {
         for line in row.iter().take(width + 1).skip(1).copied() {
             for idx in 0..CHAR_HEIGHT as i32 {
                 let p = pos + idx * WIDTH;
-                let pixel = &mut pixels[p as usize];
+                let pixel = &mut pixels[buf_index(p)];
                 let bit = ((line >> idx) & 1) as usize;
                 pixel.point = bit as u8;
                 video_set_pixel(pixel, p, ink[bit]);

@@ -111,6 +111,7 @@ static SDL_SCANCODES: LazyLock<[Scancode; 36]> = LazyLock::new(|| {
 
 use crate::audio::{audio_init, audio_output};
 use crate::loader::loader_action;
+use crate::video::buf_index;
 
 // libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
 // generator, pinned to libc's exact sequence by tests there), so no libc FFI
@@ -302,7 +303,7 @@ fn open_joystick(id: JoystickId) {
 }
 
 pub fn system_set_pixel(pos: i32, index: i32) {
-    FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos as usize] = index as u8);
+    FRAMEBUFFER.with(|fb| fb.borrow_mut()[buf_index(pos)] = index as u8);
 }
 
 pub fn system_border(index: i32) {
