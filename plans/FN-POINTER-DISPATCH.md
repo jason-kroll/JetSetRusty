@@ -318,3 +318,27 @@ Fits one plan in six phases. Phase 1+2 touch ~10 files (~400 lines
 changed, mostly mechanical renames); phases 3-5 are each contained in
 one or two files; phase 6 is docs. Each phase is an independent,
 golden-green commit, so review can stop after any phase.
+
+## Review followups (post-execution review of `d778b18`..`0e0fa72`)
+
+Open items from reviewing the executed phases — none block anything; the
+plan is complete and every gate is green at `0e0fa72` (53 unit + 23 replay
+tests, clippy `-D warnings`, fmt clean, verified independently).
+
+1. `PausedDrawOnce`'s real draw path has no golden. The phase machine is
+   unit-pinned only (`dispatch.rs::paused_draw_once_drawer_fires_once_
+   then_clears_to_pause_cheat`, which clears `GAME_STATE.frame` so the
+   draw body early-retires — test isolation, not draw coverage), and the
+   sweep-00..59 set never pauses + level-selects (both cheat selects
+   unpause first, cheat.rs:66,119), so `game_init_room`'s paused branch
+   and the once-draw body are reachable-in-principle but pinned by the
+   unit test alone. Either accept the unit pin as final, or add one small
+   `pause + set level` scenario next time tests/ is touched.
+2. The drawer test's `GAME_STATE.frame.store(false, ..)` (dispatch.rs:239)
+   deserves one comment line saying why: the draw body writes the shared
+   video buffer from a parallel test thread, so the test clears the frame
+   flag to isolate the once-gate from the draw.
+3. Plan-letter record: the phase-4 `Move` enum lists nine variants — this
+   plan's letter omitted `Maria` (do_move_maria exists and drives her
+   two-slot colour layers); `72c9403` added `Move::Maria` silently.
+   Recorded so the plan text matches the code.
