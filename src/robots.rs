@@ -24,14 +24,32 @@ const fn pos(x: i32, y: i32) -> i32 {
     y * WIDTH + x * 8
 }
 
-/// A robot's movement handler. C typed these `EVENT` (`void (*)(void)`)
-/// operating on the `curRobot` cursor global; in Rust each handler takes the
-/// robot it drives, and the cursor global disappears. Plain `fn` pointers
-/// (never null, never FFI-visible) replace the nullable C pointers —
-/// reassignment at runtime (`robot.do_move = do_move_right`) works the same.
-type MoveFn = fn(&mut Robot);
-/// A robot's draw handler (draws never mutate the robot).
-type DrawFn = fn(&Robot);
+/// A robot's movement behaviour. C stored these as `EVENT` fn pointers in the
+/// ROBOT struct operating on the `curRobot` cursor global; in Rust the
+/// variant names the behaviour and `Robot::step` matches it to the handler
+/// taking the robot it drives. Bouncing at min/max is a plain enum write
+/// (`robot.move_ = Move::Right`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Move {
+    Nothing,
+    Left,
+    Right,
+    Up,
+    Down,
+    Static,
+    ArrowLeft,
+    ArrowRight,
+    Maria,
+}
+
+/// A robot's draw behaviour (draws never mutate the robot).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Draw {
+    Nothing,
+    Robot,
+    Toilet,
+    Arrow,
+}
 
 /// One guardian slot (C `ROBOT`). Field order kept for easy diffing against
 /// the C initializer tables.
@@ -40,8 +58,8 @@ struct Robot {
     pos: i32,
     min: i32,
     max: i32,
-    do_move: MoveFn,
-    do_draw: DrawFn,
+    move_: Move,
+    draw: Draw,
     speed: i32,
     /// Animation frames: a row of `ROBOT_GFX` (8 frames × 16 raster lines).
     /// `None` for arrows and empty slots, where C stored a null pointer.
@@ -52,16 +70,38 @@ struct Robot {
     f_mask: i32,
 }
 
-fn do_move_nothing(_: &mut Robot) {}
-fn do_draw_nothing(_: &Robot) {}
+impl Robot {
+    fn step(&mut self) {
+        match self.move_ {
+            Move::Nothing => {}
+            Move::Left => do_move_left(self),
+            Move::Right => do_move_right(self),
+            Move::Up => do_move_up(self),
+            Move::Down => do_move_down(self),
+            Move::Static => do_move_static(self),
+            Move::ArrowLeft => do_move_arrow_left(self),
+            Move::ArrowRight => do_move_arrow_right(self),
+            Move::Maria => do_move_maria(self),
+        }
+    }
 
-/// C `NOROBOT` — an empty slot whose handlers are no-ops.
+    fn draw(&self) {
+        match self.draw {
+            Draw::Nothing => {}
+            Draw::Robot => do_draw_robot(self),
+            Draw::Toilet => do_draw_toilet(self),
+            Draw::Arrow => do_draw_arrow(self),
+        }
+    }
+}
+
+/// C `NOROBOT` — an empty slot with no-op handlers.
 const NOROBOT: Robot = Robot {
     pos: 0,
     min: 0,
     max: 0,
-    do_move: do_move_nothing,
-    do_draw: do_draw_nothing,
+    move_: Move::Nothing,
+    draw: Draw::Nothing,
     speed: 0,
     gfx: None,
     ink: 0x0,
@@ -527,9 +567,9 @@ static ROBOT_GFX: [[[u16; 16]; 8]; 45] = [
 #[rustfmt::skip]
 static ROBOT_START: [[Robot; 8]; 60] = [
     [
-        Robot { pos: pos(10, 48), min: pos(10, 8), max: pos(10, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[36]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(29, 56), min: pos(19, 56), max: pos(29, 56), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(7, 56), min: pos(7, 0), max: pos(7, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(10, 48), min: pos(10, 8), max: pos(10, 104), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[36]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(29, 56), min: pos(19, 56), max: pos(29, 56), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(7, 56), min: pos(7, 0), max: pos(7, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b010 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -537,9 +577,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 0
     [
-        Robot { pos: pos(8, 80), min: pos(0, 80), max: pos(10, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(20, 80), min: pos(14, 80), max: pos(29, 80), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(12, 24), min: pos(12, 0), max: pos(12, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 6, gfx: Some(&ROBOT_GFX[26]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(8, 80), min: pos(0, 80), max: pos(10, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(20, 80), min: pos(14, 80), max: pos(29, 80), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(12, 24), min: pos(12, 0), max: pos(12, 96), move_: Move::Down, draw: Draw::Robot, speed: 6, gfx: Some(&ROBOT_GFX[26]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -547,9 +587,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 1
     [
-        Robot { pos: pos(16, 104), min: pos(0, 104), max: pos(30, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(14, 72), min: pos(14, 48), max: pos(14, 87), do_move: do_move_up, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(27, 24), min: pos(5, 24), max: pos(30, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(16, 104), min: pos(0, 104), max: pos(30, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(14, 72), min: pos(14, 48), max: pos(14, 87), move_: Move::Up, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(27, 24), min: pos(5, 24), max: pos(30, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -557,39 +597,39 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 2
     [
-        Robot { pos: pos(2, 32), min: pos(2, 32), max: pos(2, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(5, 50), min: pos(5, 16), max: pos(5, 80), do_move: do_move_up, do_draw: do_draw_robot, speed: 6, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(8, 64), min: pos(8, 19), max: pos(8, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[37]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(9, 104), min: pos(4, 104), max: pos(14, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(2, 32), min: pos(2, 32), max: pos(2, 88), move_: Move::Down, draw: Draw::Robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(5, 50), min: pos(5, 16), max: pos(5, 80), move_: Move::Up, draw: Draw::Robot, speed: 6, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(8, 64), min: pos(8, 19), max: pos(8, 88), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[37]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(9, 104), min: pos(4, 104), max: pos(14, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 3
     [
-        Robot { pos: pos(18, 80), min: pos(14, 80), max: pos(29, 80), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(21, 88), min: pos(16, 88), max: pos(29, 88), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(8, 64), min: pos(5, 64), max: pos(29, 64), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(20, 40), min: pos(0, 40), max: pos(10, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(15, 104), min: pos(10, 104), max: pos(30, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(18, 80), min: pos(14, 80), max: pos(29, 80), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(21, 88), min: pos(16, 88), max: pos(29, 88), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(8, 64), min: pos(5, 64), max: pos(29, 64), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(20, 40), min: pos(0, 40), max: pos(10, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(15, 104), min: pos(10, 104), max: pos(30, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 4
     [
-        Robot { pos: pos(14, 64), min: pos(14, 40), max: pos(14, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(11, 80), min: pos(11, 44), max: pos(11, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(23, 80), min: pos(23, 44), max: pos(23, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(17, 48), min: pos(17, 48), max: pos(17, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(14, 64), min: pos(14, 40), max: pos(14, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(11, 80), min: pos(11, 44), max: pos(11, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(23, 80), min: pos(23, 44), max: pos(23, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(17, 48), min: pos(17, 48), max: pos(17, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 5
     [
-        Robot { pos: pos(2, 48), min: pos(2, 0), max: pos(2, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(4, 48), min: pos(4, 0), max: pos(4, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(3, 64), min: pos(3, 16), max: pos(3, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(2, 48), min: pos(2, 0), max: pos(2, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(4, 48), min: pos(4, 0), max: pos(4, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(3, 64), min: pos(3, 16), max: pos(3, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -597,9 +637,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 6
     [
-        Robot { pos: pos(16, 64), min: pos(12, 64), max: pos(18, 64), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(5, 88), min: pos(0, 88), max: pos(11, 88), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(0, 82), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(16, 64), min: pos(12, 64), max: pos(18, 64), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(5, 88), min: pos(0, 88), max: pos(11, 88), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(0, 82), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -607,21 +647,21 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 7
     [
-        Robot { pos: pos(2, 80), min: pos(2, 64), max: pos(2, 112), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(5, 80), min: pos(5, 64), max: pos(5, 112), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(8, 80), min: pos(8, 64), max: pos(8, 112), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(6, 40), min: pos(0, 40), max: pos(10, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(12, 32), min: pos(12, 0), max: pos(12, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(27, 88), min: pos(16, 88), max: pos(29, 88), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(19, 24), min: pos(17, 24), max: pos(30, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(2, 80), min: pos(2, 64), max: pos(2, 112), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(5, 80), min: pos(5, 64), max: pos(5, 112), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(8, 80), min: pos(8, 64), max: pos(8, 112), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(6, 40), min: pos(0, 40), max: pos(10, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(12, 32), min: pos(12, 0), max: pos(12, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(27, 88), min: pos(16, 88), max: pos(29, 88), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(19, 24), min: pos(17, 24), max: pos(30, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
     ], // room 8
     [
-        Robot { pos: pos(30, 80), min: pos(30, 64), max: pos(30, 112), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(7, 72), min: pos(7, 64), max: pos(7, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(19, 40), min: pos(16, 40), max: pos(30, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(14, 48), min: pos(14, 0), max: pos(14, 56), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[25]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(0, 34), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(30, 80), min: pos(30, 64), max: pos(30, 112), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[37]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(7, 72), min: pos(7, 64), max: pos(7, 104), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(19, 40), min: pos(16, 40), max: pos(30, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(14, 48), min: pos(14, 0), max: pos(14, 56), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[25]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(0, 34), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -637,29 +677,29 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 10
     [
-        Robot { pos: pos(10, 48), min: 0, max: 0, do_move: do_move_static, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[14]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(19, 24), min: pos(5, 24), max: pos(30, 24), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(19, 80), min: pos(9, 80), max: pos(17, 80), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(0, 34), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(0, 11), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(10, 48), min: 0, max: 0, move_: Move::Static, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[14]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(19, 24), min: pos(5, 24), max: pos(30, 24), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(19, 80), min: pos(9, 80), max: pos(17, 80), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(0, 34), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(0, 11), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 11
     [
-        Robot { pos: pos(7, 40), min: pos(0, 40), max: pos(10, 40), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(8, 80), min: pos(0, 80), max: pos(19, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(24, 24), min: pos(5, 24), max: pos(30, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(0, 66), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(7, 40), min: pos(0, 40), max: pos(10, 40), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(8, 80), min: pos(0, 80), max: pos(19, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(24, 24), min: pos(5, 24), max: pos(30, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(0, 66), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 12
     [
-        Robot { pos: pos(12, 88), min: pos(12, 0), max: pos(12, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(19, 56), min: pos(14, 56), max: pos(23, 56), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(20, 80), min: pos(19, 80), max: pos(30, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(12, 88), min: pos(12, 0), max: pos(12, 104), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(19, 56), min: pos(14, 56), max: pos(23, 56), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(20, 80), min: pos(19, 80), max: pos(30, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -667,28 +707,28 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 13
     [
-        Robot { pos: pos(4, 48), min: pos(4, 48), max: pos(4, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[39]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(12, 64), min: pos(12, 40), max: pos(12, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[39]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(5, 32), min: pos(0, 32), max: pos(9, 32), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(24, 8), min: pos(24, 0), max: pos(24, 16), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[13]), ink: 0x7, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(4, 48), min: pos(4, 48), max: pos(4, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[39]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(12, 64), min: pos(12, 40), max: pos(12, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[39]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(5, 32), min: pos(0, 32), max: pos(9, 32), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(24, 8), min: pos(24, 0), max: pos(24, 16), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[13]), ink: 0x7, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 14
     [
-        Robot { pos: pos(5, 48), min: pos(5, 48), max: pos(5, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(11, 80), min: pos(11, 44), max: pos(11, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(19, 32), min: pos(19, 32), max: pos(19, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 6, gfx: Some(&ROBOT_GFX[38]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(25, 64), min: pos(25, 40), max: pos(25, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(6, 32), min: pos(0, 32), max: pos(9, 32), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(0, 50), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(5, 48), min: pos(5, 48), max: pos(5, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(11, 80), min: pos(11, 44), max: pos(11, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(19, 32), min: pos(19, 32), max: pos(19, 96), move_: Move::Down, draw: Draw::Robot, speed: 6, gfx: Some(&ROBOT_GFX[38]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(25, 64), min: pos(25, 40), max: pos(25, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(6, 32), min: pos(0, 32), max: pos(9, 32), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(0, 50), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
     ], // room 15
     [
-        Robot { pos: pos(8, 32), min: pos(0, 32), max: pos(9, 32), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(0, 66), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(8, 32), min: pos(0, 32), max: pos(9, 32), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(0, 66), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -697,17 +737,17 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 16
     [
-        Robot { pos: pos(5, 64), min: pos(5, 40), max: pos(5, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(11, 80), min: pos(11, 40), max: pos(11, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(19, 48), min: pos(19, 48), max: pos(19, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(25, 32), min: pos(25, 32), max: pos(25, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 6, gfx: Some(&ROBOT_GFX[38]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(0, 66), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(5, 64), min: pos(5, 40), max: pos(5, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[38]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(11, 80), min: pos(11, 40), max: pos(11, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[38]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(19, 48), min: pos(19, 48), max: pos(19, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[38]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(25, 32), min: pos(25, 32), max: pos(25, 96), move_: Move::Down, draw: Draw::Robot, speed: 6, gfx: Some(&ROBOT_GFX[38]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(0, 66), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 17
     [
-        Robot { pos: pos(22, 104), min: pos(14, 104), max: pos(24, 104), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(22, 104), min: pos(14, 104), max: pos(24, 104), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -717,29 +757,29 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 18
     [
-        Robot { pos: pos(8, 40), min: pos(4, 40), max: pos(20, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(16, 40), min: pos(12, 40), max: pos(28, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(11, 72), min: pos(9, 72), max: pos(20, 72), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x2, f_update: 0, f_index: 1, f_mask: 0b111 },
-        Robot { pos: pos(24, 72), min: pos(22, 72), max: pos(27, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(7, 104), min: pos(5, 104), max: pos(12, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 1, f_mask: 0b111 },
-        Robot { pos: pos(12, 104), min: pos(11, 104), max: pos(18, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x1, f_update: 0, f_index: 2, f_mask: 0b111 },
-        Robot { pos: pos(18, 104), min: pos(16, 104), max: pos(23, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 3, f_mask: 0b111 },
-        Robot { pos: pos(24, 104), min: pos(23, 104), max: pos(30, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(8, 40), min: pos(4, 40), max: pos(20, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(16, 40), min: pos(12, 40), max: pos(28, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(11, 72), min: pos(9, 72), max: pos(20, 72), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x2, f_update: 0, f_index: 1, f_mask: 0b111 },
+        Robot { pos: pos(24, 72), min: pos(22, 72), max: pos(27, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(7, 104), min: pos(5, 104), max: pos(12, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 1, f_mask: 0b111 },
+        Robot { pos: pos(12, 104), min: pos(11, 104), max: pos(18, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x1, f_update: 0, f_index: 2, f_mask: 0b111 },
+        Robot { pos: pos(18, 104), min: pos(16, 104), max: pos(23, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 3, f_mask: 0b111 },
+        Robot { pos: pos(24, 104), min: pos(23, 104), max: pos(30, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
     ], // room 19
     [
-        Robot { pos: pos(12, 16), min: pos(12, 16), max: pos(12, 48), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[40]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(5, 72), min: pos(5, 48), max: pos(5, 87), do_move: do_move_up, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(7, 56), min: pos(7, 48), max: pos(7, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(11, 75), min: pos(11, 72), max: pos(11, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[27]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(24, 80), min: pos(14, 80), max: pos(29, 80), do_move: do_move_right, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(12, 16), min: pos(12, 16), max: pos(12, 48), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[40]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(5, 72), min: pos(5, 48), max: pos(5, 87), move_: Move::Up, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(7, 56), min: pos(7, 48), max: pos(7, 96), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(11, 75), min: pos(11, 72), max: pos(11, 96), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[27]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(24, 80), min: pos(14, 80), max: pos(29, 80), move_: Move::Right, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[33]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 20
     [
-        Robot { pos: pos(24, 88), min: pos(16, 88), max: pos(26, 88), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(14, 56), min: pos(14, 48), max: pos(14, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(6, 72), min: pos(6, 48), max: pos(6, 87), do_move: do_move_up, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(24, 88), min: pos(16, 88), max: pos(26, 88), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(14, 56), min: pos(14, 48), max: pos(14, 96), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(6, 72), min: pos(6, 48), max: pos(6, 87), move_: Move::Up, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[27]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b010 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -747,48 +787,48 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 21
     [
-        Robot { pos: pos(4, 24), min: pos(0, 24), max: pos(11, 24), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(16, 24), min: pos(13, 24), max: pos(21, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(22, 48), min: pos(12, 48), max: pos(24, 48), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[23]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(4, 72), min: pos(2, 72), max: pos(6, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[25]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(22, 96), min: pos(0, 96), max: pos(30, 96), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(11, 80), min: pos(9, 80), max: pos(17, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(4, 24), min: pos(0, 24), max: pos(11, 24), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(16, 24), min: pos(13, 24), max: pos(21, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(22, 48), min: pos(12, 48), max: pos(24, 48), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[23]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(4, 72), min: pos(2, 72), max: pos(6, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[25]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(22, 96), min: pos(0, 96), max: pos(30, 96), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(11, 80), min: pos(9, 80), max: pos(17, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
     ], // room 22
     [
-        Robot { pos: pos(3, 32), min: pos(3, 8), max: pos(3, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(9, 96), min: pos(9, 0), max: pos(9, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(15, 64), min: pos(15, 0), max: pos(15, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[21]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(20, 32), min: pos(20, 8), max: pos(20, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(3, 32), min: pos(3, 8), max: pos(3, 104), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(9, 96), min: pos(9, 0), max: pos(9, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(15, 64), min: pos(15, 0), max: pos(15, 104), move_: Move::Up, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[21]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(20, 32), min: pos(20, 8), max: pos(20, 104), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 23
     [
-        Robot { pos: pos(9, 96), min: pos(9, 0), max: pos(9, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(14, 64), min: pos(14, 0), max: pos(14, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[21]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(20, 96), min: pos(20, 0), max: pos(20, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(27, 32), min: pos(27, 8), max: pos(27, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(9, 96), min: pos(9, 0), max: pos(9, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(14, 64), min: pos(14, 0), max: pos(14, 104), move_: Move::Up, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[21]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(20, 96), min: pos(20, 0), max: pos(20, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[21]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(27, 32), min: pos(27, 8), max: pos(27, 104), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[21]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 24
     [
-        Robot { pos: pos(16, 104), min: pos(0, 104), max: pos(24, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[34]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(4, 72), min: pos(0, 72), max: pos(5, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(3, 48), min: pos(0, 48), max: pos(6, 48), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[34]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(8, 24), min: pos(0, 24), max: pos(9, 24), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(16, 104), min: pos(0, 104), max: pos(24, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[34]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(4, 72), min: pos(0, 72), max: pos(5, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(3, 48), min: pos(0, 48), max: pos(6, 48), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[34]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(8, 24), min: pos(0, 24), max: pos(9, 24), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 25
     [
-        Robot { pos: pos(3, 72), min: pos(3, 0), max: pos(3, 96), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[3]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(7, 88), min: pos(7, 0), max: pos(7, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(3, 72), min: pos(3, 0), max: pos(3, 96), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[3]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(7, 88), min: pos(7, 0), max: pos(7, 104), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -797,17 +837,17 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 26
     [
-        Robot { pos: pos(25, 48), min: pos(25, 0), max: pos(25, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(27, 48), min: pos(27, 0), max: pos(27, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(26, 64), min: pos(26, 16), max: pos(26, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(12, 96), min: pos(0, 96), max: pos(15, 96), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(6, 64), min: pos(6, 56), max: pos(6, 80), do_move: do_move_up, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[3]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(17, 76), min: pos(17, 40), max: pos(17, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[2]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(25, 48), min: pos(25, 0), max: pos(25, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(27, 48), min: pos(27, 0), max: pos(27, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(26, 64), min: pos(26, 16), max: pos(26, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(12, 96), min: pos(0, 96), max: pos(15, 96), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(6, 64), min: pos(6, 56), max: pos(6, 80), move_: Move::Up, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[3]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(17, 76), min: pos(17, 40), max: pos(17, 80), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[2]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
     ], // room 27
     [
-        Robot { pos: pos(25, 96), min: pos(24, 96), max: pos(30, 96), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(25, 96), min: pos(24, 96), max: pos(30, 96), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -817,27 +857,27 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 28
     [
-        Robot { pos: pos(8, 32), min: pos(8, 0), max: pos(8, 88), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[41]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(11, 16), min: pos(11, 0), max: pos(11, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[41]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(14, 72), min: pos(14, 0), max: pos(14, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[42]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(17, 64), min: pos(17, 8), max: pos(17, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[41]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(20, 32), min: pos(20, 0), max: pos(20, 80), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[41]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(23, 16), min: pos(23, 0), max: pos(23, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[41]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(28, 72), min: pos(28, 0), max: pos(28, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 3, gfx: Some(&ROBOT_GFX[41]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(8, 32), min: pos(8, 0), max: pos(8, 88), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[41]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(11, 16), min: pos(11, 0), max: pos(11, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[41]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(14, 72), min: pos(14, 0), max: pos(14, 96), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[42]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(17, 64), min: pos(17, 8), max: pos(17, 104), move_: Move::Up, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[41]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(20, 32), min: pos(20, 0), max: pos(20, 80), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[41]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(23, 16), min: pos(23, 0), max: pos(23, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[41]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(28, 72), min: pos(28, 0), max: pos(28, 96), move_: Move::Down, draw: Draw::Robot, speed: 3, gfx: Some(&ROBOT_GFX[41]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
     ], // room 29
     [
-        Robot { pos: pos(10, 64), min: pos(10, 56), max: pos(10, 80), do_move: do_move_up, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[4]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(13, 48), min: pos(13, 40), max: pos(13, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[2]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(16, 76), min: pos(16, 40), max: pos(16, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[1]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(22, 80), min: pos(19, 80), max: pos(30, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(10, 64), min: pos(10, 56), max: pos(10, 80), move_: Move::Up, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[4]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(13, 48), min: pos(13, 40), max: pos(13, 80), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[2]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(16, 76), min: pos(16, 40), max: pos(16, 80), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[1]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(22, 80), min: pos(19, 80), max: pos(30, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 30
     [
-        Robot { pos: pos(12, 104), min: pos(5, 104), max: pos(12, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 1, f_mask: 0b111 },
+        Robot { pos: pos(12, 104), min: pos(5, 104), max: pos(12, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 1, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -847,7 +887,7 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 31
     [
-        Robot { pos: pos(4, 48), min: pos(2, 48), max: pos(7, 48), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(4, 48), min: pos(2, 48), max: pos(7, 48), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -857,8 +897,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 32
     [
-        Robot { pos: pos(16, 24), min: pos(0, 24), max: pos(27, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[25]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(28, 104), min: 0, max: 0, do_move: do_move_static, do_draw: do_draw_toilet, speed: 0, gfx: Some(&ROBOT_GFX[0]), ink: 0xf, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(16, 24), min: pos(0, 24), max: pos(27, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[25]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(28, 104), min: 0, max: 0, move_: Move::Static, draw: Draw::Toilet, speed: 0, gfx: Some(&ROBOT_GFX[0]), ink: 0xf, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -867,9 +907,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 33
     [
-        Robot { pos: pos(6, 32), min: pos(6, 16), max: pos(6, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x7, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(12, 16), min: pos(12, 16), max: pos(12, 48), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[40]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(16, 104), min: pos(10, 104), max: pos(30, 104), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(6, 32), min: pos(6, 16), max: pos(6, 104), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x7, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(12, 16), min: pos(12, 16), max: pos(12, 48), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[40]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(16, 104), min: pos(10, 104), max: pos(30, 104), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -877,8 +917,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 34
     [
-        Robot { pos: pos(14, 88), min: 0, max: 0, do_move: do_move_maria, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[43]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(14, 88), min: 0, max: 0, do_move: do_move_maria, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[44]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(14, 88), min: 0, max: 0, move_: Move::Maria, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[43]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(14, 88), min: 0, max: 0, move_: Move::Maria, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[44]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -887,9 +927,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 35
     [
-        Robot { pos: pos(2, 16), min: pos(0, 16), max: pos(10, 16), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(7, 48), min: pos(7, 40), max: pos(7, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[1]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(0, 73), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(2, 16), min: pos(0, 16), max: pos(10, 16), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(7, 48), min: pos(7, 40), max: pos(7, 80), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[1]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(0, 73), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -897,9 +937,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 36
     [
-        Robot { pos: pos(20, 32), min: pos(20, 0), max: pos(20, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[4]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(9, 72), min: pos(9, 64), max: pos(9, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(0, 66), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(20, 32), min: pos(20, 0), max: pos(20, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[4]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(9, 72), min: pos(9, 64), max: pos(9, 104), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(0, 66), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -907,17 +947,17 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 37
     [
-        Robot { pos: pos(4, 48), min: pos(4, 0), max: pos(4, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(6, 48), min: pos(6, 0), max: pos(6, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(5, 64), min: pos(5, 16), max: pos(5, 104), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(22, 80), min: pos(8, 80), max: pos(24, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(4, 48), min: pos(4, 0), max: pos(4, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[28]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(6, 48), min: pos(6, 0), max: pos(6, 88), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[29]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(5, 64), min: pos(5, 16), max: pos(5, 104), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[30]), ink: 0x4, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(22, 80), min: pos(8, 80), max: pos(24, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 38
     [
-        Robot { pos: pos(8, 24), min: pos(5, 24), max: pos(30, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(8, 24), min: pos(5, 24), max: pos(30, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[20]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -927,8 +967,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 39
     [
-        Robot { pos: pos(18, 72), min: pos(18, 64), max: pos(18, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(10, 96), min: pos(10, 56), max: pos(10, 96), do_move: do_move_up, do_draw: do_draw_robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(18, 72), min: pos(18, 64), max: pos(18, 104), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(10, 96), min: pos(10, 56), max: pos(10, 96), move_: Move::Up, draw: Draw::Robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -937,19 +977,19 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 40
     [
-        Robot { pos: pos(4, 66), min: pos(4, 56), max: pos(4, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(6, 70), min: pos(6, 56), max: pos(6, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(8, 74), min: pos(8, 56), max: pos(8, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x1, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(10, 78), min: pos(10, 56), max: pos(10, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(12, 82), min: pos(12, 56), max: pos(12, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(14, 86), min: pos(14, 56), max: pos(14, 88), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[12]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(0, 41), min: 28 * 8, max: 28, do_move: do_move_arrow_left, do_draw: do_draw_arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
-        Robot { pos: pos(0, 73), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(4, 66), min: pos(4, 56), max: pos(4, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(6, 70), min: pos(6, 56), max: pos(6, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(8, 74), min: pos(8, 56), max: pos(8, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x1, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(10, 78), min: pos(10, 56), max: pos(10, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(12, 82), min: pos(12, 56), max: pos(12, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[11]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(14, 86), min: pos(14, 56), max: pos(14, 88), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[12]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(0, 41), min: 28 * 8, max: 28, move_: Move::ArrowLeft, draw: Draw::Arrow, speed: 1, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(0, 73), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
     ], // room 41
     [
-        Robot { pos: pos(4, 72), min: pos(0, 72), max: pos(5, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(16, 64), min: pos(12, 64), max: pos(18, 64), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(0, 97), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(4, 72), min: pos(0, 72), max: pos(5, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[31]), ink: 0x7, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(16, 64), min: pos(12, 64), max: pos(18, 64), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(0, 97), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -957,8 +997,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 42
     [
-        Robot { pos: pos(20, 88), min: pos(17, 88), max: pos(30, 88), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(24, 40), min: pos(16, 40), max: pos(30, 40), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(20, 88), min: pos(17, 88), max: pos(30, 88), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(24, 40), min: pos(16, 40), max: pos(30, 40), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -967,7 +1007,7 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 43
     [
-        Robot { pos: pos(20, 24), min: pos(20, 0), max: pos(20, 64), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[16]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(20, 24), min: pos(20, 0), max: pos(20, 64), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[16]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -977,9 +1017,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 44
     [
-        Robot { pos: pos(16, 88), min: pos(12, 88), max: pos(29, 88), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(18, 24), min: pos(18, 0), max: pos(18, 64), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(22, 64), min: pos(21, 64), max: pos(30, 64), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[8]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(16, 88), min: pos(12, 88), max: pos(29, 88), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(18, 24), min: pos(18, 0), max: pos(18, 64), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(22, 64), min: pos(21, 64), max: pos(30, 64), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[8]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -987,38 +1027,38 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 45
     [
-        Robot { pos: pos(4, 32), min: pos(4, 0), max: pos(4, 64), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(13, 56), min: pos(13, 48), max: pos(13, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
-        Robot { pos: pos(19, 72), min: pos(15, 72), max: pos(23, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(25, 72), min: pos(25, 32), max: pos(25, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[22]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(4, 32), min: pos(4, 0), max: pos(4, 64), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(13, 56), min: pos(13, 48), max: pos(13, 96), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[27]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b010 },
+        Robot { pos: pos(19, 72), min: pos(15, 72), max: pos(23, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[24]), ink: 0x2, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(25, 72), min: pos(25, 32), max: pos(25, 80), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[22]), ink: 0x3, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 46
     [
-        Robot { pos: pos(5, 16), min: pos(0, 16), max: pos(10, 16), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(20, 24), min: pos(18, 24), max: pos(22, 24), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(16, 24), min: pos(16, 0), max: pos(16, 64), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(22, 96), min: pos(22, 56), max: pos(22, 96), do_move: do_move_up, do_draw: do_draw_robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(5, 16), min: pos(0, 16), max: pos(10, 16), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(20, 24), min: pos(18, 24), max: pos(22, 24), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x4, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(16, 24), min: pos(16, 0), max: pos(16, 64), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(22, 96), min: pos(22, 56), max: pos(22, 96), move_: Move::Up, draw: Draw::Robot, speed: 5, gfx: Some(&ROBOT_GFX[37]), ink: 0x6, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 47
     [
-        Robot { pos: pos(16, 104), min: pos(7, 104), max: pos(22, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(25, 24), min: pos(0, 24), max: pos(27, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(9, 48), min: pos(4, 48), max: pos(27, 48), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
-        Robot { pos: pos(19, 72), min: pos(2, 72), max: pos(27, 72), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(16, 104), min: pos(7, 104), max: pos(22, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(25, 24), min: pos(0, 24), max: pos(27, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(9, 48), min: pos(4, 48), max: pos(27, 48), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b111 },
+        Robot { pos: pos(19, 72), min: pos(2, 72), max: pos(27, 72), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[18]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
         NOROBOT,
     ], // room 48
     [
-        Robot { pos: pos(17, 72), min: pos(11, 72), max: pos(18, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(11, 56), min: pos(9, 56), max: pos(30, 56), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(17, 72), min: pos(11, 72), max: pos(18, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[32]), ink: 0x3, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(11, 56), min: pos(9, 56), max: pos(30, 56), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1027,9 +1067,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 49
     [
-        Robot { pos: pos(16, 104), min: pos(7, 104), max: pos(22, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(9, 72), min: pos(7, 72), max: pos(20, 72), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(20, 48), min: pos(7, 48), max: pos(17, 48), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(16, 104), min: pos(7, 104), max: pos(22, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(9, 72), min: pos(7, 72), max: pos(20, 72), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[9]), ink: 0x6, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(20, 48), min: pos(7, 48), max: pos(17, 48), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[5]), ink: 0x4, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1037,9 +1077,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 50
     [
-        Robot { pos: pos(22, 104), min: pos(10, 104), max: pos(30, 104), do_move: do_move_right, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b011 },
-        Robot { pos: pos(16, 48), min: pos(12, 48), max: pos(24, 48), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[23]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(3, 24), min: pos(3, 0), max: pos(3, 64), do_move: do_move_down, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(22, 104), min: pos(10, 104), max: pos(30, 104), move_: Move::Right, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[10]), ink: 0x5, f_update: 0, f_index: 4, f_mask: 0b011 },
+        Robot { pos: pos(16, 48), min: pos(12, 48), max: pos(24, 48), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[23]), ink: 0x7, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(3, 24), min: pos(3, 0), max: pos(3, 64), move_: Move::Down, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[17]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1057,9 +1097,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 52
     [
-        Robot { pos: pos(14, 32), min: pos(14, 0), max: pos(14, 96), do_move: do_move_down, do_draw: do_draw_robot, speed: 4, gfx: Some(&ROBOT_GFX[3]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(4, 48), min: 0, max: 0, do_move: do_move_static, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[14]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
-        Robot { pos: pos(9, 80), min: pos(0, 80), max: pos(10, 80), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(14, 32), min: pos(14, 0), max: pos(14, 96), move_: Move::Down, draw: Draw::Robot, speed: 4, gfx: Some(&ROBOT_GFX[3]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(4, 48), min: 0, max: 0, move_: Move::Static, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[14]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(9, 80), min: pos(0, 80), max: pos(10, 80), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x2, f_update: 0, f_index: 0, f_mask: 0b111 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1067,8 +1107,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 53
     [
-        Robot { pos: pos(11, 32), min: pos(11, 0), max: pos(11, 64), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(14, 24), min: pos(14, 0), max: pos(14, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[22]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(11, 32), min: pos(11, 0), max: pos(11, 64), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[6]), ink: 0x5, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(14, 24), min: pos(14, 0), max: pos(14, 80), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[22]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1077,9 +1117,9 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 54
     [
-        Robot { pos: pos(19, 104), min: pos(7, 104), max: pos(22, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(20, 88), min: pos(12, 88), max: pos(29, 88), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(19, 104), min: pos(7, 104), max: pos(22, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(20, 88), min: pos(12, 88), max: pos(29, 88), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[33]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1087,8 +1127,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 55
     [
-        Robot { pos: pos(11, 50), min: pos(11, 16), max: pos(11, 80), do_move: do_move_up, do_draw: do_draw_robot, speed: 6, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(14, 24), min: pos(14, 0), max: pos(14, 80), do_move: do_move_down, do_draw: do_draw_robot, speed: 1, gfx: Some(&ROBOT_GFX[22]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b001 },
+        Robot { pos: pos(11, 50), min: pos(11, 16), max: pos(11, 80), move_: Move::Up, draw: Draw::Robot, speed: 6, gfx: Some(&ROBOT_GFX[37]), ink: 0x5, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(14, 24), min: pos(14, 0), max: pos(14, 80), move_: Move::Down, draw: Draw::Robot, speed: 1, gfx: Some(&ROBOT_GFX[22]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b001 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1097,7 +1137,7 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 56
     [
-        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, do_move: do_move_arrow_right, do_draw: do_draw_arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
+        Robot { pos: pos(0, 42), min: 208 * 8, max: 208, move_: Move::ArrowRight, draw: Draw::Arrow, speed: 0, gfx: None, ink: 0x0, f_update: 0, f_index: 0, f_mask: 0b000 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1107,8 +1147,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 57
     [
-        Robot { pos: pos(8, 104), min: pos(4, 104), max: pos(14, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
-        Robot { pos: pos(21, 72), min: pos(21, 64), max: pos(21, 104), do_move: do_move_up, do_draw: do_draw_robot, speed: 2, gfx: Some(&ROBOT_GFX[16]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(8, 104), min: pos(4, 104), max: pos(14, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[19]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b111 },
+        Robot { pos: pos(21, 72), min: pos(21, 64), max: pos(21, 104), move_: Move::Up, draw: Draw::Robot, speed: 2, gfx: Some(&ROBOT_GFX[16]), ink: 0x2, f_update: 2, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1117,8 +1157,8 @@ static ROBOT_START: [[Robot; 8]; 60] = [
         NOROBOT,
     ], // room 58
     [
-        Robot { pos: pos(23, 24), min: pos(23, 24), max: pos(30, 24), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
-        Robot { pos: pos(20, 104), min: pos(17, 104), max: pos(30, 104), do_move: do_move_left, do_draw: do_draw_robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(23, 24), min: pos(23, 24), max: pos(30, 24), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[35]), ink: 0x6, f_update: 0, f_index: 0, f_mask: 0b011 },
+        Robot { pos: pos(20, 104), min: pos(17, 104), max: pos(30, 104), move_: Move::Left, draw: Draw::Robot, speed: 0, gfx: Some(&ROBOT_GFX[7]), ink: 0x3, f_update: 0, f_index: 0, f_mask: 0b011 },
         NOROBOT,
         NOROBOT,
         NOROBOT,
@@ -1138,7 +1178,7 @@ thread_local! {
 // --- Movement handlers ------------------------------------------------------
 // Horizontal walkers animate through fIndex 0..=3 (facing left) or 4..=7
 // (facing right) and step one tile per completed cycle, bouncing between
-// min and max by swapping their own do_move pointer.
+// min and max by swapping their own move_ variant.
 
 fn do_move_left(robot: &mut Robot) {
     if robot.f_index > 0 {
@@ -1147,7 +1187,7 @@ fn do_move_left(robot: &mut Robot) {
         robot.pos -= 8;
         robot.f_index = 3;
     } else {
-        robot.do_move = do_move_right;
+        robot.move_ = Move::Right;
         robot.f_index += 4;
     }
 }
@@ -1159,7 +1199,7 @@ fn do_move_right(robot: &mut Robot) {
         robot.pos += 8;
         robot.f_index = 4;
     } else {
-        robot.do_move = do_move_left;
+        robot.move_ = Move::Left;
         robot.f_index &= 3;
     }
 }
@@ -1173,7 +1213,7 @@ fn do_move_up(robot: &mut Robot) {
     robot.pos -= robot.speed * WIDTH;
     if robot.pos <= robot.min {
         robot.pos = robot.min;
-        robot.do_move = do_move_down;
+        robot.move_ = Move::Down;
     }
 }
 
@@ -1186,7 +1226,7 @@ fn do_move_down(robot: &mut Robot) {
     robot.pos += robot.speed * WIDTH;
     if robot.pos >= robot.max {
         // NB: unlike do_move_up, C does not clamp pos to max here.
-        robot.do_move = do_move_up;
+        robot.move_ = Move::Up;
     }
 }
 
@@ -1277,8 +1317,7 @@ fn do_draw_arrow(robot: &Robot) {
 pub fn robots_ticker() {
     ROBOT_THIS.with(|robots| {
         for robot in robots.borrow_mut().iter_mut() {
-            let do_move = robot.do_move;
-            do_move(robot);
+            robot.step();
         }
     });
 }
@@ -1286,7 +1325,7 @@ pub fn robots_ticker() {
 pub fn robots_drawer() {
     ROBOT_THIS.with(|robots| {
         for robot in robots.borrow().iter() {
-            (robot.do_draw)(robot);
+            robot.draw();
         }
     });
 }
@@ -1302,8 +1341,8 @@ pub fn robots_init() {
             && GAME_STATE.mode() == GameMode::Maria
         {
             for robot in &mut robots[..2] {
-                robot.do_move = do_move_nothing;
-                robot.do_draw = do_draw_nothing;
+                robot.move_ = Move::Nothing;
+                robot.draw = Draw::Nothing;
             }
         }
     });
