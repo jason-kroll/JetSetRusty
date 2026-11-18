@@ -10,13 +10,13 @@ const FIRSTLANDING_FLOOR_Y: i32 = 104;
 
 pub fn cheat_responder() -> Event {
     if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
-        Some(cheat_enabled)
+        Some(cheat_level_select)
     } else {
-        Some(cheat_disabled)
+        Some(cheat_code_entry)
     }
 }
 
-pub fn cheat_enabled() {
+pub fn cheat_level_select() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
@@ -49,16 +49,16 @@ pub fn cheat_enabled() {
     set_action(Some(game_init_room));
 }
 
-pub fn cheat_disabled() {
+pub fn cheat_code_entry() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 
-    let miner = GAME_STATE.miner.lock().unwrap();
+    let y = GAME_STATE.miner.lock().unwrap().y;
     let pos = CHEAT_POS.load(Ordering::Relaxed);
     // Letter keys arrive as Key::A + offset; map the input back to ASCII to
     // compare against the code word. The bounds check keeps the index in
     // range even if the code has already been fully entered.
     if GAME_STATE.level.load(Ordering::Relaxed) != FIRSTLANDING
-        || miner.y != FIRSTLANDING_FLOOR_Y
+        || y != FIRSTLANDING_FLOOR_Y
         || pos >= CHEAT_CODE.len()
         || CHEAT_CODE[pos] != (game_input() - Key::A as i32 + b'a' as i32) as u8
     {
