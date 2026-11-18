@@ -307,9 +307,12 @@ pub fn do_game_drawer() {
         return;
     }
 
-    miner_drawer();
+    // One miner lock for the miner and rope draw passes.
+    let mut miner = game.miner.lock().unwrap();
+    miner_drawer(&miner);
+    rope::rope_draw(&mut miner);
+    drop(miner);
 
-    rope::rope_draw();
     if clock_redraw() {
         do_draw_clock();
     }
@@ -504,9 +507,11 @@ pub fn do_game_ticker() {
         return;
     }
 
-    // Tick level and robots
+    // Tick level and robots. The miner lock is taken once here and passed
+    // down; nothing below re-locks it.
     level_ticker();
-    robots_ticker();
+    let mut miner = game.miner.lock().unwrap();
+    robots_ticker(&miner);
 
     // GM_TOILET mode: return to title after timeout
     if game.mode() == GameMode::Toilet {
@@ -518,15 +523,13 @@ pub fn do_game_ticker() {
     }
 
     // Tick miner
-    miner_ticker();
+    miner_ticker(&mut miner);
 
     // GM_RUNNING mode
     if game.mode() == GameMode::Running {
-        let mut miner = game.miner.lock().unwrap();
         miner.frame |= 1;
 
         if miner.x == 224 && game.level.load(Ordering::Relaxed) == THEBATHROOM {
-            drop(miner);
             game.set_mode(GameMode::Toilet);
             robots_flush();
             game.clock_ticks.store(0, Ordering::Relaxed);
@@ -535,22 +538,23 @@ pub fn do_game_ticker() {
     }
 
     // GM_MARIA mode: check for victory
-    if game.mode() == GameMode::Maria && game.level.load(Ordering::Relaxed) == MASTERBEDROOM {
-        // Guard drops at the end of this if-block, before Rope_Ticker.
-        let miner = game.miner.lock().unwrap();
-        if miner.air == 0 && miner.x == 40 {
-            game.set_mode(GameMode::Running);
-        }
+    if game.mode() == GameMode::Maria
+        && game.level.load(Ordering::Relaxed) == MASTERBEDROOM
+        && miner.air == 0
+        && miner.x == 40
+    {
+        game.set_mode(GameMode::Running);
     }
 
     // Tick rope
     rope::rope_tick();
+    drop(miner);
 
     // Tick clock
     clock_ticker();
 }
 
-pub fn game_got_item() {
+pub fn game_got_item(pan_x: i32) {
     let game = &*GAME_STATE;
 
     // gameScoreItems++
@@ -564,11 +568,8 @@ pub fn game_got_item() {
         game.set_mode(GameMode::Maria);
     }
 
-    // audio_pan_x = minerWilly.x
-    // Use try_lock to avoid deadlock if we already hold the miner lock
-    if let Ok(miner_guard) = game.miner.try_lock() {
-        crate::audio::set_audio_pan_x(miner_guard.x);
-    }
+    // audio_pan_x = minerWilly.x (passed in; the caller holds the miner lock)
+    crate::audio::set_audio_pan_x(pan_x);
 
     audio_sfx(Sfx::Item);
 }

@@ -14,7 +14,7 @@
 
 use crate::audio::{Sfx, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;
-use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM};
+use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM, Miner};
 use crate::video::{video_draw_arrow, video_draw_robot, video_draw_sprite};
 use std::cell::RefCell;
 use std::sync::atomic::Ordering;
@@ -71,7 +71,7 @@ struct Robot {
 }
 
 impl Robot {
-    fn step(&mut self) {
+    fn step(&mut self, miner: &Miner) {
         match self.move_ {
             Move::Nothing => {}
             Move::Left => do_move_left(self),
@@ -81,7 +81,7 @@ impl Robot {
             Move::Static => do_move_static(self),
             Move::ArrowLeft => do_move_arrow_left(self),
             Move::ArrowRight => do_move_arrow_right(self),
-            Move::Maria => do_move_maria(self),
+            Move::Maria => do_move_maria(self, miner),
         }
     }
 
@@ -1271,10 +1271,8 @@ fn do_move_arrow_right(robot: &mut Robot) {
     robot.min = robot.max * 8;
 }
 
-fn do_move_maria(robot: &mut Robot) {
-    // Maria reacts to Willy: reads GAME_STATE.miner directly (no sync needed
-    // as we're mid-frame inside an already-synced context).
-    let miner = GAME_STATE.miner.lock().unwrap();
+fn do_move_maria(robot: &mut Robot, miner: &Miner) {
+    // Maria reacts to Willy's position, passed in by the caller.
     if miner.y < 96 && miner.air == 0 {
         robot.f_index = 3;
     } else if miner.y < 104 && miner.air == 0 {
@@ -1314,10 +1312,10 @@ fn do_draw_arrow(robot: &Robot) {
 
 // --- Entry points (called from game.rs / title.rs) ---------------------------
 
-pub fn robots_ticker() {
+pub fn robots_ticker(miner: &Miner) {
     ROBOT_THIS.with(|robots| {
         for robot in robots.borrow_mut().iter_mut() {
-            robot.step();
+            robot.step(miner);
         }
     });
 }

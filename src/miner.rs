@@ -359,8 +359,7 @@ fn fall_step(air: i32, y: i32) -> FallStep {
     }
 }
 
-fn move_left_right() {
-    let mut miner = GAME_STATE.miner.lock().unwrap();
+fn move_left_right(miner: &mut Miner) {
     let mut y = 0;
     let mut offset = 0;
 
@@ -389,11 +388,11 @@ fn move_left_right() {
         }
 
         if miner.x == 30 * 8 {
-            game_change_level(Direction::Right, &mut miner);
+            game_change_level(Direction::Right, miner);
             return;
         }
 
-        if is_solid(miner.tile + offset + 2, &mut miner) {
+        if is_solid(miner.tile + offset + 2, &mut *miner) {
             return;
         }
 
@@ -417,11 +416,11 @@ fn move_left_right() {
         }
 
         if miner.x == 0 {
-            game_change_level(Direction::Left, &mut miner);
+            game_change_level(Direction::Left, &mut *miner);
             return;
         }
 
-        if is_solid(miner.tile + offset - 1, &mut miner) {
+        if is_solid(miner.tile + offset - 1, &mut *miner) {
             return;
         }
 
@@ -437,8 +436,7 @@ fn move_left_right() {
     miner.tile += offset;
 }
 
-fn update_dir(convey_dir: i32) {
-    let mut miner = GAME_STATE.miner.lock().unwrap();
+fn update_dir(convey_dir: i32, miner: &mut Miner) {
     let mut dir = 0;
 
     // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
@@ -486,13 +484,11 @@ fn update_dir(convey_dir: i32) {
     }
 }
 
-fn do_miner_ticker() {
-    let mut miner = GAME_STATE.miner.lock().unwrap();
+fn do_miner_ticker(miner: &mut Miner) {
     let convey_dir = C_NONE;
 
     if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
-        drop(miner);
-        update_dir(convey_dir);
+        update_dir(convey_dir, miner);
         return;
     }
 
@@ -502,7 +498,7 @@ fn do_miner_ticker() {
             level_get_tile_type(t, air, jump)
         }) {
             JumpOutcome::Above => {
-                game_change_level(Direction::Above, &mut miner);
+                game_change_level(Direction::Above, miner);
                 return;
             }
             JumpOutcome::BumpHead { y, tile } => {
@@ -536,8 +532,7 @@ fn do_miner_ticker() {
                 }
 
                 if miner.jump != 13 && miner.jump != 16 {
-                    drop(miner);
-                    move_left_right();
+                    move_left_right(miner);
                     return;
                 }
             }
@@ -548,12 +543,11 @@ fn do_miner_ticker() {
         let (air, jump) = (miner.air, miner.jump);
         match ground_check(miner.tile, air, &|t| level_get_tile_type(t, air, jump)) {
             GroundOutcome::Below => {
-                game_change_level(Direction::Below, &mut miner);
+                game_change_level(Direction::Below, &mut *miner);
                 return;
             }
             GroundOutcome::HarmPass => {
-                drop(miner);
-                move_left_right();
+                move_left_right(miner);
                 return;
             }
             GroundOutcome::Die => {
@@ -562,9 +556,8 @@ fn do_miner_ticker() {
             }
             GroundOutcome::Land { convey_dir } => {
                 miner.air = 0;
-                drop(miner);
-                update_dir(convey_dir);
-                move_left_right();
+                update_dir(convey_dir, miner);
+                move_left_right(miner);
                 return;
             }
             GroundOutcome::Fall => {}
@@ -572,8 +565,7 @@ fn do_miner_ticker() {
     }
 
     if miner.air == 1 {
-        drop(miner);
-        move_left_right();
+        move_left_right(miner);
         return;
     }
 
@@ -592,17 +584,15 @@ fn do_miner_ticker() {
     miner.tile += step.tile_add;
 }
 
-pub fn miner_ticker() {
-    do_miner_ticker();
+pub fn miner_ticker(miner: &mut Miner) {
+    do_miner_ticker(miner);
 
-    let mut miner = GAME_STATE.miner.lock().unwrap();
     if miner.y < 0 {
-        game_change_level(Direction::Above, &mut miner);
+        game_change_level(Direction::Above, miner);
     }
 }
 
-pub fn miner_drawer() {
-    let miner = GAME_STATE.miner.lock().unwrap();
+pub fn miner_drawer(miner: &Miner) {
     let (air, jump) = (miner.air, miner.jump);
     let mut offset = 0;
     let mut align = miner.align;
@@ -643,7 +633,7 @@ pub fn miner_drawer() {
     for _ in 0..align {
         if level_get_tile_type(tile, air, jump) == TileType::Item {
             level_erase_item(tile);
-            game_got_item();
+            game_got_item(miner.x);
         }
         tile += adj;
         adj ^= 30;

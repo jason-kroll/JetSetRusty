@@ -170,10 +170,11 @@ pub fn rope_tick() {
     }
 }
 
-/// Draw the rope if the current room has one (called from the game drawer).
-pub fn rope_draw() {
+/// Draw the rope if the current room has one (called from the game drawer,
+/// which holds the one miner lock).
+pub fn rope_draw(miner: &mut Miner) {
     if ROPE_ACTIVE.with(Cell::get) {
-        do_rope_drawer();
+        do_rope_drawer(miner);
     }
 }
 
@@ -181,7 +182,7 @@ pub fn rope_draw() {
 // Extern declarations - the real C globals shared with levels.rs and the C code
 // ----------------------------------------------------------------------------
 
-use crate::game::GAME_STATE;
+use crate::game::{GAME_STATE, Miner};
 
 // Level constants
 const B_WILLY: i32 = 4;
@@ -190,7 +191,7 @@ const B_WILLY: i32 = 4;
 // Internal implementation
 // ----------------------------------------------------------------------------
 
-fn do_rope_drawer() {
+fn do_rope_drawer(miner: &mut Miner) {
     let data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
     let ink = ROPE.ink.load(Ordering::Relaxed);
 
@@ -233,7 +234,6 @@ fn do_rope_drawer() {
                 if (x & 2) != 0 { 3 } else { 2 }
             };
 
-            let mut miner = GAME_STATE.miner.lock().unwrap();
             miner.x = if frame < 2 { willy_x } else { willy_x - 8 };
             miner.y = willy_y;
             miner.frame = frame;
@@ -253,14 +253,10 @@ fn do_rope_drawer() {
 
     // Handle rope movement when holding
     if ROPE.hold.load(Ordering::Relaxed) {
-        let miner = GAME_STATE.miner.lock().unwrap();
         let willy_moving = miner.move_ != 0;
-        drop(miner);
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
-            let miner = GAME_STATE.miner.lock().unwrap();
             let willy_dir = miner.dir;
-            drop(miner);
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
             let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
@@ -274,7 +270,6 @@ fn do_rope_drawer() {
                 return;
             }
 
-            let mut miner = GAME_STATE.miner.lock().unwrap();
             GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
             miner.y &= 124;
             miner.air = 0;
