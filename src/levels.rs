@@ -5013,7 +5013,8 @@ fn do_flash(tile: &mut Tile) {
     tile.ink[2] = tile.ink[video_flash() as usize];
 }
 
-pub fn level_erase_item(tile: usize) {
+pub fn level_erase_item(tile: i32) {
+    let tile = usize::try_from(tile).expect("item tile is non-negative");
     let level = game_level();
     let attr = ACTIVE_LEVELS.with(|a| {
         let mut a = a.borrow_mut();
@@ -5054,17 +5055,24 @@ pub fn tile_type_ramp_for(raw: TileType) -> TileType {
     }
 }
 
-pub fn level_get_tile_ramp(tile: usize) -> TileType {
-    if tile >= LEVEL_TILES {
+// Tile-domain boundary: game logic works in i32 because tiles can be
+// transiently negative mid-jump (ceiling probes). Out-of-domain reads are
+// Space by stated design — the same result the old `as usize` wrap produced
+// by landing on the >= LEVEL_TILES guard — and the single checked
+// conversion happens here, after the guard.
+pub fn level_get_tile_ramp(tile: i32) -> TileType {
+    if tile < 0 || tile >= LEVEL_TILES as i32 {
         return TileType::Space;
     }
+    let tile = usize::try_from(tile).expect("guarded to 0..512");
     tile_type_ramp_for(LEVEL_TILE.with(|t| t.borrow()[tile].tile_type))
 }
 
-pub fn level_get_tile_type(tile: usize) -> TileType {
-    if tile >= LEVEL_TILES {
+pub fn level_get_tile_type(tile: i32) -> TileType {
+    if tile < 0 || tile >= LEVEL_TILES as i32 {
         return TileType::Space;
     }
+    let tile = usize::try_from(tile).expect("guarded to 0..512");
     let raw = LEVEL_TILE.with(|t| t.borrow()[tile].tile_type);
     // Use atomic caches to avoid deadlocking
     let air = GAME_STATE.miner_air.load(Ordering::Relaxed);

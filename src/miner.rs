@@ -208,16 +208,16 @@ enum SolidOutcome {
     Land,
 }
 
-fn solid_check(tile: i32, lookup: &dyn Fn(usize) -> TileType, miner: &Miner) -> SolidOutcome {
+fn solid_check(tile: i32, lookup: &dyn Fn(i32) -> TileType, miner: &Miner) -> SolidOutcome {
     if tile < 0 || tile == 512 {
         return SolidOutcome::Clear;
     }
 
-    if lookup(tile as usize) == TileType::Solid {
+    if lookup(tile) == TileType::Solid {
         return SolidOutcome::Solid;
     }
 
-    if lookup((tile + 32) as usize) == TileType::Solid {
+    if lookup(tile + 32) == TileType::Solid {
         return SolidOutcome::Solid;
     }
 
@@ -225,7 +225,7 @@ fn solid_check(tile: i32, lookup: &dyn Fn(usize) -> TileType, miner: &Miner) -> 
         return SolidOutcome::Clear;
     }
 
-    if lookup((tile + 64) as usize) != TileType::Solid {
+    if lookup(tile + 64) != TileType::Solid {
         return SolidOutcome::Clear;
     }
 
@@ -272,19 +272,14 @@ enum JumpOutcome {
 }
 
 // Pure core of the air == 1 (jumping) branch of do_miner_ticker.
-fn jump_step(
-    jump_idx: usize,
-    y: i32,
-    tile: i32,
-    lookup: &dyn Fn(usize) -> TileType,
-) -> JumpOutcome {
+fn jump_step(jump_idx: usize, y: i32, tile: i32, lookup: &dyn Fn(i32) -> TileType) -> JumpOutcome {
     let j = JUMP_INFO[jump_idx];
     let ny = y + j.jump;
     if ny < 0 {
         return JumpOutcome::Above;
     }
     let nt = tile + j.tile;
-    if lookup(nt as usize) == TileType::Solid || lookup((nt + 1) as usize) == TileType::Solid {
+    if lookup(nt) == TileType::Solid || lookup(nt + 1) == TileType::Solid {
         return JumpOutcome::BumpHead {
             y: (ny + 8) & 120,
             tile: nt + 32,
@@ -311,13 +306,13 @@ enum GroundOutcome {
 
 // Pure core of the align == 4 (feet on tile boundary) branch of
 // do_miner_ticker: what is below Willy, and what happens this tick.
-fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(usize) -> TileType) -> GroundOutcome {
+fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(i32) -> TileType) -> GroundOutcome {
     let tile = tile_base + 64;
     if tile & 512 != 0 {
         return GroundOutcome::Below;
     }
-    let t0 = lookup(tile as usize);
-    let t1 = lookup((tile + 1) as usize);
+    let t0 = lookup(tile);
+    let t1 = lookup(tile + 1);
     if t0 == TileType::Harm || t1 == TileType::Harm {
         if air == 1 && (t0 <= TileType::Space || t1 <= TileType::Space) {
             return GroundOutcome::HarmPass;
@@ -387,10 +382,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if level_get_tile_ramp((miner.tile + 64) as usize) == TileType::RampL {
+            if level_get_tile_ramp(miner.tile + 64) == TileType::RampL {
                 y = 8;
                 offset = 32;
-            } else if level_get_tile_ramp((miner.tile + 34) as usize) == TileType::RampR {
+            } else if level_get_tile_ramp(miner.tile + 34) == TileType::RampR {
                 y = -8;
                 offset = -32;
             }
@@ -416,10 +411,10 @@ fn move_left_right() {
         }
 
         if miner.air == 0 {
-            if level_get_tile_ramp((miner.tile + 31) as usize) == TileType::RampL {
+            if level_get_tile_ramp(miner.tile + 31) == TileType::RampL {
                 y = -8;
                 offset = -32;
-            } else if level_get_tile_ramp((miner.tile + 65) as usize) == TileType::RampR {
+            } else if level_get_tile_ramp(miner.tile + 65) == TileType::RampR {
                 y = 8;
                 offset = 32;
             }
@@ -629,10 +624,10 @@ pub fn miner_drawer() {
     let mut align = miner.align;
 
     if miner.air == 0 {
-        if level_get_tile_ramp((miner.tile + 64) as usize) == TileType::RampL {
+        if level_get_tile_ramp(miner.tile + 64) == TileType::RampL {
             offset = miner.frame << 1;
             align = yalign(offset);
-        } else if level_get_tile_ramp((miner.tile + 65) as usize) == TileType::RampR {
+        } else if level_get_tile_ramp(miner.tile + 65) == TileType::RampR {
             offset = 6 - (miner.frame << 1);
             align = yalign(offset);
         }
@@ -651,7 +646,7 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if level_get_tile_type(tile as usize) == TileType::Harm {
+        if level_get_tile_type(tile) == TileType::Harm {
             set_action(Some(die_action));
             return;
         }
@@ -662,8 +657,8 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if level_get_tile_type(tile as usize) == TileType::Item {
-            level_erase_item(tile as usize);
+        if level_get_tile_type(tile) == TileType::Item {
+            level_erase_item(tile);
             game_got_item();
         }
         tile += adj;
@@ -690,10 +685,14 @@ mod tests {
     use super::*;
 
     // Stub for the real level_get_tile_type: all Space, with the same
-    // out-of-bounds -> Space behaviour.
-    fn lookup_of(tiles: &[TileType; 512]) -> impl Fn(usize) -> TileType + '_ {
+    // out-of-domain -> Space behaviour (negative tiles included).
+    fn lookup_of(tiles: &[TileType; 512]) -> impl Fn(i32) -> TileType + '_ {
         move |i| {
-            if i >= 512 { TileType::Space } else { tiles[i] }
+            if !(0..512).contains(&i) {
+                TileType::Space
+            } else {
+                tiles[usize::try_from(i).expect("guarded to 0..512")]
+            }
         }
     }
 
