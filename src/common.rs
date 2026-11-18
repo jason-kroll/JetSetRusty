@@ -2,9 +2,6 @@
 pub const WIDTH: i32 = 256;
 pub const HEIGHT: i32 = 192;
 
-// Function pointer type — equivalent to typedef void (*EVENT)(void)
-pub type Event = Option<fn()>;
-
 // Key codes enum. The discriminants mirror the C original's KEY enum
 // (reference/c-original/src/common.h) wherever the game can observe them,
 // because the SDL poll tables in game_main.rs are indexed by these values:
