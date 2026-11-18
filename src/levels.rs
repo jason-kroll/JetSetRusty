@@ -5005,28 +5005,12 @@ pub fn level_erase_item(tile: usize) {
     });
 }
 
-pub fn level_get_tile_ramp(tile: usize) -> TileType {
-    if tile >= LEVEL_TILES {
-        return TileType::Space;
-    }
-    match LEVEL_TILE.with(|t| t.borrow()[tile].tile_type) {
-        TileType::RampLC => TileType::RampL,
-        TileType::RampRC => TileType::RampR,
-        t => t,
-    }
-}
-
-pub fn level_get_tile_type(tile: usize) -> TileType {
-    if tile >= LEVEL_TILES {
-        return TileType::Space;
-    }
-    match LEVEL_TILE.with(|t| t.borrow()[tile].tile_type) {
+// Pure mapping cores of level_get_tile_type / level_get_tile_ramp.
+pub fn tile_type_for(raw: TileType, air: i32, jump: i32) -> TileType {
+    match raw {
         TileType::RampLC => TileType::ConveyR,
         TileType::RampRC => TileType::ConveyL,
         TileType::SolidFloor => {
-            // Use atomic caches to avoid deadlocking
-            let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
-            let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
             if air == 1 && jump == 0 {
                 TileType::Solid
             } else {
@@ -5035,6 +5019,32 @@ pub fn level_get_tile_type(tile: usize) -> TileType {
         }
         t => t,
     }
+}
+
+pub fn tile_type_ramp_for(raw: TileType) -> TileType {
+    match raw {
+        TileType::RampLC => TileType::RampL,
+        TileType::RampRC => TileType::RampR,
+        t => t,
+    }
+}
+
+pub fn level_get_tile_ramp(tile: usize) -> TileType {
+    if tile >= LEVEL_TILES {
+        return TileType::Space;
+    }
+    tile_type_ramp_for(LEVEL_TILE.with(|t| t.borrow()[tile].tile_type))
+}
+
+pub fn level_get_tile_type(tile: usize) -> TileType {
+    if tile >= LEVEL_TILES {
+        return TileType::Space;
+    }
+    let raw = LEVEL_TILE.with(|t| t.borrow()[tile].tile_type);
+    // Use atomic caches to avoid deadlocking
+    let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
+    let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
+    tile_type_for(raw, air, jump)
 }
 
 pub fn level_ticker() {
@@ -5135,4 +5145,44 @@ pub fn level_init() {
             title.as_bytes_with_nul(),
         );
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn solid_floor_is_solid_only_at_jump_start() {
+        assert_eq!(tile_type_for(TileType::SolidFloor, 1, 0), TileType::Solid);
+        assert_eq!(tile_type_for(TileType::SolidFloor, 1, 1), TileType::Floor);
+        assert_eq!(tile_type_for(TileType::SolidFloor, 0, 0), TileType::Floor);
+        assert_eq!(tile_type_for(TileType::SolidFloor, 2, 0), TileType::Floor);
+    }
+
+    #[test]
+    fn ramp_conveyor_mappings() {
+        assert_eq!(tile_type_for(TileType::RampLC, 0, 0), TileType::ConveyR);
+        assert_eq!(tile_type_for(TileType::RampRC, 0, 0), TileType::ConveyL);
+        assert_eq!(tile_type_ramp_for(TileType::RampLC), TileType::RampL);
+        assert_eq!(tile_type_ramp_for(TileType::RampRC), TileType::RampR);
+    }
+
+    #[test]
+    fn all_other_types_map_to_themselves() {
+        const OTHERS: [TileType; 9] = [
+            TileType::Item,
+            TileType::Space,
+            TileType::Solid,
+            TileType::Floor,
+            TileType::ConveyL,
+            TileType::ConveyR,
+            TileType::RampL,
+            TileType::RampR,
+            TileType::Harm,
+        ];
+        for t in OTHERS {
+            assert_eq!(tile_type_for(t, 1, 0), t);
+            assert_eq!(tile_type_ramp_for(t), t);
+        }
+    }
 }
