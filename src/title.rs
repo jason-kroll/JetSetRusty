@@ -145,9 +145,9 @@ fn do_title_drawer() {
 
 fn do_title_responder() {
     // Upstream 69070b9: joystick fire starts the game like Enter.
-    if Key::from_key_code(game_input()) == Key::Enter || system_is_joy_fire() {
+    if game_input() == Key::Enter || system_is_joy_fire() {
         set_action(Some(game_start));
-    } else if Key::from_key_code(game_input()) == Key::Escape {
+    } else if game_input() == Key::Escape {
         do_quit();
     }
 }

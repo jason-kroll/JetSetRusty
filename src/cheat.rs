@@ -8,6 +8,42 @@ const CHEAT_CODE: &[u8] = b"writetyper";
 // miner.y on First Landing's floor — the only spot where the code is read
 const FIRSTLANDING_FLOOR_Y: i32 = 104;
 
+/// The level-select keys in scan order — digits 1..0 then letters a..t, the
+/// same 30 keys C's CheatLevelSelect loop polls as
+/// `System_IsKey(KEY_1 + i)`; the matched position names room 1..30.
+const LEVEL_KEYS: [Key; 30] = [
+    Key::K1,
+    Key::K2,
+    Key::K3,
+    Key::K4,
+    Key::K5,
+    Key::K6,
+    Key::K7,
+    Key::K8,
+    Key::K9,
+    Key::K0,
+    Key::A,
+    Key::B,
+    Key::C,
+    Key::D,
+    Key::E,
+    Key::F,
+    Key::G,
+    Key::H,
+    Key::I,
+    Key::J,
+    Key::K,
+    Key::L,
+    Key::M,
+    Key::N,
+    Key::O,
+    Key::P,
+    Key::Q,
+    Key::R,
+    Key::S,
+    Key::T,
+];
+
 pub fn cheat_responder() -> Event {
     if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
         Some(cheat_level_select)
@@ -19,14 +55,14 @@ pub fn cheat_responder() -> Event {
 fn cheat_level_select() {
     let mut level: i32 = 0;
 
-    for i in 0..30 {
-        if system_is_key(Key::K1 as i32 + i) {
-            level = i + 1;
+    for (i, &key) in LEVEL_KEYS.iter().enumerate() {
+        if system_is_key(key) {
+            level = (i + 1) as i32;
             break;
         }
     }
 
-    if !system_is_key(Key::Enter as i32) {
+    if !system_is_key(Key::Enter) {
         game_pause(false);
         return;
     }
@@ -35,7 +71,7 @@ fn cheat_level_select() {
         return;
     }
 
-    if system_is_key(Key::LShift as i32) || system_is_key(Key::RShift as i32) {
+    if system_is_key(Key::LShift) || system_is_key(Key::RShift) {
         level += 30;
     }
 
@@ -49,22 +85,15 @@ fn cheat_level_select() {
     set_action(Some(game_init_room));
 }
 
-/// The lowercase ASCII byte a letter input names. Letter keys arrive as
-/// `Key::A` + offset (see `common::Key`); every other input maps to None.
-fn letter_byte(input: i32) -> Option<u8> {
-    let offset = input - Key::A as i32;
-    (0..=25).contains(&offset).then(|| b'a' + offset as u8)
-}
-
 /// Progress through CHEAT_CODE after one input: one past the matched letter
 /// on a match, zero on anything else — a wrong letter, a non-letter input,
 /// or an already-complete code word. Matches C: cheat.c reads the '\0'
 /// sentinel one past the last letter and resets cheatPos on any mismatch.
-fn code_progress(pos: usize, input: i32) -> usize {
+fn code_progress(pos: usize, key: Key) -> usize {
     // Not an Option equality: no expected letter (pos == len) paired with a
     // non-letter input must NOT count as a match
-    match (CHEAT_CODE.get(pos), letter_byte(input)) {
-        (Some(want), Some(ch)) if *want == ch => pos + 1,
+    match (CHEAT_CODE.get(pos), key.letter()) {
+        (Some(&want), Some(ch)) if want == ch => pos + 1,
         _ => 0,
     }
 }
@@ -102,33 +131,9 @@ fn cheat_code_entry() {
 mod tests {
     use super::*;
 
-    // map_keycode produces letter inputs arithmetically as Key::A + offset
-    fn key(c: u8) -> i32 {
-        Key::A as i32 + (c - b'a') as i32
-    }
-
-    #[test]
-    fn letter_byte_maps_letters_and_rejects_everything_else() {
-        for (offset, c) in (b'a'..=b'z').enumerate() {
-            assert_eq!(letter_byte(Key::A as i32 + offset as i32), Some(c));
-        }
-        for k in [
-            Key::Left as i32,
-            Key::Right as i32,
-            Key::Jump as i32,
-            Key::Enter as i32,
-            Key::LShift as i32,
-            Key::RShift as i32,
-            Key::K1 as i32,
-            Key::K4 as i32,
-            Key::Escape as i32,
-            Key::Pause as i32,
-            Key::Mute as i32,
-            Key::Else as i32,
-            Key::None as i32,
-        ] {
-            assert_eq!(letter_byte(k), None);
-        }
+    // map_keycode produces letter inputs as their Key variant
+    fn key(c: u8) -> Key {
+        Key::from_letter(c)
     }
 
     #[test]
@@ -143,13 +148,13 @@ mod tests {
 
     #[test]
     fn code_progress_resets_on_any_mismatch() {
-        // "writ" typed, then a stray 'x' — C parity: the position resets,
+        // "writ" typed, then a stray 'a' — C parity: the position resets,
         // and 'e' restarts from 'w' rather than resuming at position 4
-        assert_eq!(code_progress(4, key(b'x')), 0);
+        assert_eq!(code_progress(4, key(b'a')), 0);
         assert_eq!(code_progress(0, key(b'e')), 0);
         // movement and digit keys are not code-word candidates
-        assert_eq!(code_progress(4, Key::Left as i32), 0);
-        assert_eq!(code_progress(4, Key::K1 as i32), 0);
+        assert_eq!(code_progress(4, Key::Left), 0);
+        assert_eq!(code_progress(4, Key::K1), 0);
     }
 
     #[test]
@@ -158,6 +163,6 @@ mod tests {
         // after a completed word restarts it
         let end = CHEAT_CODE.len();
         assert_eq!(code_progress(end, key(b'w')), 0);
-        assert_eq!(code_progress(end, Key::Left as i32), 0);
+        assert_eq!(code_progress(end, Key::Left), 0);
     }
 }

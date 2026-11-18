@@ -13,14 +13,6 @@ use std::sync::Mutex;
 
 static CODES_STATE: Mutex<CodesState> = Mutex::new(CodesState::new());
 
-// Enums coming in from C as i32
-pub const KEY_1: i32 = K1 as i32;
-pub const KEY_2: i32 = K2 as i32;
-pub const KEY_3: i32 = K3 as i32;
-pub const KEY_4: i32 = K4 as i32;
-pub const KEY_ENTER: i32 = Enter as i32;
-pub const KEY_ESCAPE: i32 = Escape as i32;
-
 pub fn do_codes_responder() {
     CODES_STATE.lock().unwrap().do_codes_responder();
 }
@@ -124,12 +116,12 @@ impl CodesState {
     // b"" byte-string literals carry the interior nul bytes these control strings need
     fn do_codes_responder(&mut self) {
         match game_input() {
-            KEY_1 => self.key = 1, // blue
-            KEY_2 => self.key = 2, // red
-            KEY_3 => self.key = 3, // magenta
-            KEY_4 => self.key = 4, // green
+            K1 => self.key = 1, // blue
+            K2 => self.key = 2, // red
+            K3 => self.key = 3, // magenta
+            K4 => self.key = 4, // green
 
-            KEY_ENTER => {
+            Enter => {
                 if self.code[3] == 0 {
                     return;
                 }
@@ -158,7 +150,7 @@ impl CodesState {
                 self.get_code();
             }
 
-            KEY_ESCAPE => do_quit(),
+            Escape => do_quit(),
 
             _ => {}
         }

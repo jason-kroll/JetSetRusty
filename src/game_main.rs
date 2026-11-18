@@ -126,7 +126,7 @@ thread_local! {
     static RESPONDER: Cell<Event> = const { Cell::new(None) };
     static TICKER: Cell<Event> = const { Cell::new(None) };
     static DRAWER: Cell<Event> = const { Cell::new(None) };
-    static GAME_INPUT: Cell<i32> = const { Cell::new(Key::None as i32) };
+    static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
     static VIDEO_FLASH: Cell<i32> = const { Cell::new(0) };
 }
 
@@ -154,10 +154,10 @@ pub(crate) fn set_drawer(f: Event) {
 pub(crate) fn drawer() -> Event {
     DRAWER.with(Cell::get)
 }
-pub(crate) fn set_game_input(key: i32) {
+pub(crate) fn set_game_input(key: Key) {
     GAME_INPUT.with(|c| c.set(key));
 }
-pub(crate) fn game_input() -> i32 {
+pub(crate) fn game_input() -> Key {
     GAME_INPUT.with(Cell::get)
 }
 pub(crate) fn video_flash() -> bool {
@@ -214,7 +214,10 @@ pub fn system_rnd() -> i32 {
     crate::rng::rand()
 }
 
-pub fn system_is_key(key: i32) -> bool {
+/// Is this key held? Maps the Key to its SDL keycode/scancode through the
+/// poll tables, which are indexed by Key value (C's sdlKey layout — only
+/// Left..=T, values 0..=35, have slots).
+pub fn system_is_key(key: Key) -> bool {
     let sym = SDL_KEYS[key as usize];
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
         return held;
@@ -259,10 +262,10 @@ enum JoyEvent {
 // Map a joystick event to (new [left, right, fire] state, one-shot game input).
 // Any button is "fire" (plus a one-shot Key::Else input); axis 0 beyond
 // +/-255 is left/right, inside the deadzone the reading is ignored.
-fn map_joy_event(state: [bool; 3], ev: JoyEvent) -> ([bool; 3], i32) {
+fn map_joy_event(state: [bool; 3], ev: JoyEvent) -> ([bool; 3], Key) {
     match ev {
-        JoyEvent::ButtonDown => ([state[0], state[1], true], Key::Else as i32),
-        JoyEvent::ButtonUp => ([state[0], state[1], false], Key::None as i32),
+        JoyEvent::ButtonDown => ([state[0], state[1], true], Key::Else),
+        JoyEvent::ButtonUp => ([state[0], state[1], false], Key::None),
         JoyEvent::Axis0(value) => {
             let (left, right) = if value < -255 {
                 (true, false)
@@ -271,7 +274,7 @@ fn map_joy_event(state: [bool; 3], ev: JoyEvent) -> ([bool; 3], i32) {
             } else {
                 (false, false)
             };
-            ([left, right, state[2]], Key::None as i32)
+            ([left, right, state[2]], Key::None)
         }
     }
 }
@@ -360,16 +363,16 @@ fn fire(event: Event) {
 // queued since the last tick (Key::None for events that aren't game input) and
 // None once the queue is empty. Shared by live play and replay so both run the
 // exact same frame logic.
-pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<i32>) {
+pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<Key>) {
     fire(action());
     while let Some(input) = next_input() {
         set_game_input(input);
-        if game_input() != Key::None as i32 {
+        if game_input() != Key::None {
             fire(responder());
         }
     }
     // As in live play, where the final (empty) poll leaves gameInput at None.
-    set_game_input(Key::None as i32);
+    set_game_input(Key::None);
     fire(ticker());
     fire(drawer());
     toggle_video_flash(timer_update(timer_flash));
@@ -413,7 +416,7 @@ pub(crate) fn game_running() -> bool {
 
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
-    set_game_input(Key::None as i32);
+    set_game_input(Key::None);
 
     EVENT_PUMP.with(|p| {
         let mut pump = p.borrow_mut();
@@ -438,7 +441,7 @@ fn system_get_event() -> bool {
                 let gui_held = state.is_scancode_pressed(Scancode::LGui)
                     || state.is_scancode_pressed(Scancode::RGui);
                 set_game_input(if swallow_keydown(sym, gui_held) {
-                    Key::None as i32
+                    Key::None
                 } else {
                     map_keycode(sym)
                 });
@@ -486,27 +489,41 @@ fn swallow_keydown(sym: i32, gui_held: bool) -> bool {
     gui_held || is_gui_keycode(sym)
 }
 
-// Map an SDL keycode to the game's one-shot input (gameInput) for a keydown.
-// Shared by live play and replay, so scripted presses map exactly like real ones.
-pub(crate) fn map_keycode(sym: i32) -> i32 {
-    let k1 = keycode_i32(Keycode::_1);
-    let ka = keycode_i32(Keycode::A);
+// Map an SDL keycode to the game's one-shot input for a keydown. Shared by
+// live play and replay, so scripted presses map exactly like real ones.
+// C MapKeycode: only digits 1..4 and the seven code-word letters e i p r
+// t w y are inputs; every other key — movement included — maps to Key::Else
+// (held keys are polled via system_is_key instead).
+pub(crate) fn map_keycode(sym: i32) -> Key {
+    const DIGITS: [Key; 4] = [Key::K1, Key::K2, Key::K3, Key::K4];
+    const LETTER_INPUTS: [(Keycode, Key); 7] = [
+        (Keycode::E, Key::E),
+        (Keycode::I, Key::I),
+        (Keycode::P, Key::P),
+        (Keycode::R, Key::R),
+        (Keycode::T, Key::T),
+        (Keycode::W, Key::W),
+        (Keycode::Y, Key::Y),
+    ];
 
     if sym == keycode_i32(Keycode::Return) {
-        Key::Enter as i32
+        Key::Enter
     } else if sym == keycode_i32(Keycode::Escape) {
-        Key::Escape as i32
+        Key::Escape
     } else if sym == keycode_i32(Keycode::Pause) || sym == keycode_i32(Keycode::Tab) {
-        Key::Pause as i32
+        Key::Pause
     } else if sym == keycode_i32(Keycode::LAlt) || sym == keycode_i32(Keycode::RAlt) {
-        Key::Mute as i32
-    } else if sym >= k1 && sym <= keycode_i32(Keycode::_4) {
-        Key::K1 as i32 + (sym - k1)
-    } else if matches!(sym - ka, 4 | 8 | 15 | 17 | 19 | 22 | 24) {
-        // e i p r t w y
-        Key::A as i32 + (sym - ka)
+        Key::Mute
+    } else if (keycode_i32(Keycode::_1)..=keycode_i32(Keycode::_4)).contains(&sym) {
+        DIGITS[(sym - keycode_i32(Keycode::_1)) as usize]
     } else {
-        Key::Else as i32
+        match LETTER_INPUTS
+            .iter()
+            .find(|&&(kc, _)| keycode_i32(kc) == sym)
+        {
+            Some(&(_, key)) => key,
+            None => Key::Else,
+        }
     }
 }
 
@@ -795,22 +812,22 @@ mod tests {
     // the same physical key must produce the same game input.
     #[test]
     fn map_keycode_pins_special_keys() {
-        assert_eq!(map_keycode(keycode_i32(Kc::Return)), Key::Enter as i32);
-        assert_eq!(map_keycode(keycode_i32(Kc::Escape)), Key::Escape as i32);
-        assert_eq!(map_keycode(keycode_i32(Kc::Pause)), Key::Pause as i32);
-        assert_eq!(map_keycode(keycode_i32(Kc::Tab)), Key::Pause as i32);
-        assert_eq!(map_keycode(keycode_i32(Kc::LAlt)), Key::Mute as i32);
-        assert_eq!(map_keycode(keycode_i32(Kc::RAlt)), Key::Mute as i32);
+        assert_eq!(map_keycode(keycode_i32(Kc::Return)), Key::Enter);
+        assert_eq!(map_keycode(keycode_i32(Kc::Escape)), Key::Escape);
+        assert_eq!(map_keycode(keycode_i32(Kc::Pause)), Key::Pause);
+        assert_eq!(map_keycode(keycode_i32(Kc::Tab)), Key::Pause);
+        assert_eq!(map_keycode(keycode_i32(Kc::LAlt)), Key::Mute);
+        assert_eq!(map_keycode(keycode_i32(Kc::RAlt)), Key::Mute);
     }
 
     #[test]
     fn map_keycode_pins_digits() {
         let base = keycode_i32(Kc::_1);
-        for i in 0..4 {
-            assert_eq!(map_keycode(base + i), Key::K1 as i32 + i, "digit {i}");
+        for (i, expected) in [Key::K1, Key::K2, Key::K3, Key::K4].iter().enumerate() {
+            assert_eq!(map_keycode(base + i as i32), *expected, "digit {i}");
         }
         for kc in [Kc::_0, Kc::_5, Kc::_6, Kc::_7, Kc::_8, Kc::_9] {
-            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else as i32);
+            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else);
         }
     }
 
@@ -822,9 +839,9 @@ mod tests {
         for offset in 0..26 {
             let sym = keycode_i32(Kc::A) + offset;
             let expected = if mapped.contains(&offset) {
-                Key::A as i32 + offset
+                Key::from_letter(b'a' + offset as u8)
             } else {
-                Key::Else as i32
+                Key::Else
             };
             assert_eq!(map_keycode(sym), expected, "letter offset {offset}");
         }
@@ -834,17 +851,17 @@ mod tests {
     fn map_keycode_pins_movement_keys_to_else() {
         // Held movement keys are polled via system_is_key, not one-shot input.
         for kc in [Kc::Left, Kc::Right, Kc::Space, Kc::LShift, Kc::RShift] {
-            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else as i32);
+            assert_eq!(map_keycode(keycode_i32(kc)), Key::Else);
         }
     }
 
     // SDL_KEYS must stay coherent with map_keycode for the inputs that
-    // system_is_key polls: Return maps back to Enter and digits 1-4 to K1-K4.
+    // system_is_key polls: Return maps to Enter and digits 1-4 to K1-K4.
     #[test]
     fn sdl_keys_table_matches_map_keycode() {
         assert_eq!(SDL_KEYS.len(), 36);
         for k in [Key::Enter, Key::K1, Key::K2, Key::K3, Key::K4] {
-            assert_eq!(map_keycode(SDL_KEYS[k as usize]), k as i32);
+            assert_eq!(map_keycode(SDL_KEYS[k as usize]), k);
         }
     }
 
@@ -860,31 +877,31 @@ mod tests {
         let s = [false, false, false];
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(-256)),
-            ([true, false, false], Key::None as i32)
+            ([true, false, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(-255)),
-            ([false, false, false], Key::None as i32)
+            ([false, false, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(0)),
-            ([false, false, false], Key::None as i32)
+            ([false, false, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(255)),
-            ([false, false, false], Key::None as i32)
+            ([false, false, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(256)),
-            ([false, true, false], Key::None as i32)
+            ([false, true, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(i16::MIN)),
-            ([true, false, false], Key::None as i32)
+            ([true, false, false], Key::None)
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(i16::MAX)),
-            ([false, true, false], Key::None as i32)
+            ([false, true, false], Key::None)
         );
     }
 
@@ -893,17 +910,17 @@ mod tests {
         // button down: fire=true and a one-shot Key::Else input, left/right kept
         assert_eq!(
             map_joy_event([true, false, false], JoyEvent::ButtonDown),
-            ([true, false, true], Key::Else as i32)
+            ([true, false, true], Key::Else)
         );
         // button up: fire=false, no one-shot input, left/right kept
         assert_eq!(
             map_joy_event([false, true, true], JoyEvent::ButtonUp),
-            ([false, true, false], Key::None as i32)
+            ([false, true, false], Key::None)
         );
         // axis motion: fire preserved, no one-shot input
         assert_eq!(
             map_joy_event([false, false, true], JoyEvent::Axis0(300)),
-            ([false, true, true], Key::None as i32)
+            ([false, true, true], Key::None)
         );
     }
 

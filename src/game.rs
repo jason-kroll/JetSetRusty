@@ -289,9 +289,7 @@ pub fn do_game_responder() {
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
 
-    let input = game_input();
-
-    match Key::from_key_code(input) {
+    match game_input() {
         Key::Pause => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
         Key::Mute => {
             let new_music = !game.music.load(Ordering::Relaxed);
