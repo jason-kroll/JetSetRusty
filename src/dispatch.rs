@@ -235,6 +235,11 @@ mod tests {
 
     #[test]
     fn paused_draw_once_drawer_fires_once_then_clears_to_pause_cheat() {
+        // The draw body writes the shared video buffer, which parallel test
+        // threads may also be drawing into — clear the frame flag so
+        // do_game_drawer early-returns and this test isolates just the
+        // once-gate (the real draw path is covered by the pause-level
+        // golden scenario).
         crate::game::GAME_STATE
             .frame
             .store(false, std::sync::atomic::Ordering::Relaxed);

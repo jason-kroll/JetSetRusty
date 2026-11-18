@@ -1,0 +1,12 @@
+# Pause during play, then change room via `set level` while still paused.
+# The replay poke installs Game(Init) directly, so game_init_room runs at the
+# next tick's step 4, takes its paused branch, and selects PausedDrawOnce —
+# whose drawer runs the real game draw once (game_init_room set frame=true)
+# before clearing to PauseCheat. The sweep-00..59 scenarios never pause +
+# level-select, so this is the only golden covering that once-draw path.
+# Frame 410's video hash must differ from 409's (the redraw really happened).
+frames 700
+100 space          # skip the code card
+300 enter          # start the game (The Bathroom, room 33)
+400 tab 1          # pause -> Game(Pause)
+410 set level 28   # First Landing while paused -> Game(Init) -> PausedDrawOnce

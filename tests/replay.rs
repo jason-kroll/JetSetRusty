@@ -180,6 +180,13 @@ fn harm() {
     check("harm");
 }
 
+// Pause + `set level` while paused: covers the PausedDrawOnce once-draw path
+// (game_init_room's paused branch), which no sweep scenario reaches.
+#[test]
+fn pause_level() {
+    check("pause-level");
+}
+
 #[test]
 fn transitions() {
     check("transitions");

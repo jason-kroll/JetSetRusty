@@ -237,7 +237,8 @@ scope. The SDL event plumbing (`use sdl3::event::Event as SdlEvent;`,
    → returns a `CheatHandler` enum matched at the call site in
    `do_game_responder`.
 4. **Robots vtables.** `do_move: MoveFn` → `enum Move { Nothing, Left,
-   Right, Up, Down, Static, ArrowLeft, ArrowRight }`; `do_draw: DrawFn` →
+   Right, Up, Down, Static, ArrowLeft, ArrowRight, Maria }` (Maria drives
+   her two-slot colour layers in the Master Bedroom); `do_draw: DrawFn` →
    `enum Draw { Nothing, Robot, Toilet, Arrow }`. Bounce becomes
    `robot.move = Move::Right`; `robots_ticker`/`robots_drawer` match on the
    enum (or call `robot.step()` / `robot.draw()` with the match inside
