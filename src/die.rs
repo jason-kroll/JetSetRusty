@@ -1,10 +1,10 @@
 use crate::audio::{Sfx, audio_reduce_music_speed, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;
-use crate::game::{GAME_STATE, LIVES};
-use crate::game_main::{
-    Action, Drawer, Responder, Ticker, set_action, set_drawer, set_responder, set_ticker,
-    system_border,
+use crate::dispatch::{
+    DiePhase, GameOverPhase, GamePhase, Pending, Screen, queue_pending, set_screen,
 };
+use crate::game::{GAME_STATE, LIVES};
+use crate::game_main::system_border;
 use crate::video::{video_draw_sprite, video_pixel_ink_fill, video_pixel_paper_fill};
 use std::cell::Cell;
 use std::sync::atomic::Ordering;
@@ -36,7 +36,7 @@ pub(crate) fn die_ticker() {
     }
 
     if GAME_STATE.lives.load(Ordering::Relaxed) < 0 {
-        set_action(Action::GameOver);
+        queue_pending(Pending::Enter(Screen::GameOver(GameOverPhase::Init)));
         return;
     }
 
@@ -48,7 +48,7 @@ pub(crate) fn die_ticker() {
     );
     miner_restore();
     audio_reduce_music_speed();
-    set_action(Action::Game);
+    queue_pending(Pending::Enter(Screen::Game(GamePhase::Init)));
 }
 
 pub(crate) fn die_init() {
@@ -60,12 +60,5 @@ pub(crate) fn die_init() {
     set_audio_pan_x(miner.x);
     drop(miner);
     audio_sfx(Sfx::Die);
-    set_ticker(Ticker::Die);
-}
-
-pub fn die_action() {
-    set_responder(Responder::Noop);
-    set_ticker(Ticker::DieInit);
-    set_drawer(Drawer::Die);
-    set_action(Action::None);
+    set_screen(Screen::Die(DiePhase::Anim));
 }

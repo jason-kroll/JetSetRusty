@@ -2,10 +2,8 @@
 
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{HEIGHT, WIDTH};
-use crate::game_main::{
-    Action, Drawer, Responder, Ticker, do_quit, game_input, set_action, set_drawer, set_responder,
-    set_ticker, system_border, system_rnd, video_flash,
-};
+use crate::dispatch::{Pending, Screen, TitlePhase, queue_pending};
+use crate::game_main::{do_quit, game_input, system_border, system_rnd, video_flash};
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
 use std::sync::Mutex;
@@ -24,8 +22,10 @@ pub fn do_codes_drawer() {
     CODES_STATE.lock().unwrap().do_codes_drawer();
 }
 
-pub fn codes_action() {
-    CODES_STATE.lock().unwrap().codes_action();
+/// The codes screen's enter work, run when Pending::Enter(Screen::Codes) is
+/// consumed; the screen itself is installed by the dispatcher.
+pub(crate) fn codes_enter() {
+    CODES_STATE.lock().unwrap().codes_enter();
 }
 
 pub struct CodesState {
@@ -131,7 +131,7 @@ impl CodesState {
                     | self.code_val(3, 0);
 
                 if entered == self.needed {
-                    set_action(Action::Title);
+                    queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init)));
                     return;
                 }
 
@@ -156,7 +156,7 @@ impl CodesState {
     }
 
     // b"" byte-string literals carry the interior nul bytes these control strings need
-    fn codes_action(&mut self) {
+    fn codes_enter(&mut self) {
         system_border(0);
         video_pixel_fill(0, WIDTH * HEIGHT);
         video_write_large(
@@ -174,12 +174,6 @@ impl CodesState {
         video_draw_robot_i32(88 * WIDTH + 11 * 8, &CODES_SPRITE[3], 4);
 
         self.get_code();
-
-        set_responder(Responder::Codes);
-        set_ticker(Ticker::Codes);
-        set_drawer(Drawer::Codes);
-
-        set_action(Action::None);
     }
 }
 

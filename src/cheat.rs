@@ -1,6 +1,7 @@
 use crate::common::{Event, Key};
+use crate::dispatch::{Pending, queue_pending};
 use crate::game::{FIRSTLANDING, GAME_STATE, game_cheat_enabled, game_pause};
-use crate::game_main::{Action, game_input, set_action, system_is_key};
+use crate::game_main::{game_input, system_is_key};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const CHEAT_CODE: &[u8] = b"writetyper";
@@ -82,7 +83,7 @@ fn cheat_level_select() {
 
     GAME_STATE.level.store(level, Ordering::Relaxed);
 
-    set_action(Action::GameInitRoom);
+    queue_pending(Pending::ReinitRoom);
 }
 
 /// Progress through CHEAT_CODE after one input: one past the matched letter

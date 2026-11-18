@@ -1,9 +1,7 @@
 use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
-use crate::game_main::{
-    Action, Drawer, Responder, Ticker, set_action, set_drawer, set_responder, set_ticker,
-    system_border, video_flash,
-};
+use crate::dispatch::{LoaderPhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
+use crate::game_main::{system_border, video_flash};
 use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
 use std::cell::{Cell, RefCell};
@@ -16,7 +14,7 @@ thread_local! {
 }
 
 pub(crate) fn do_loader_responder() {
-    set_action(Action::Title)
+    queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init)))
 }
 
 pub(crate) fn do_loader_ticker() {
@@ -33,7 +31,7 @@ pub(crate) fn do_loader_ticker() {
     // Matches C's post-increment: transition when value was 256
     let ticks = LOADER_TICKS.with(Cell::get);
     if ticks == 256 {
-        set_action(Action::Codes);
+        queue_pending(Pending::Enter(Screen::Codes));
     }
     LOADER_TICKS.with(|c| c.set(ticks + 1));
 }
@@ -62,9 +60,7 @@ pub(crate) fn do_loader_drawer2() {
 
     do_loader_drawer3();
 
-    set_responder(Responder::Loader);
-    set_ticker(Ticker::Loader);
-    set_drawer(Drawer::Loader3);
+    set_screen(Screen::Loader(LoaderPhase::Ready));
 }
 
 pub(crate) fn do_loader_drawer1() {
@@ -88,10 +84,5 @@ pub(crate) fn do_loader_drawer1() {
     );
 
     audio_music(MusicScore::Loader, true);
-    set_drawer(Drawer::Loader2);
-}
-
-pub fn loader_action() {
-    set_drawer(Drawer::Loader1);
-    set_action(Action::None);
+    set_screen(Screen::Loader(LoaderPhase::Bar));
 }

@@ -17,10 +17,10 @@ use crate::common::{
     WIDTH,
 };
 
-use crate::game_main::{
-    Action, Drawer, Responder, TICKRATE, Ticker, do_nothing, set_action, set_drawer, set_responder,
-    set_ticker, system_border,
+use crate::dispatch::{
+    GameOverPhase, GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen,
 };
+use crate::game_main::{TICKRATE, do_nothing, system_border};
 use crate::levels::level_init;
 use crate::miner::{
     miner_draw_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
@@ -229,14 +229,13 @@ pub fn game_init_room() {
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
-    // Ticker, Drawer, Action slots
+    // Phase: PausedDrawOnce when paused (the drawer runs once, then clears),
+    // Play otherwise.
     if game.game_paused.load(Ordering::Relaxed) != 0 {
-        set_ticker(Ticker::Noop);
-        set_drawer(Drawer::DrawOnce);
+        set_screen(Screen::Game(GamePhase::PausedDrawOnce));
     } else {
-        set_ticker(Ticker::Game);
+        set_screen(Screen::Game(GamePhase::Play));
     }
-    set_action(Action::None);
 }
 
 pub fn game_pause(state: bool) {
@@ -252,16 +251,13 @@ pub fn game_pause(state: bool) {
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         if game.cheat_enabled.load(Ordering::Relaxed) {
-            set_ticker(Ticker::Noop);
-            set_drawer(Drawer::Noop);
+            set_screen(Screen::Game(GamePhase::PauseCheat));
         } else {
-            set_ticker(Ticker::Pause);
-            set_drawer(Drawer::Pause);
+            set_screen(Screen::Game(GamePhase::Pause));
         }
         audio_play(false);
     } else {
-        set_ticker(Ticker::Game);
-        set_drawer(Drawer::Game);
+        set_screen(Screen::Game(GamePhase::Play));
         audio_play(game.music.load(Ordering::Relaxed));
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -292,7 +288,7 @@ pub fn do_game_responder() {
             game.music.store(new_music, Ordering::Relaxed);
             audio_play(new_music);
         }
-        Key::Escape => set_action(Action::Title),
+        Key::Escape => queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init))),
         _ => {
             if let Some(handler) = cheat_responder() {
                 handler();
@@ -408,9 +404,8 @@ pub fn game_cheat_enabled() {
         // gameFrame = 1
         game.frame.store(true, Ordering::Relaxed);
 
-        // Ticker = noop; Drawer = noop;
-        set_ticker(Ticker::Noop);
-        set_drawer(Drawer::Noop);
+        // Pause with cheat: no ticker, no drawer.
+        set_screen(Screen::Game(GamePhase::PauseCheat));
 
         // game_draw_status(); system_border(levelBorder[gameLevel])
         game_draw_status();
@@ -498,7 +493,8 @@ pub fn game_change_level(dir: Direction) {
 pub fn do_draw_once() {
     do_game_drawer();
 
-    set_drawer(Drawer::Noop);
+    // The old DRAWER-slot clear after the one-shot draw.
+    set_screen(Screen::Game(GamePhase::PauseCheat));
 }
 
 pub fn do_game_ticker() {
@@ -536,7 +532,7 @@ pub fn do_game_ticker() {
     if game.mode() == GameMode::Toilet {
         let old_ticks = game.clock_ticks.fetch_add(1, Ordering::Relaxed);
         if old_ticks == 256 {
-            set_action(Action::Title);
+            queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init)));
         }
         return;
     }
@@ -623,7 +619,7 @@ pub fn clock_ticker() {
         if clock[1] == 12 {
             clock[2] = 1 - clock[2];
             if (clock[2] == 0) && (game.mode() < GameMode::Maria) {
-                set_action(Action::GameOver);
+                queue_pending(Pending::Enter(Screen::GameOver(GameOverPhase::Init)));
             }
         } else if clock[1] == 13 {
             clock[1] = 1;
@@ -676,14 +672,6 @@ pub fn game_draw_status() {
 
     // C: GameDrawLives();
     game_draw_lives();
-}
-
-pub fn game_action() {
-    set_responder(Responder::Game);
-    // Runs once next frame, inits the room, then installs the game ticker and
-    // clears Action. Matches C's `Ticker = Game_InitRoom`.
-    set_ticker(Ticker::GameInitRoom);
-    set_drawer(Drawer::Game);
 }
 
 #[cfg(test)]

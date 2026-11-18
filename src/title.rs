@@ -1,10 +1,8 @@
 use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
-use crate::game::{GAME_STATE, game_action, game_draw_status, game_game_reset};
-use crate::game_main::{
-    Action, Drawer, Responder, Ticker, game_input, set_action, set_drawer, set_responder,
-    set_ticker, video_flash,
-};
+use crate::dispatch::{GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
+use crate::game::{GAME_STATE, game_draw_status, game_game_reset};
+use crate::game_main::{game_input, video_flash};
 use crate::levels::{level_item_count, level_restore_items};
 use crate::miner::miner_init;
 use crate::robots::robots_draw_cheat;
@@ -91,7 +89,7 @@ pub(crate) fn game_start() {
     GAME_STATE.set_mode(GameMode::Normal);
     GAME_STATE.game_paused.store(0, Ordering::Relaxed);
 
-    game_action();
+    set_screen(Screen::Game(GamePhase::Init));
 }
 
 pub(crate) fn do_title_ticker() {
@@ -118,7 +116,7 @@ pub(crate) fn do_title_ticker() {
         return;
     }
 
-    set_action(Action::Title);
+    queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init)));
 }
 
 pub(crate) fn do_title_drawer() {
@@ -146,7 +144,7 @@ pub(crate) fn do_title_drawer() {
 pub(crate) fn do_title_responder() {
     // Upstream 69070b9: joystick fire starts the game like Enter.
     if game_input() == Key::Enter || system_is_joy_fire() {
-        set_action(Action::GameStart);
+        queue_pending(Pending::StartGame);
     } else if game_input() == Key::Escape {
         do_quit();
     }
@@ -220,12 +218,5 @@ pub(crate) fn do_title_init() {
 
     audio_music(MusicScore::Title, true);
 
-    set_ticker(Ticker::Title);
-}
-
-pub fn title_action() {
-    set_responder(Responder::Title);
-    set_ticker(Ticker::TitleInit);
-    set_drawer(Drawer::Title);
-    set_action(Action::None);
+    set_screen(Screen::Title(TitlePhase::Scroll));
 }

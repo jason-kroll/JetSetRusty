@@ -3,6 +3,7 @@ mod cheat;
 mod codes;
 mod common;
 mod die;
+mod dispatch;
 mod game;
 mod game_main;
 mod gameover;

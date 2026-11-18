@@ -35,10 +35,11 @@
 
 use crate::audio::{audio_init, audio_output};
 use crate::common::{HEIGHT, WIDTH};
+use crate::dispatch::{GamePhase, Screen, set_screen};
 use crate::game::GameMode;
 use crate::game_main::{
-    SAMPLERATE, TICKRATE, Ticker, border_index, game_frame, game_running, map_keycode, seed_rng,
-    set_replay_held, set_replay_mode, set_ticker, with_framebuffer,
+    SAMPLERATE, TICKRATE, border_index, game_frame, game_running, map_keycode, seed_rng,
+    set_replay_held, set_replay_mode, with_framebuffer,
 };
 use crate::misc::{Timer, VIDEO_COLOUR, timer_set};
 // SDL3's SDLK_* constants (SDL_Keycode, a u32 newtype); letters and digits
@@ -232,7 +233,9 @@ pub fn main(args: &[String]) -> i32 {
                             miner.tile &= !31;
                         }
                         GAME_STATE.level.store(*v, Relaxed);
-                        set_ticker(Ticker::GameInitRoom);
+                        // Direct phase write (not Pending): game_init_room must
+                        // run at this frame's step 4, like the old TICKER write.
+                        set_screen(Screen::Game(GamePhase::Init));
                     }
                     SetOp::Mode(m) => GAME_STATE.set_mode(*m),
                     SetOp::Lives(v) => GAME_STATE.lives.store(*v, Relaxed),

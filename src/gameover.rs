@@ -1,9 +1,7 @@
 use crate::audio::{Sfx, audio_play, audio_sfx};
 use crate::common::WIDTH;
-use crate::game_main::{
-    Action, Drawer, Responder, Ticker, set_action, set_drawer, set_responder, set_ticker,
-    system_border,
-};
+use crate::dispatch::{GameOverPhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
+use crate::game_main::system_border;
 use crate::miner::miner_draw_sprite;
 use crate::video::video_pixel_fill;
 use std::cell::{Cell, RefCell};
@@ -85,7 +83,7 @@ pub(crate) fn gameover_ticker() {
         return;
     }
 
-    set_action(Action::Title);
+    queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init)));
 }
 
 pub(crate) fn gameover_init() {
@@ -99,12 +97,5 @@ pub(crate) fn gameover_init() {
     audio_play(false);
     audio_sfx(Sfx::Gameover);
 
-    set_ticker(Ticker::GameOver);
-}
-
-pub fn gameover_action() {
-    set_responder(Responder::Noop);
-    set_ticker(Ticker::GameOverInit);
-    set_drawer(Drawer::GameOver);
-    set_action(Action::None);
+    set_screen(Screen::GameOver(GameOverPhase::Run));
 }
