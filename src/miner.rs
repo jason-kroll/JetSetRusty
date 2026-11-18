@@ -286,6 +286,47 @@ fn jump_step(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GroundOutcome {
+    Below,
+    HarmPass,
+    Die,
+    Land { convey_dir: i32 },
+    Fall,
+}
+
+// Pure core of the align == 4 (feet on tile boundary) branch of
+// do_miner_ticker: what is below Willy, and what happens this tick.
+fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(usize) -> TileType) -> GroundOutcome {
+    let tile = tile_base + 64;
+    if tile & 512 != 0 {
+        return GroundOutcome::Below;
+    }
+    let t0 = lookup(tile as usize);
+    let t1 = lookup((tile + 1) as usize);
+    if t0 == TileType::Harm || t1 == TileType::Harm {
+        if air == 1 && (t0 as i32 <= TileType::Space as i32 || t1 as i32 <= TileType::Space as i32)
+        {
+            return GroundOutcome::HarmPass;
+        }
+        return GroundOutcome::Die;
+    }
+    if t0 as i32 > TileType::Space as i32 || t1 as i32 > TileType::Space as i32 {
+        if air >= 12 {
+            return GroundOutcome::Die;
+        }
+        let convey_dir = if t0 == TileType::ConveyL || t1 == TileType::ConveyL {
+            C_LEFT
+        } else if t0 == TileType::ConveyR || t1 == TileType::ConveyR {
+            C_RIGHT
+        } else {
+            C_NONE
+        };
+        return GroundOutcome::Land { convey_dir };
+    }
+    GroundOutcome::Fall
+}
+
 fn move_left_right() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut y = 0;
@@ -421,7 +462,7 @@ fn update_dir(convey_dir: i32) {
 
 fn do_miner_ticker() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
-    let mut convey_dir = C_NONE;
+    let convey_dir = C_NONE;
 
     if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
         drop(miner);
@@ -484,47 +525,30 @@ fn do_miner_ticker() {
     }
 
     if miner.align == 4 {
-        let tile = miner.tile + 64;
-        if tile & 512 != 0 {
-            drop(miner);
-            game_change_level(Direction::Below as i32);
-            return;
-        }
-
-        let type0 = level_get_tile_type(tile as usize);
-        let type1 = level_get_tile_type((tile + 1) as usize);
-        if type0 == TileType::Harm || type1 == TileType::Harm {
-            if miner.air == 1
-                && (type0 as i32 <= TileType::Space as i32
-                    || type1 as i32 <= TileType::Space as i32)
-            {
+        match ground_check(miner.tile, miner.air, &level_get_tile_type) {
+            GroundOutcome::Below => {
+                drop(miner);
+                game_change_level(Direction::Below as i32);
+                return;
+            }
+            GroundOutcome::HarmPass => {
                 drop(miner);
                 move_left_right();
-            } else {
-                set_action(Some(die_action));
+                return;
             }
-            return;
-        }
-
-        if type0 as i32 > TileType::Space as i32 || type1 as i32 > TileType::Space as i32 {
-            if miner.air >= 12 {
+            GroundOutcome::Die => {
                 set_action(Some(die_action));
                 return;
             }
-
-            miner.air = 0;
-            GAME_STATE.miner_air.store(0, Ordering::Relaxed);
-
-            if type0 == TileType::ConveyL || type1 == TileType::ConveyL {
-                convey_dir = C_LEFT;
-            } else if type0 == TileType::ConveyR || type1 == TileType::ConveyR {
-                convey_dir = C_RIGHT;
+            GroundOutcome::Land { convey_dir } => {
+                miner.air = 0;
+                GAME_STATE.miner_air.store(0, Ordering::Relaxed);
+                drop(miner);
+                update_dir(convey_dir);
+                move_left_right();
+                return;
             }
-
-            drop(miner);
-            update_dir(convey_dir);
-            move_left_right();
-            return;
+            GroundOutcome::Fall => {}
         }
     }
 
@@ -783,6 +807,81 @@ mod tests {
                 length: 5,
                 apex: true,
             }
+        );
+    }
+
+    // ground_check with tile_base = 100 inspects tiles 164 and 165.
+    #[test]
+    fn ground_below_when_tile_row_wraps() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(448, 0, &lookup), GroundOutcome::Below);
+    }
+
+    #[test]
+    fn ground_nothing_below_falls() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(100, 0, &lookup), GroundOutcome::Fall);
+
+        // an item does not stop a fall (Item < Space in the enum order)
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::Item;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(100, 0, &lookup), GroundOutcome::Fall);
+    }
+
+    #[test]
+    fn ground_harm_kills_except_mid_jump_pass() {
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::Harm;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(100, 0, &lookup), GroundOutcome::Die);
+        // air == 1 and the other tile is Space: Willy passes through mid-jump
+        assert_eq!(ground_check(100, 1, &lookup), GroundOutcome::HarmPass);
+
+        // the other tile solid-ish: still dies
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::Harm;
+        tiles[165] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(100, 1, &lookup), GroundOutcome::Die);
+
+        // harm on the second tile only
+        let mut tiles = [TileType::Space; 512];
+        tiles[165] = TileType::Harm;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(ground_check(100, 0, &lookup), GroundOutcome::Die);
+    }
+
+    #[test]
+    fn ground_landing_detects_fall_death_and_conveyors() {
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(
+            ground_check(100, 11, &lookup),
+            GroundOutcome::Land { convey_dir: C_NONE }
+        );
+        // hard fall (air >= 12) onto something solid-ish kills
+        assert_eq!(ground_check(100, 12, &lookup), GroundOutcome::Die);
+
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::ConveyR;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(
+            ground_check(100, 5, &lookup),
+            GroundOutcome::Land {
+                convey_dir: C_RIGHT
+            }
+        );
+
+        let mut tiles = [TileType::Space; 512];
+        tiles[165] = TileType::ConveyL;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(
+            ground_check(100, 5, &lookup),
+            GroundOutcome::Land { convey_dir: C_LEFT }
         );
     }
 }
