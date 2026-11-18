@@ -649,7 +649,6 @@ pub fn miner_init() {
     miner.move_ = 0;
     miner.air = 0;
     miner_save(&miner);
-    drop(miner);
 }
 
 #[cfg(test)]
