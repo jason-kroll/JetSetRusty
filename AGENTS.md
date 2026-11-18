@@ -157,3 +157,7 @@ valgrind --error-exitcode=1 ./target/debug/jetsetrusty 2>&1 | head -40
 ## Room reference
 
 `ROOMS.md` is the authoritative numbered list of all 60 rooms with their teleport-code key bindings (used by the "writetyper" cheat). Refer to it when working on level transitions, cheat code handling, or anything that names a specific room.
+
+## Independent review
+
+After completing each phase or multi-step change, spawn the `reviewer` subagent (a GLM Flash fresh-eyes child; its definition: `~/.vibe/agents/reviewer.toml`) with the artifact under test and the claim it makes — a diff, a plan section, or a golden enumeration — in one message. It reads only what you pass it and reports a verdict with file-and-line evidence; apply only what its verdict proves.
