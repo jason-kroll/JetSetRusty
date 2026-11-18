@@ -54,7 +54,7 @@ for tok in re.findall(r"SPACE|\{[^{}]+\}", c_gfx_blk):
 c_gfx += [[0] * 8] * (10 - len(c_gfx))  # rest zero-init in C
 c_info_blk = re.search(r"\.info = \{(.*?)\n        \},", cblk, re.S).group(1)
 c_info = re.findall(r"\{(0x[0-9a-fA-F]+),\s*(T_\w+)\}", c_info_blk)
-c_info += [("0x00", "T_SPACE")] * (10 - len(c_info))  # T_SPACE == 0
+c_info += [("0x00", "T_SPACE")] * (10 - len(c_info))  # match the Rust tail: convert_levels.py pads unlisted slots with T_SPACE
 c_itemcount = int(re.search(r"\.itemCount = (\d+)", cblk).group(1))
 c_item = [int(x) for x in re.search(r"\.item = \{([^}]*)\}", cblk).group(1).split(",") if x.strip()]
 
