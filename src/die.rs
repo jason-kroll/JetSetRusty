@@ -1,4 +1,4 @@
-use crate::audio::{SFX_DIE, audio_reduce_music_speed, audio_sfx, set_audio_pan_x};
+use crate::audio::{Sfx, audio_reduce_music_speed, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, LIVES, game_action};
 use crate::game_main::{set_action, set_drawer, set_responder, set_ticker};
@@ -58,7 +58,7 @@ fn die_init() {
     let miner = GAME_STATE.miner.lock().unwrap();
     set_audio_pan_x(miner.x);
     drop(miner);
-    audio_sfx(SFX_DIE as i32);
+    audio_sfx(Sfx::Die);
     set_ticker(Some(die_ticker));
 }
 

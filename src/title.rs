@@ -1,4 +1,4 @@
-use crate::audio::{audio_music, audio_music_playing};
+use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::game::{GAME_STATE, game_action, game_draw_status, game_game_reset};
 use crate::game_main::{
@@ -17,7 +17,6 @@ use crate::video::{video_cycle_colours, video_write, video_write_large};
 
 use crate::game_main::{do_nothing, do_quit, system_border, system_is_joy_fire};
 
-const MUS_TITLE: i32 = 0;
 const THEBATHROOM: i32 = 33;
 
 static TITLE_JSW: [i32; 100] = [
@@ -218,7 +217,7 @@ fn do_title_init() {
     set_text_frame(-1);
     set_colour_cycle(1);
 
-    audio_music(MUS_TITLE, true);
+    audio_music(MusicScore::Title, true);
 
     set_ticker(Some(do_title_ticker));
 }

@@ -1,5 +1,5 @@
 #![warn(unused_unsafe)]
-use crate::audio::{SFX_ITEM, audio_music, audio_music_clock, audio_play, audio_sfx};
+use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::gameover_action;
@@ -33,9 +33,6 @@ use crate::title::title_action;
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
-
-// Music constants (from audio.h enum: MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2)
-const MUS_GAME: i32 = 1;
 
 // Public constants (from game.h)
 pub const LIVES: usize = (18 * 8 + 4) * WIDTH as usize + 4;
@@ -402,7 +399,7 @@ pub fn game_game_reset() {
 
     // audio_music(MUS_GAME, gameMusic)
     let music = game.music.load(Ordering::Relaxed);
-    audio_music(MUS_GAME, music);
+    audio_music(MusicScore::Game, music);
 }
 
 pub fn game_cheat_enabled() {
@@ -597,7 +594,7 @@ pub fn game_got_item() {
         crate::audio::set_audio_pan_x(miner_guard.x);
     }
 
-    audio_sfx(SFX_ITEM as i32);
+    audio_sfx(Sfx::Item);
 }
 
 // Port of C's ClockTicker; called once per game frame from do_game_ticker.

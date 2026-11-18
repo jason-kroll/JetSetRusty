@@ -1,4 +1,4 @@
-use crate::audio::{SFX_GAMEOVER, audio_play, audio_sfx};
+use crate::audio::{Sfx, audio_play, audio_sfx};
 use crate::common::WIDTH;
 use crate::game_main::{
     do_nothing, set_action, set_drawer, set_responder, set_ticker, system_border,
@@ -98,7 +98,7 @@ fn gameover_init() {
     set_boot_ticks(0);
 
     audio_play(false);
-    audio_sfx(SFX_GAMEOVER as i32);
+    audio_sfx(Sfx::Gameover);
 
     set_ticker(Some(gameover_ticker));
 }

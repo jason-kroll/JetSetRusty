@@ -22,12 +22,25 @@ const EV_END: i16 = 0x40;
 pub const MUS_STOP: i32 = 0;
 pub const MUS_PLAY: i32 = 1;
 
-// Matches audio.h SFX enum order
-pub const SFX_ITEM: usize = 0;
-pub const SFX_DIE: usize = 1;
-pub const SFX_GAMEOVER: usize = 2;
-pub const SFX_ARROW: usize = 3;
-pub const SFX_NONE: usize = 5;
+// Matches audio.h MUS_* enum order; also indexes MUSIC_SCORE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MusicScore {
+    Title = 0,
+    Game = 1,
+    Loader = 2,
+}
+
+// Matches audio.h SFX_* enum order; also indexes SFX_PITCH. SFX_WILLY (4)
+// has no variant — the willy trampoline never reads a pitch table, so in
+// the port that row is unreachable, exactly as in C.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sfx {
+    Item = 0,
+    Die = 1,
+    Gameover = 2,
+    Arrow = 3,
+    None = 5,
+}
 
 // musicChannel[i] maps to audioChannel index
 const MUSIC_CH: [usize; NMUSIC] = [3, 4, 5, 6, 7];
@@ -47,9 +60,9 @@ struct Channel {
 
 // Replaces C SFX struct; indices instead of raw pointers.
 struct SfxInfo {
-    pitch_table: usize, // which SFX_PITCH row
-    pitch_idx: usize,   // current position within that row
-    channel: usize,     // index into AudioState.channels
+    pitch_table: Sfx, // which SFX_PITCH row
+    pitch_idx: usize, // current position within that row
+    channel: usize,   // index into AudioState.channels
     length: i32,
     clock: i32,
     // Trampolines take the locked AudioState as their argument, so
@@ -203,12 +216,12 @@ struct AudioState {
     sfx: [SfxInfo; NSFX],
     // Index of the sfx slot being processed by the trampoline functions below.
     cur_sfx: usize,
-    music_index: usize,
+    music_index: MusicScore,
     music_tempo: i32,
     music_pitch: i32,
     music_clock: i32,
     music_delta: i32,
-    cur_music_table: usize,
+    cur_music_table: MusicScore,
     cur_music_idx: usize,
     samples_music: i32,
     music_channels: usize,
@@ -233,7 +246,7 @@ impl AudioState {
         }
         const fn sfx_slot(channel: usize) -> SfxInfo {
             SfxInfo {
-                pitch_table: SFX_NONE,
+                pitch_table: Sfx::None,
                 pitch_idx: 0,
                 channel,
                 length: 0,
@@ -255,12 +268,12 @@ impl AudioState {
             ],
             sfx: [sfx_slot(0), sfx_slot(1), sfx_slot(2)],
             cur_sfx: 0,
-            music_index: 0,
+            music_index: MusicScore::Title,
             music_tempo: TICKRATE,
             music_pitch: 0,
             music_clock: 0,
             music_delta: 0,
-            cur_music_table: 0,
+            cur_music_table: MusicScore::Title,
             cur_music_idx: 0,
             samples_music: 0,
             music_channels: 0,
@@ -301,13 +314,13 @@ fn sfx_off_trampoline(s: &mut AudioState) {
 
 fn sfx_play_trampoline(s: &mut AudioState) {
     let i = s.cur_sfx;
-    let pitch = SFX_PITCH[s.sfx[i].pitch_table][s.sfx[i].pitch_idx] as usize;
+    let pitch = SFX_PITCH[s.sfx[i].pitch_table as usize][s.sfx[i].pitch_idx] as usize;
     let ch = s.sfx[i].channel;
     s.channels[ch].frequency = FREQUENCY_TABLE[pitch];
     let len = s.sfx[i].length;
     s.sfx[i].clock += len;
     s.sfx[i].pitch_idx += 1;
-    if SFX_PITCH[s.sfx[i].pitch_table][s.sfx[i].pitch_idx] > 0 {
+    if SFX_PITCH[s.sfx[i].pitch_table as usize][s.sfx[i].pitch_idx] > 0 {
         return;
     }
     s.sfx[i].do_sfx = Some(sfx_off_trampoline);
@@ -390,50 +403,49 @@ pub fn audio_willy_sfx(note: i32, length: i32) {
     s.sfx[0].do_sfx = Some(sfx_willy_trampoline);
 }
 
-pub fn audio_sfx(sfx: i32) {
+pub fn audio_sfx(sfx: Sfx) {
     let mut s = AUDIO_STATE.lock().unwrap();
-    let sfx = sfx as usize;
     let pan = audio_pan_x();
 
-    let target_slot = if sfx == SFX_GAMEOVER || sfx == SFX_DIE {
+    let target_slot = if sfx == Sfx::Gameover || sfx == Sfx::Die {
         // Schedule channels 0 and 1 to stop; don't call immediately.
         s.sfx[0].do_sfx = Some(sfx_off_trampoline);
         s.sfx[1].do_sfx = Some(sfx_off_trampoline);
         2
-    } else if sfx == SFX_ARROW {
+    } else if sfx == Sfx::Arrow {
         2
     } else {
         1
     };
 
     match sfx {
-        SFX_ITEM => {
+        Sfx::Item => {
             s.sfx[1].length = 1;
-            s.sfx[1].pitch_table = SFX_ITEM;
+            s.sfx[1].pitch_table = Sfx::Item;
             s.sfx[1].pitch_idx = 0;
             let ch = s.sfx[1].channel;
             channel_pan(&mut s.channels[ch], pan as usize);
             s.sfx[1].do_play = Some(sfx_play_trampoline);
         }
-        SFX_ARROW => {
+        Sfx::Arrow => {
             s.sfx[2].length = 1;
-            s.sfx[2].pitch_table = SFX_ARROW;
+            s.sfx[2].pitch_table = Sfx::Arrow;
             s.sfx[2].pitch_idx = 0;
             let ch = s.sfx[2].channel;
             channel_stereo(&mut s.channels[ch], 256 - pan, pan);
             s.sfx[2].do_play = Some(sfx_play_trampoline);
         }
-        SFX_DIE => {
+        Sfx::Die => {
             s.sfx[2].length = 1;
-            s.sfx[2].pitch_table = SFX_DIE;
+            s.sfx[2].pitch_table = Sfx::Die;
             s.sfx[2].pitch_idx = 0;
             let ch = s.sfx[2].channel;
             channel_pan(&mut s.channels[ch], pan as usize);
             s.sfx[2].do_play = Some(sfx_play_trampoline);
         }
-        SFX_GAMEOVER => {
+        Sfx::Gameover => {
             s.sfx[2].length = 2;
-            s.sfx[2].pitch_table = SFX_GAMEOVER;
+            s.sfx[2].pitch_table = Sfx::Gameover;
             s.sfx[2].pitch_idx = 0;
             let ch = s.sfx[2].channel;
             channel_stereo(&mut s.channels[ch], 256, -256);
@@ -456,20 +468,22 @@ pub fn audio_output(output: &mut [i16; 2]) {
             if s.music_delta == s.music_clock {
                 // Process all events due this tick (time==0 events chain immediately).
                 loop {
-                    let data = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx];
+                    let data = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx];
                     s.cur_music_idx += 1;
                     let ch = (data & 0x0f) as usize;
 
                     match data & 0xf0 {
                         EV_NOTE_ON => {
-                            let note = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32
+                            let note = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx]
+                                as i32
                                 + s.music_pitch;
                             s.cur_music_idx += 1;
                             s.channels[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
                             s.channels[MUSIC_CH[ch]].do_phase = Some(do_phase_fn);
                         }
                         EV_END => {
-                            let playing = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
+                            let playing =
+                                MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx] as i32;
                             AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
                             music_reset(&mut s);
                             // MUS_PLAY → time=0 → continue loop from top of reset score
@@ -485,7 +499,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
                         _ => music_note_off(&mut s, ch),
                     }
 
-                    let time = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
+                    let time = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx] as i32;
                     s.cur_music_idx += 1;
                     s.music_delta += time;
                     if time != 0 {
@@ -546,10 +560,10 @@ pub fn audio_play(playing: bool) {
     s.music_channels = if playing { NCHANNELS } else { NSFX };
 }
 
-pub fn audio_music(music: i32, playing: bool) {
+pub fn audio_music(music: MusicScore, playing: bool) {
     {
         let mut s = AUDIO_STATE.lock().unwrap();
-        s.music_index = music as usize;
+        s.music_index = music;
         music_reset(&mut s);
         s.music_pitch = 0;
         s.music_tempo = TICKRATE;

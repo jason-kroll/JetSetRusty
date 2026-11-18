@@ -1,4 +1,4 @@
-use crate::audio::{audio_music, audio_music_playing};
+use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::{
     set_action, set_drawer, set_responder, set_ticker, system_border, video_flash,
@@ -9,9 +9,6 @@ use crate::codes::codes_action;
 use crate::game_main::do_nothing;
 use crate::title::title_action;
 use std::cell::{Cell, RefCell};
-
-// MUS_TITLE=0, MUS_GAME=1, MUS_LOADER=2 (from audio.h enum order)
-const MUS_LOADER: i32 = 2;
 
 thread_local! {
     static LOADER_TICKS: Cell<u32> = const { Cell::new(0) };
@@ -92,7 +89,7 @@ fn do_loader_drawer1() {
         &build_with_ink[..],
     );
 
-    audio_music(MUS_LOADER, true);
+    audio_music(MusicScore::Loader, true);
     set_drawer(Some(do_loader_drawer2));
 }
 
