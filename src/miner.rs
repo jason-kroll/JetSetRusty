@@ -327,6 +327,33 @@ fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(usize) -> TileType) ->
     GroundOutcome::Fall
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FallStep {
+    air: i32,
+    y: i32,
+    align: i32,
+    tile_add: i32,
+    pitch: i32,
+}
+
+// Pure core of the falling tail of do_miner_ticker.
+fn fall_step(air: i32, y: i32) -> FallStep {
+    let mut air = air + 1;
+    if air == 16 {
+        // this affects the falling sound effect
+        air = 12;
+    }
+    let y = y + 4;
+    let (align, tile_add) = if y & 7 != 0 { (6, 0) } else { (4, 32) };
+    FallStep {
+        air,
+        y,
+        align,
+        tile_add,
+        pitch: 78 - air,
+    }
+}
+
 fn move_left_right() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut y = 0;
@@ -565,23 +592,14 @@ fn do_miner_ticker() {
         return;
     }
 
-    miner.air += 1;
-    GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
-    if miner.air == 16 {
-        // this affects the falling sound effect
-        miner.air = 12;
-        GAME_STATE.miner_air.store(12, Ordering::Relaxed);
-    }
-
+    let step = fall_step(miner.air, miner.y);
+    miner.air = step.air;
+    GAME_STATE.miner_air.store(step.air, Ordering::Relaxed);
     set_audio_pan_x(miner.x);
-    audio_willy_sfx(78 - miner.air, 4);
-    miner.y += 4;
-    miner.align = 4;
-    if miner.y & 7 != 0 {
-        miner.align += 2;
-    } else {
-        miner.tile += 32;
-    }
+    audio_willy_sfx(step.pitch, 4);
+    miner.y = step.y;
+    miner.align = step.align;
+    miner.tile += step.tile_add;
 }
 
 pub fn miner_ticker() {
@@ -882,6 +900,47 @@ mod tests {
         assert_eq!(
             ground_check(100, 5, &lookup),
             GroundOutcome::Land { convey_dir: C_LEFT }
+        );
+    }
+
+    #[test]
+    fn fall_step_moves_down_and_tracks_alignment() {
+        // y lands on an 8px boundary: full tile step, align 4
+        assert_eq!(
+            fall_step(2, 100),
+            FallStep {
+                air: 3,
+                y: 104,
+                align: 4,
+                tile_add: 32,
+                pitch: 75,
+            }
+        );
+        // mid-tile: align 6, no tile advance
+        assert_eq!(
+            fall_step(11, 96),
+            FallStep {
+                air: 12,
+                y: 100,
+                align: 6,
+                tile_add: 0,
+                pitch: 66,
+            }
+        );
+    }
+
+    #[test]
+    fn fall_step_caps_air_at_16_to_12() {
+        // air 15 -> 16 would keep rising; the engine clamps to 12 (falling sfx)
+        assert_eq!(
+            fall_step(15, 103),
+            FallStep {
+                air: 12,
+                y: 107,
+                align: 6,
+                tile_add: 0,
+                pitch: 66,
+            }
         );
     }
 }
