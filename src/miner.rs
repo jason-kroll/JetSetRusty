@@ -199,16 +199,16 @@ pub fn miner_save() {
     );
 }
 
-fn is_solid(tile: i32, miner: &mut Miner) -> bool {
+fn is_solid_with(tile: i32, lookup: &dyn Fn(usize) -> TileType, miner: &mut Miner) -> bool {
     if tile < 0 || tile == 512 {
         return false;
     }
 
-    if level_get_tile_type(tile as usize) == TileType::Solid {
+    if lookup(tile as usize) == TileType::Solid {
         return true;
     }
 
-    if level_get_tile_type((tile + 32) as usize) == TileType::Solid {
+    if lookup((tile + 32) as usize) == TileType::Solid {
         return true;
     }
 
@@ -216,7 +216,7 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
         return false;
     }
 
-    if level_get_tile_type((tile + 64) as usize) != TileType::Solid {
+    if lookup((tile + 64) as usize) != TileType::Solid {
         return false;
     }
 
@@ -226,10 +226,18 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
 
     if miner.air == 1 && miner.jump > 9 {
         miner.air = 0;
-        GAME_STATE.miner_air.store(0, Ordering::Relaxed);
     }
 
     false
+}
+
+fn is_solid(tile: i32, miner: &mut Miner) -> bool {
+    let prev_air = miner.air;
+    let solid = is_solid_with(tile, &level_get_tile_type, miner);
+    if miner.air != prev_air {
+        GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
+    }
+    solid
 }
 
 fn move_left_right() {
@@ -570,4 +578,94 @@ pub fn miner_init() {
     drop(miner);
 
     miner_save();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Stub for the real level_get_tile_type: all Space, with the same
+    // out-of-bounds -> Space behaviour.
+    fn lookup_of(tiles: &[TileType; 512]) -> impl Fn(usize) -> TileType + '_ {
+        move |i| {
+            if i >= 512 { TileType::Space } else { tiles[i] }
+        }
+    }
+
+    fn miner_with(align: i32, air: i32, jump: i32) -> Miner {
+        Miner {
+            align,
+            air,
+            jump,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn out_of_range_tiles_are_not_solid() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        let mut m = Miner::default();
+        assert!(!is_solid_with(-1, &lookup, &mut m));
+        assert!(!is_solid_with(512, &lookup, &mut m));
+    }
+
+    #[test]
+    fn solid_at_tile_or_one_row_down_blocks() {
+        let mut tiles = [TileType::Space; 512];
+        tiles[100] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        let mut m = miner_with(4, 0, 0);
+        assert!(is_solid_with(100, &lookup, &mut m));
+
+        let mut tiles = [TileType::Space; 512];
+        tiles[132] = TileType::Solid; // tile + 32
+        let lookup = lookup_of(&tiles);
+        let mut m = miner_with(4, 0, 0);
+        assert!(is_solid_with(100, &lookup, &mut m));
+    }
+
+    #[test]
+    fn past_bottom_edge_is_never_solid() {
+        // tile + 64 > 511 returns false before the align check
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        let mut m = miner_with(6, 0, 0);
+        assert!(!is_solid_with(448, &lookup, &mut m));
+
+        let mut tiles = [TileType::Space; 512];
+        tiles[448] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        let mut m = miner_with(4, 0, 0);
+        assert!(is_solid_with(448, &lookup, &mut m));
+
+        let mut tiles = [TileType::Space; 512];
+        tiles[480] = TileType::Solid; // tile + 32
+        let lookup = lookup_of(&tiles);
+        let mut m = miner_with(4, 0, 0);
+        assert!(is_solid_with(448, &lookup, &mut m));
+    }
+
+    #[test]
+    fn solid_two_rows_down_only_blocks_when_aligned_or_landing() {
+        let mut tiles = [TileType::Space; 512];
+        tiles[164] = TileType::Solid; // tile + 64 for tile = 100
+        let lookup = lookup_of(&tiles);
+
+        let mut m = miner_with(4, 0, 0);
+        assert!(!is_solid_with(100, &lookup, &mut m));
+
+        let mut m = miner_with(6, 0, 0);
+        assert!(is_solid_with(100, &lookup, &mut m));
+
+        // mid-jump past jump 9: Willy lands on the ceiling, air resets to 0
+        let mut m = miner_with(4, 1, 10);
+        assert!(!is_solid_with(100, &lookup, &mut m));
+        assert_eq!(m.air, 0);
+
+        // jump <= 9 does not trigger it
+        let mut m = miner_with(4, 1, 9);
+        assert!(!is_solid_with(100, &lookup, &mut m));
+        assert_eq!(m.air, 1);
+    }
 }
