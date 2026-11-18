@@ -453,14 +453,14 @@ fn update_dir(convey_dir: i32) {
     let mut dir = 0;
 
     // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
-    if (system_is_key(Key::Left as i32) != 0 || system_is_joy_left() != 0 || convey_dir == C_LEFT)
+    if (system_is_key(Key::Left as i32) || system_is_joy_left() || convey_dir == C_LEFT)
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         dir += 1;
     }
 
-    if system_is_key(Key::Right as i32) != 0
-        || system_is_joy_right() != 0
+    if system_is_key(Key::Right as i32)
+        || system_is_joy_right()
         || convey_dir == C_RIGHT
         || GAME_STATE.mode.load(Ordering::Relaxed) == GameMode::Running as u8
     {
@@ -485,7 +485,7 @@ fn update_dir(convey_dir: i32) {
         }
     }
 
-    if (system_is_key(Key::Jump as i32) != 0 || system_is_joy_fire() != 0)
+    if (system_is_key(Key::Jump as i32) || system_is_joy_fire())
         && GAME_STATE.mode.load(Ordering::Relaxed) < GameMode::Running as u8
     {
         miner.air = 1;

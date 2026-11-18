@@ -97,8 +97,8 @@ fn game_start() {
 }
 
 fn do_title_ticker() {
-    if audio_music_playing() != 0 {
-        if video_flash() != 0 {
+    if audio_music_playing() {
+        if video_flash() {
             set_text_jsw_byte(1, b'\x0b');
             set_text_jsw_byte(3, b'\x02');
         } else {
@@ -124,7 +124,7 @@ fn do_title_ticker() {
 }
 
 fn do_title_drawer() {
-    if audio_music_playing() != 0 {
+    if audio_music_playing() {
         for &tile in TITLE_JSW.iter().take(100) {
             TEXT_JSW.with(|t| {
                 video_write(tile_2_pixel(tile), &t.borrow()[..]);
@@ -147,7 +147,7 @@ fn do_title_drawer() {
 
 fn do_title_responder() {
     // Upstream 69070b9: joystick fire starts the game like Enter.
-    if game_input() == Key::Enter as i32 || system_is_joy_fire() != 0 {
+    if game_input() == Key::Enter as i32 || system_is_joy_fire() {
         set_action(Some(game_start));
     } else if game_input() == Key::Escape as i32 {
         do_quit();

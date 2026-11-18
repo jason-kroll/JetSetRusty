@@ -104,7 +104,7 @@ impl CodesState {
     }
 
     fn do_codes_ticker(&mut self) {
-        if video_flash() != 0 {
+        if video_flash() {
             self.cell[0] = 0x02;
             self.cell[2] = 0x01;
         } else {

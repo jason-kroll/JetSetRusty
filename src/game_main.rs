@@ -160,8 +160,8 @@ pub(crate) fn set_game_input(key: i32) {
 pub(crate) fn game_input() -> i32 {
     GAME_INPUT.with(Cell::get)
 }
-pub(crate) fn video_flash() -> i32 {
-    VIDEO_FLASH.with(Cell::get)
+pub(crate) fn video_flash() -> bool {
+    VIDEO_FLASH.with(|c| c.get() != 0)
 }
 pub(crate) fn toggle_video_flash(bit: i32) {
     VIDEO_FLASH.with(|c| c.set(c.get() ^ bit));
@@ -214,10 +214,10 @@ pub fn system_rnd() -> i32 {
     crate::rng::rand()
 }
 
-pub fn system_is_key(key: i32) -> i32 {
+pub fn system_is_key(key: i32) -> bool {
     let sym = SDL_KEYS[key as usize];
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
-        return held as i32;
+        return held;
     }
     // Live play: read SDL's keyboard state through the event pump.
     EVENT_PUMP.with(|p| {
@@ -226,19 +226,19 @@ pub fn system_is_key(key: i32) -> i32 {
             .as_ref()
             .expect("system_is_key called before run() initialised SDL");
         pump.keyboard_state()
-            .is_scancode_pressed(SDL_SCANCODES[key as usize]) as i32
+            .is_scancode_pressed(SDL_SCANCODES[key as usize])
     })
 }
 
 // Joystick state polled by the game (upstream System_IsJoyLeft/Right/Fire).
-pub(crate) fn system_is_joy_left() -> i32 {
-    JOY_STATE.with(|s| s.get()[0])
+pub(crate) fn system_is_joy_left() -> bool {
+    JOY_STATE.with(|s| s.get()[0] != 0)
 }
-pub(crate) fn system_is_joy_right() -> i32 {
-    JOY_STATE.with(|s| s.get()[1])
+pub(crate) fn system_is_joy_right() -> bool {
+    JOY_STATE.with(|s| s.get()[1] != 0)
 }
-pub(crate) fn system_is_joy_fire() -> i32 {
-    JOY_STATE.with(|s| s.get()[2])
+pub(crate) fn system_is_joy_fire() -> bool {
+    JOY_STATE.with(|s| s.get()[2] != 0)
 }
 
 fn set_joy_state(left: i32, right: i32, fire: i32) {

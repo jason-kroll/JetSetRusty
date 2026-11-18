@@ -20,13 +20,13 @@ fn cheat_level_select() {
     let mut level: i32 = 0;
 
     for i in 0..30 {
-        if system_is_key(Key::K1 as i32 + i) != 0 {
+        if system_is_key(Key::K1 as i32 + i) {
             level = i + 1;
             break;
         }
     }
 
-    if system_is_key(Key::Enter as i32) == 0 {
+    if !system_is_key(Key::Enter as i32) {
         game_pause(false);
         return;
     }
@@ -35,7 +35,7 @@ fn cheat_level_select() {
         return;
     }
 
-    if system_is_key(Key::LShift as i32) != 0 || system_is_key(Key::RShift as i32) != 0 {
+    if system_is_key(Key::LShift as i32) || system_is_key(Key::RShift as i32) {
         level += 30;
     }
 

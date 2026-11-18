@@ -27,7 +27,7 @@ fn do_loader_responder() {
 fn do_loader_ticker() {
     LOADER_TEXT.with(|t| {
         let mut text = t.borrow_mut();
-        if video_flash() != 0 {
+        if video_flash() {
             text[1] = 7;
             text[3] = 2;
         } else {
@@ -48,7 +48,7 @@ fn do_loader_drawer3() {
 }
 
 fn do_loader_drawer2() {
-    if audio_music_playing() != 0 {
+    if audio_music_playing() {
         return;
     }
 

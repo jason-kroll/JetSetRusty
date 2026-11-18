@@ -1,7 +1,7 @@
 use crate::misc::{Timer, timer_set, timer_update};
 use std::cell::Cell;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // from misc.h
 const SAMPLERATE: i32 = 22050;
@@ -174,13 +174,13 @@ static SFX_PITCH: [&[i32]; 6] = [
 // screens on the main thread, so it stays a plain atomic; audio_pan_x is only
 // ever touched on the main thread, so it is a thread-local Cell.
 
-static AUDIO_MUSIC_PLAYING: AtomicI32 = AtomicI32::new(MUS_STOP);
+static AUDIO_MUSIC_PLAYING: AtomicBool = AtomicBool::new(false); // MUS_STOP
 
 thread_local! {
     static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
 }
 
-pub fn audio_music_playing() -> i32 {
+pub fn audio_music_playing() -> bool {
     AUDIO_MUSIC_PLAYING.load(Ordering::Relaxed)
 }
 
@@ -443,7 +443,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
     if s.samples_music == 0 {
         s.samples_music = timer_update(&mut s.timer_music);
 
-        if audio_music_playing() != 0 {
+        if audio_music_playing() {
             if s.music_delta == s.music_clock {
                 // Process all events due this tick (time==0 events chain immediately).
                 loop {
@@ -461,7 +461,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
                         }
                         x if x == EV_END => {
                             let playing = MUSIC_SCORE[s.cur_music_table][s.cur_music_idx] as i32;
-                            AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
+                            AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
                             music_reset(&mut s);
                             // MUS_PLAY → time=0 → continue loop from top of reset score
                             // MUS_STOP → time=1 → break
@@ -535,7 +535,7 @@ pub fn audio_output(output: &mut [i16; 2]) {
 }
 
 pub fn audio_play(playing: i32) {
-    AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
+    AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
     let mut s = AUDIO_STATE.lock().unwrap();
     s.music_channels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
 }
