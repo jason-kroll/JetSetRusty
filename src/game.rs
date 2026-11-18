@@ -1,6 +1,5 @@
 #![warn(unused_unsafe)]
 use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
-use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
 use crate::misc::Timer;
@@ -9,18 +8,13 @@ use crate::video::{
     video_cycle_colours, video_pixel_ink_fill, video_pixel_paper_fill, video_write_large,
 };
 
-use crate::common::{
-    // Types
-    Event,
-    Key,
-    // Constant(s)
-    WIDTH,
-};
+use crate::common::{Key, WIDTH};
 
+use crate::cheat::{CheatHandler, cheat_code_entry, cheat_handler, cheat_level_select};
 use crate::dispatch::{
     GameOverPhase, GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen,
 };
-use crate::game_main::{TICKRATE, do_nothing, system_border};
+use crate::game_main::{TICKRATE, system_border};
 use crate::levels::level_init;
 use crate::miner::{
     miner_draw_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
@@ -52,16 +46,18 @@ pub const THEBEACH: i32 = 57;
 // life ink colors for drawing lives
 const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
-// Static callback variable(s)
+// Set when the clock display needs a redraw on the next game drawer pass;
+// cleared by do_draw_clock after drawing. Was the DO_CLOCK_UPDATE fn-pointer
+// slot (None / do_draw_clock / do_nothing).
 thread_local! {
-    static DO_CLOCK_UPDATE: Cell<Event> = const { Cell::new(None) };
+    static CLOCK_REDRAW: Cell<bool> = const { Cell::new(false) };
 }
 
-fn do_clock_update() -> Event {
-    DO_CLOCK_UPDATE.with(Cell::get)
+fn clock_redraw() -> bool {
+    CLOCK_REDRAW.with(Cell::get)
 }
-fn set_do_clock_update(f: Event) {
-    DO_CLOCK_UPDATE.with(|c| c.set(f));
+fn set_clock_redraw(v: bool) {
+    CLOCK_REDRAW.with(|c| c.set(v));
 }
 
 // Probably a lot of functions go here!
@@ -289,11 +285,10 @@ pub fn do_game_responder() {
             audio_play(new_music);
         }
         Key::Escape => queue_pending(Pending::Enter(Screen::Title(TitlePhase::Init))),
-        _ => {
-            if let Some(handler) = cheat_responder() {
-                handler();
-            }
-        }
+        _ => match cheat_handler() {
+            CheatHandler::LevelSelect => cheat_level_select(),
+            CheatHandler::CodeEntry => cheat_code_entry(),
+        },
     }
 }
 
@@ -320,11 +315,9 @@ pub fn do_game_drawer() {
 
     miner_drawer();
 
-    if let Some(func) = rope::rope_drawer() {
-        func();
-    }
-    if let Some(func) = do_clock_update() {
-        func();
+    rope::rope_draw();
+    if clock_redraw() {
+        do_draw_clock();
     }
 }
 
@@ -347,7 +340,7 @@ pub fn do_draw_clock() {
     }
 
     video_write_large(WIDTH - 60, STATUS as i32, &text[..]);
-    set_do_clock_update(Some(do_nothing));
+    set_clock_redraw(false);
 }
 
 pub fn do_pause_ticker() {
@@ -378,7 +371,7 @@ pub fn game_game_reset() {
     *game.score_clock.lock().unwrap() = [0, 7, 0];
 
     // DoClockUpdate = do_draw_clock
-    set_do_clock_update(Some(do_draw_clock));
+    set_clock_redraw(true);
 
     // gameClockTicks = 0
     game.clock_ticks.store(0, Ordering::Relaxed);
@@ -564,9 +557,7 @@ pub fn do_game_ticker() {
     }
 
     // Tick rope
-    if let Some(f) = rope::rope_ticker() {
-        f();
-    }
+    rope::rope_tick();
 
     // Tick clock
     clock_ticker();
@@ -626,7 +617,7 @@ pub fn clock_ticker() {
         }
     }
 
-    set_do_clock_update(Some(do_draw_clock));
+    set_clock_redraw(true);
 }
 
 pub fn game_draw_lives() {

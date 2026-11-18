@@ -1,5 +1,5 @@
 /// rope.rs - Modernized version with proper FFI safety
-use crate::common::{Event, WIDTH};
+use crate::common::WIDTH;
 use crate::game::{COLDSTORE, Direction, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{
     VIDEO_PIXEL, buf_index, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel,
@@ -151,26 +151,30 @@ static ROPE: RopeState = RopeState {
     ink: AtomicU8::new(0),
 };
 
-// ----------------------------------------------------------------------------
-// C-visible function pointer variables (game.c calls these indirectly)
-// ----------------------------------------------------------------------------
-
+// Whether the current room has a rope, set by rope_init per room. The old
+// ROPE_TICKER/ROPE_DRAWER fn-pointer slots collapse into this one flag:
+// when set, rope_tick/rope_draw run the rope handlers; when clear they are
+// no-ops (the old do_nothing slot values).
 thread_local! {
-    static ROPE_TICKER: Cell<Event> = const { Cell::new(None) };
-    static ROPE_DRAWER: Cell<Event> = const { Cell::new(None) };
+    static ROPE_ACTIVE: Cell<bool> = const { Cell::new(false) };
 }
 
-pub fn rope_ticker() -> Event {
-    ROPE_TICKER.with(Cell::get)
+fn set_rope_active(active: bool) {
+    ROPE_ACTIVE.with(|c| c.set(active));
 }
-pub fn set_rope_ticker(f: Event) {
-    ROPE_TICKER.with(|c| c.set(f));
+
+/// Tick the rope if the current room has one (called from the game ticker).
+pub fn rope_tick() {
+    if ROPE_ACTIVE.with(Cell::get) {
+        do_rope_ticker();
+    }
 }
-pub fn rope_drawer() -> Event {
-    ROPE_DRAWER.with(Cell::get)
-}
-pub fn set_rope_drawer(f: Event) {
-    ROPE_DRAWER.with(|c| c.set(f));
+
+/// Draw the rope if the current room has one (called from the game drawer).
+pub fn rope_draw() {
+    if ROPE_ACTIVE.with(Cell::get) {
+        do_rope_drawer();
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -293,14 +297,6 @@ fn do_rope_ticker() {
     }
 }
 
-fn rope_ticker_fn() {
-    do_rope_ticker();
-}
-
-fn rope_drawer_fn() {
-    do_rope_drawer();
-}
-
 pub fn rope_init() {
     let level = GAME_STATE.level.load(Ordering::Relaxed);
     let (x, ink) = match level {
@@ -310,8 +306,7 @@ pub fn rope_init() {
         SWIMMINGPOOL => (16, 7),
         THEBEACH => (14, 5),
         _ => {
-            set_rope_ticker(Some(do_nothing));
-            set_rope_drawer(Some(do_nothing));
+            set_rope_active(false);
             return;
         }
     };
@@ -323,10 +318,7 @@ pub fn rope_init() {
     ROPE.side.store(0, Ordering::Relaxed);
     ROPE.hold.store(false, Ordering::Relaxed);
 
-    set_rope_ticker(Some(rope_ticker_fn));
-    set_rope_drawer(Some(rope_drawer_fn));
+    set_rope_active(true);
 }
-
-fn do_nothing() {}
 
 use crate::levels::level_dir;

@@ -1,4 +1,4 @@
-use crate::common::{Event, Key};
+use crate::common::Key;
 use crate::dispatch::{Pending, queue_pending};
 use crate::game::{FIRSTLANDING, GAME_STATE, game_cheat_enabled, game_pause};
 use crate::game_main::{game_input, system_is_key};
@@ -45,15 +45,23 @@ const LEVEL_KEYS: [Key; 30] = [
     Key::T,
 ];
 
-pub fn cheat_responder() -> Event {
+/// Which cheat handler the game responder runs — chosen from cheat_enabled.
+/// Was the fn-pointer-returning cheat_responder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheatHandler {
+    LevelSelect,
+    CodeEntry,
+}
+
+pub fn cheat_handler() -> CheatHandler {
     if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
-        Some(cheat_level_select)
+        CheatHandler::LevelSelect
     } else {
-        Some(cheat_code_entry)
+        CheatHandler::CodeEntry
     }
 }
 
-fn cheat_level_select() {
+pub(crate) fn cheat_level_select() {
     let mut level: i32 = 0;
 
     for (i, &key) in LEVEL_KEYS.iter().enumerate() {
@@ -99,7 +107,7 @@ fn code_progress(pos: usize, key: Key) -> usize {
     }
 }
 
-fn cheat_code_entry() {
+pub(crate) fn cheat_code_entry() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 
     let y = GAME_STATE.miner.lock().unwrap().y;

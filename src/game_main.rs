@@ -173,10 +173,6 @@ pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
 // ---- Exported helpers -------------------------------------------------------
 
-// Still used as the DO_CLOCK_UPDATE slot's off value (game.rs) until the
-// sub-slot phase replaces it.
-pub fn do_nothing() {}
-
 pub fn do_quit() {
     // As in the C original: the main loop exits on this atomic. The old
     // slot-clearing writes are gone — the dispatcher has no slots to clear.
