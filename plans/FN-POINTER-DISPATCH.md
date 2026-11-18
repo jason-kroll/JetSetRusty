@@ -18,7 +18,31 @@ Mistral Vibe <vibe@mistral.ai>` trailer. Gates after every phase:
 `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test` (all golden replays + unit tests), `cargo build`.
 
-## Status: REVIEWED — ready to execute
+## Status: COMPLETE
+
+Six commits, all gates green after each (fmt, clippy `-D warnings`,
+`cargo test` — 23 golden replays byte-identical throughout, unit tests
+49 -> 53 with the new dispatch deferral tests):
+
+- `d778b18` Phase 1 — four `Cell<Event>` slots became typed slot enums
+- `7e171bd` Phase 2 — collapsed into one `Cell<Dispatch>` (`Screen` +
+  phases + `Pending`) in the new `src/dispatch.rs`, with deferral tests
+- `8da5144` Phase 3 — rope/clock/cheat sub-slots became `bool`/enum;
+  `do_nothing` deleted
+- `72c9403` Phase 4 — robots' `MoveFn`/`DrawFn` vtables became
+  `Move`/`Draw` enums matched in `Robot::step`/`draw`
+- `e771a4e` Phase 5 — audio `do_phase` became `on: bool`,
+  `do_sfx`/`do_play` became `Option<SfxHandler>`; `Event` alias deleted
+  from `common.rs`
+- Phase 6 (docs) — AGENTS.md architecture rewritten, stale comments
+  swept
+
+Deviation from the plan text: the drawer one-shot `PausedDrawOnce`
+transitions to `PauseCheat` (not `Pause`) after firing, because that is
+what the old slot-clearing actually produced (T=noop, D=noop); the
+plan's "Pause" wording was loose. Also `do_quit` now only sets
+`GAME_RUNNING`, matching the C original — the old slot clears were an
+extra-port addition no golden covered.
 
 Review of the previous draft fixed: stale line citations, the missing
 drawer-slot one-shot, the cheat-responder consultation, the initial state,

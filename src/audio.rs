@@ -31,7 +31,7 @@ pub enum MusicScore {
 }
 
 // Matches audio.h SFX_* enum order; also indexes SFX_PITCH. SFX_WILLY (4)
-// has no variant — the willy trampoline never reads a pitch table, so in
+// has no variant — the willy handler never reads a pitch table, so in
 // the port that row is unreachable, exactly as in C.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sfx {
@@ -52,14 +52,13 @@ struct Channel {
     right: [i32; 3],
     phase: u32,
     frequency: u32,
-    // Channel on (oscillator running). Was a do_phase fn-pointer sentinel
-    // (None = off, Some(do_phase_fn) = on); the oscillator itself is inlined
-    // in audio_output's mixing loop.
+    // Channel on (oscillator running) — was a fn-pointer on/off sentinel.
+    // The oscillator itself is inlined in audio_output's mixing loop.
     on: bool,
 }
 
-/// What an SFX slot does when its clock fires. Was the do_sfx/do_play
-/// fn-pointer trampolines; the handlers take &mut AudioState because
+/// What an SFX slot does when its clock fires. Was fn-pointer slots; the
+/// handlers take &mut AudioState because
 /// audio_output calls them while holding the single AUDIO_STATE guard
 /// (std Mutex is not reentrant) — no global CUR_SFX handoff needed beyond
 /// the cur_sfx slot index.
@@ -234,7 +233,7 @@ pub fn set_audio_pan_x(pan: i32) {
 struct AudioState {
     channels: [Channel; NCHANNELS],
     sfx: [SfxInfo; NSFX],
-    // Index of the sfx slot being processed by the trampoline functions below.
+    // Index of the sfx slot being processed by the SFX handler functions below.
     cur_sfx: usize,
     music_index: MusicScore,
     music_tempo: i32,

@@ -153,8 +153,8 @@ static ROPE: RopeState = RopeState {
 
 // Whether the current room has a rope, set by rope_init per room. The old
 // ROPE_TICKER/ROPE_DRAWER fn-pointer slots collapse into this one flag:
-// when set, rope_tick/rope_draw run the rope handlers; when clear they are
-// no-ops (the old do_nothing slot values).
+// when set, rope_tick/rope_draw run the rope handlers; when clear they do
+// nothing.
 thread_local! {
     static ROPE_ACTIVE: Cell<bool> = const { Cell::new(false) };
 }

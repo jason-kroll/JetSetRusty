@@ -45,8 +45,8 @@ const LEVEL_KEYS: [Key; 30] = [
     Key::T,
 ];
 
-/// Which cheat handler the game responder runs — chosen from cheat_enabled.
-/// Was the fn-pointer-returning cheat_responder.
+/// Which cheat handler the game responder runs — chosen from cheat_enabled
+/// (was a fn-pointer return before the typed enum).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CheatHandler {
     LevelSelect,

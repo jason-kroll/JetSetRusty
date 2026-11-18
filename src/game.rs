@@ -48,7 +48,7 @@ const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 
 // Set when the clock display needs a redraw on the next game drawer pass;
 // cleared by do_draw_clock after drawing. Was the DO_CLOCK_UPDATE fn-pointer
-// slot (None / do_draw_clock / do_nothing).
+// slot.
 thread_local! {
     static CLOCK_REDRAW: Cell<bool> = const { Cell::new(false) };
 }
@@ -195,10 +195,8 @@ impl GameState {
 
 // Game functions
 //
-// Installed as the `Ticker` by game_action and runs exactly once: it sets up the
-// room, then swaps `Ticker` to do_game_ticker and `Action` to do_nothing — that
-// do_nothing handoff is what stops the title's `game_start` from re-firing (and
-// restarting the music) every frame. Must be `extern "C"` to fit `Event`.
+// Runs exactly once as the Game(Init) phase's ticker: it sets up the room,
+// then moves the phase to Play (or PausedDrawOnce when paused).
 pub fn game_init_room() {
     level_init();
     robots_init();

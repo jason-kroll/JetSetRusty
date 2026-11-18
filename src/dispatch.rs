@@ -108,14 +108,14 @@ pub(crate) fn with_dispatch<R>(f: impl FnOnce(&mut Dispatch) -> R) -> R {
     })
 }
 
-/// Queue a one-shot command for the start of the next frame (the old
-/// set_action).
+/// Queue a one-shot command for the start of the next frame (the C-era
+/// ACTION slot).
 pub(crate) fn queue_pending(p: Pending) {
     with_dispatch(|d| d.pending = Some(p));
 }
 
 /// Install a screen/phase now — visible to the next handler read, which may
-/// be later in the same frame (the old set_ticker/set_drawer/set_responder).
+/// be later in the same frame (the C-era TICKER/DRAWER/RESPONDER writes).
 pub(crate) fn set_screen(s: Screen) {
     with_dispatch(|d| d.screen = s);
 }
