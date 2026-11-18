@@ -21,9 +21,9 @@ fn keycode_i32(k: Keycode) -> i32 {
     sdl3::sys::keycode::SDL_Keycode::from(k).0 as i32
 }
 
-// SDL keycodes indexed by key value 0..35 (Key::Left=0 .. Key::A=10 plus the
-// letter range 10..35 produced arithmetically by map_keycode). system_is_key
-// compares these against replay-scripted presses.
+// SDL keycodes indexed by Key value 0..=35 (Key::Left=0 .. Key::T=35, the
+// last letter with a poll slot — C's sdlKey[36] covers exactly these).
+// system_is_key compares these against replay-scripted presses.
 static SDL_KEYS: LazyLock<[i32; 36]> = LazyLock::new(|| {
     [
         keycode_i32(Keycode::Left),
