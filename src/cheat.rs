@@ -1,23 +1,19 @@
 use crate::common::{Event, Key};
-use crate::game::{GAME_STATE, game_cheat_enabled, game_init_room, game_pause};
+use crate::game::{FIRSTLANDING, GAME_STATE, game_cheat_enabled, game_init_room, game_pause};
 use crate::game_main::{game_input, set_action, system_is_key};
-use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-// These will move to game.rs when we port that
-const FIRSTLANDING: i32 = 28;
 
 static CHEAT_CODE: &[u8] = b"writetyper";
 
-thread_local! {
-    static CHEAT_RESPONDER: Cell<Event> = const { Cell::new(Some(cheat_disabled)) };
-}
+// miner.y on First Landing's floor — the only spot where the code is read
+const FIRSTLANDING_FLOOR_Y: i32 = 104;
 
 pub fn cheat_responder() -> Event {
-    CHEAT_RESPONDER.with(Cell::get)
-}
-fn set_cheat_responder(f: Event) {
-    CHEAT_RESPONDER.with(|c| c.set(f));
+    if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
+        Some(cheat_enabled)
+    } else {
+        Some(cheat_disabled)
+    }
 }
 
 pub fn cheat_enabled() {
@@ -57,10 +53,14 @@ pub fn cheat_disabled() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 
     let miner = GAME_STATE.miner.lock().unwrap();
+    let pos = CHEAT_POS.load(Ordering::Relaxed);
+    // Letter keys arrive as Key::A + offset; map the input back to ASCII to
+    // compare against the code word. The bounds check keeps the index in
+    // range even if the code has already been fully entered.
     if GAME_STATE.level.load(Ordering::Relaxed) != FIRSTLANDING
-        || miner.y != 104
-        || CHEAT_CODE[CHEAT_POS.load(Ordering::Relaxed)]
-            != (game_input() - Key::A as i32 + b'a' as i32) as u8
+        || miner.y != FIRSTLANDING_FLOOR_Y
+        || pos >= CHEAT_CODE.len()
+        || CHEAT_CODE[pos] != (game_input() - Key::A as i32 + b'a' as i32) as u8
     {
         game_pause(false);
         return;
@@ -73,6 +73,4 @@ pub fn cheat_disabled() {
     }
 
     game_cheat_enabled();
-
-    set_cheat_responder(Some(cheat_enabled));
 }
