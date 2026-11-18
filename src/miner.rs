@@ -399,7 +399,7 @@ fn move_left_right() {
 
         if miner.x == 30 * 8 {
             drop(miner);
-            game_change_level(Direction::Right as i32);
+            game_change_level(Direction::Right);
             return;
         }
 
@@ -428,7 +428,7 @@ fn move_left_right() {
 
         if miner.x == 0 {
             drop(miner);
-            game_change_level(Direction::Left as i32);
+            game_change_level(Direction::Left);
             return;
         }
 
@@ -520,7 +520,7 @@ fn do_miner_ticker() {
         ) {
             JumpOutcome::Above => {
                 drop(miner);
-                game_change_level(Direction::Above as i32);
+                game_change_level(Direction::Above);
                 return;
             }
             JumpOutcome::BumpHead { y, tile } => {
@@ -569,7 +569,7 @@ fn do_miner_ticker() {
         match ground_check(miner.tile, miner.air, &level_get_tile_type) {
             GroundOutcome::Below => {
                 drop(miner);
-                game_change_level(Direction::Below as i32);
+                game_change_level(Direction::Below);
                 return;
             }
             GroundOutcome::HarmPass => {
@@ -622,7 +622,7 @@ pub fn miner_ticker() {
     let miner = GAME_STATE.miner.lock().unwrap();
     if miner.y < 0 {
         drop(miner);
-        game_change_level(Direction::Above as i32);
+        game_change_level(Direction::Above);
     }
 }
 

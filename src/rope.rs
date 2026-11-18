@@ -1,9 +1,9 @@
 /// rope.rs - Modernized version with proper FFI safety
 use crate::common::{Event, WIDTH};
-use crate::game::{COLDSTORE, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
+use crate::game::{COLDSTORE, Direction, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{VIDEO_PIXEL, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel};
 use std::cell::Cell;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 const ROPE_SEGS: i32 = 33;
 
@@ -121,7 +121,7 @@ static ROPE_MOVE: [i32; 2] = [-1, 1];
 struct RopeState {
     dir: AtomicI32,
     pos: AtomicI32,
-    hold: AtomicI32,
+    hold: AtomicBool,
     x: AtomicI32,
     side: AtomicI32,
     ink: AtomicI32,
@@ -132,7 +132,7 @@ impl Default for RopeState {
         Self {
             dir: AtomicI32::new(0),
             pos: AtomicI32::new(0),
-            hold: AtomicI32::new(0),
+            hold: AtomicBool::new(false),
             x: AtomicI32::new(0),
             side: AtomicI32::new(0),
             ink: AtomicI32::new(0),
@@ -143,7 +143,7 @@ impl Default for RopeState {
 static ROPE: RopeState = RopeState {
     dir: AtomicI32::new(0),
     pos: AtomicI32::new(0),
-    hold: AtomicI32::new(0),
+    hold: AtomicBool::new(false),
     x: AtomicI32::new(0),
     side: AtomicI32::new(0),
     ink: AtomicI32::new(0),
@@ -179,7 +179,6 @@ use crate::game::GAME_STATE;
 
 // Level constants
 const B_WILLY: i32 = 4;
-const R_ABOVE: i32 = 0;
 
 // ----------------------------------------------------------------------------
 // Internal implementation
@@ -211,12 +210,12 @@ fn do_rope_drawer() {
         let willy_rope_zero = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == 0;
         if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
             GAME_STATE.miner_willy_rope.store(seg, Ordering::Relaxed);
-            ROPE.hold.store(1, Ordering::Relaxed);
+            ROPE.hold.store(true, Ordering::Relaxed);
         }
 
         // Handle Willy position if holding rope
         let willy_on_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == seg;
-        if willy_on_rope && ROPE.hold.load(Ordering::Relaxed) != 0 {
+        if willy_on_rope && ROPE.hold.load(Ordering::Relaxed) {
             let willy_x = x & 248;
             let willy_y = y - 8;
 
@@ -242,12 +241,12 @@ fn do_rope_drawer() {
     // Handle negative minerWillyRope
     if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) < 0 {
         GAME_STATE.miner_willy_rope.fetch_add(1, Ordering::Relaxed);
-        ROPE.hold.store(0, Ordering::Relaxed);
+        ROPE.hold.store(false, Ordering::Relaxed);
         return;
     }
 
     // Handle rope movement when holding
-    if ROPE.hold.load(Ordering::Relaxed) != 0 {
+    if ROPE.hold.load(Ordering::Relaxed) {
         let miner = GAME_STATE.miner.lock().unwrap();
         let willy_moving = miner.move_ != 0;
         drop(miner);
@@ -259,7 +258,7 @@ fn do_rope_drawer() {
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
             let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
 
-            let level_dir = level_dir(R_ABOVE as usize);
+            let level_dir = level_dir(Direction::Above);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
 
             if adjusted_seg < ROPE_SEGS {
@@ -320,7 +319,7 @@ pub fn rope_init() {
     ROPE.dir.store(0, Ordering::Relaxed);
     ROPE.pos.store(34, Ordering::Relaxed);
     ROPE.side.store(0, Ordering::Relaxed);
-    ROPE.hold.store(0, Ordering::Relaxed);
+    ROPE.hold.store(false, Ordering::Relaxed);
 
     set_rope_ticker(Some(rope_ticker_fn));
     set_rope_drawer(Some(rope_drawer_fn));

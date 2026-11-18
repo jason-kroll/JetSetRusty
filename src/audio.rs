@@ -540,10 +540,10 @@ pub fn audio_output(output: &mut [i16; 2]) {
     s.samples_sfx -= 1;
 }
 
-pub fn audio_play(playing: i32) {
-    AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
+pub fn audio_play(playing: bool) {
+    AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
     let mut s = AUDIO_STATE.lock().unwrap();
-    s.music_channels = if playing == MUS_PLAY { NCHANNELS } else { NSFX };
+    s.music_channels = if playing { NCHANNELS } else { NSFX };
 }
 
 pub fn audio_music(music: i32, playing: i32) {
@@ -561,7 +561,7 @@ pub fn audio_music(music: i32, playing: i32) {
         s.samples_music = 0;
         timer_set(&mut s.timer_music, SAMPLERATE, TICKRATE);
     }
-    audio_play(playing);
+    audio_play(playing == MUS_PLAY);
 }
 
 pub fn audio_init() {

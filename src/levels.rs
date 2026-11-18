@@ -1,5 +1,5 @@
 use crate::common::WIDTH;
-use crate::game::GAME_STATE;
+use crate::game::{Direction, GAME_STATE};
 use crate::game_main::{system_border, video_flash};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
 use std::cell::RefCell;
@@ -4950,8 +4950,8 @@ fn game_level() -> usize {
     GAME_STATE.level.load(Ordering::Relaxed) as usize
 }
 
-pub fn level_dir(dir: usize) -> i32 {
-    LEVEL_DATA[game_level()].map[dir]
+pub fn level_dir(dir: Direction) -> i32 {
+    LEVEL_DATA[game_level()].map[dir as usize]
 }
 
 pub fn level_item_count() -> i32 {

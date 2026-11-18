@@ -1,7 +1,5 @@
 #![warn(unused_unsafe)]
-use crate::audio::{
-    MUS_PLAY, MUS_STOP, SFX_ITEM, audio_music, audio_music_clock, audio_play, audio_sfx,
-};
+use crate::audio::{SFX_ITEM, audio_music, audio_music_clock, audio_play, audio_sfx};
 use crate::cheat::cheat_responder;
 use crate::game_main::game_input;
 use crate::gameover::gameover_action;
@@ -88,20 +86,6 @@ pub enum Direction {
     Left,
 }
 
-impl Direction {
-    /// Codes 0..=3 in declaration order (Above is pinned at 0); anything
-    /// else is None.
-    pub fn from_i32(v: i32) -> Option<Direction> {
-        const ALL: [Direction; 4] = [
-            Direction::Above,
-            Direction::Right,
-            Direction::Below,
-            Direction::Left,
-        ];
-        ALL.get(v as usize).copied()
-    }
-}
-
 // miner struct (from game.h)
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Miner {
@@ -124,8 +108,8 @@ pub struct GameState {
     // Frequently accessed, thread-safe, atomic fields (cheap access)
     pub cheat_enabled: AtomicBool,
     pub clock_ticks: AtomicI32,
-    pub frame: AtomicI32,
-    pub game_paused: AtomicI32,
+    pub frame: AtomicBool,
+    pub game_paused: AtomicI32, // counter: 0 = unpaused, counts up while paused
     pub inactivity_timer: AtomicI32,
     pub item_count: AtomicI32,
     pub level: AtomicI32,
@@ -138,7 +122,7 @@ pub struct GameState {
     pub miner_air: AtomicI32,
     pub miner_jump: AtomicI32,
     pub mode: AtomicU8,
-    pub music: AtomicU8,
+    pub music: AtomicBool,
 
     // How to use enums in Atomics:
     // MY_ENUM.store(MyEnum::B as i32, Ordering::Release);
@@ -166,7 +150,7 @@ const LEVEL_BORDER: [i32; 60] = [
 pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     cheat_enabled: AtomicBool::new(false),
     clock_ticks: AtomicI32::new(0),
-    frame: AtomicI32::new(0),
+    frame: AtomicBool::new(false),
     game_paused: AtomicI32::new(0),
     inactivity_timer: AtomicI32::new(0),
     item_count: AtomicI32::new(0),
@@ -180,7 +164,7 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     miner_jump: AtomicI32::new(0),
     mode: AtomicU8::new(0),
     // C: `int gameMusic = MUS_PLAY;` — music on by default.
-    music: AtomicU8::new(MUS_PLAY as u8),
+    music: AtomicBool::new(true),
     score_clock: Mutex::new([0, 7, 0]), // 7:00 AM
     score_items: Mutex::new(0),
     timer: Mutex::new(Timer::default()),
@@ -214,7 +198,7 @@ pub fn game_init_room() {
 
     // Timer
     timer_set(&mut game.timer.lock().unwrap(), 12, TICKRATE);
-    game.frame.store(1, Ordering::Relaxed);
+    game.frame.store(true, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
 
@@ -248,11 +232,11 @@ pub fn game_pause(state: bool) {
             set_ticker(Some(do_pause_ticker));
             set_drawer(Some(do_pause_drawer));
         }
-        audio_play(MUS_STOP);
+        audio_play(false);
     } else {
         set_ticker(Some(do_game_ticker));
         set_drawer(Some(do_game_drawer));
-        audio_play(game.music.load(Ordering::Relaxed) as i32);
+        audio_play(game.music.load(Ordering::Relaxed));
 
         game.inactivity_timer.store(0, Ordering::Relaxed);
         // Original: `if (cheatEnabled == 0)`. Redraw the status band on unpause
@@ -280,13 +264,9 @@ pub fn do_game_responder() {
     match Key::from_key_code(input) {
         Key::Pause => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
         Key::Mute => {
-            let new_music = if game.music.load(Ordering::Relaxed) == 0 {
-                1
-            } else {
-                0
-            };
+            let new_music = !game.music.load(Ordering::Relaxed);
             game.music.store(new_music, Ordering::Relaxed);
-            audio_play(new_music as i32);
+            audio_play(new_music);
         }
         Key::Escape => set_action(Some(title_action)),
         _ => {
@@ -300,7 +280,7 @@ pub fn do_game_responder() {
 pub fn do_game_drawer() {
     let game = &*GAME_STATE;
 
-    if game.frame.load(Ordering::Relaxed) == 0 {
+    if !game.frame.load(Ordering::Relaxed) {
         return;
     }
 
@@ -310,7 +290,7 @@ pub fn do_game_drawer() {
     level_drawer();
     robots_drawer();
 
-    if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
+    if game.music.load(Ordering::Relaxed) {
         game_draw_lives();
     }
 
@@ -402,7 +382,7 @@ pub fn game_cheat_enabled() {
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
         // gameFrame = 1
-        game.frame.store(1, Ordering::Relaxed);
+        game.frame.store(true, Ordering::Relaxed);
 
         // Ticker = do_nothing; Drawer = do_nothing;
         set_ticker(Some(do_nothing));
@@ -421,14 +401,14 @@ pub fn game_cheat_enabled() {
     robots_draw_cheat();
 }
 
-pub fn game_change_level(dir: i32) {
+pub fn game_change_level(dir: Direction) {
     let game = &*GAME_STATE;
 
     // int level = level_dir(dir)
-    let level = level_dir(dir as usize);
+    let level = level_dir(dir);
 
     // Special case for R_ABOVE from THEDRIVE or FIRSTLANDING
-    if Direction::from_i32(dir) == Some(Direction::Above) {
+    if dir == Direction::Above {
         let mut miner = game.miner.lock().unwrap();
         if (level == THEDRIVE && miner.x > 22 && miner.x < 32)
             || (level == FIRSTLANDING && miner.x > 182)
@@ -447,8 +427,8 @@ pub fn game_change_level(dir: i32) {
     // locks GAME_STATE.miner itself).
     {
         let mut miner = game.miner.lock().unwrap();
-        match Direction::from_i32(dir) {
-            Some(Direction::Above) => {
+        match dir {
+            Direction::Above => {
                 // minerWilly.y = 13 * 8 = 104
                 miner.y = 13 * 8;
                 // minerWilly.x = (minerWilly.tile & 31) * 8
@@ -460,13 +440,13 @@ pub fn game_change_level(dir: i32) {
                 // minerWilly.air = 0
                 miner.air = 0;
             }
-            Some(Direction::Right) => {
+            Direction::Right => {
                 // minerWilly.x = 0
                 miner.x = 0;
                 // minerWilly.tile &= ~31
                 miner.tile &= !31;
             }
-            Some(Direction::Below) => {
+            Direction::Below => {
                 // if (minerWilly.air < 11) { minerWilly.air = 2; }
                 if miner.air < 11 {
                     miner.air = 2;
@@ -476,13 +456,12 @@ pub fn game_change_level(dir: i32) {
                 // minerWilly.tile &= 31
                 miner.tile &= 31;
             }
-            Some(Direction::Left) => {
+            Direction::Left => {
                 // minerWilly.x = 30 * 8 = 240
                 miner.x = 30 * 8;
                 // minerWilly.tile |= 30
                 miner.tile |= 30;
             }
-            None => {}
         }
     }
 
@@ -499,7 +478,7 @@ pub fn do_game_ticker() {
     let game = &*GAME_STATE;
 
     // Inactivity check: pause after 5 minutes when music stopped
-    if game.music.load(Ordering::Relaxed) == MUS_STOP as u8 {
+    if !game.music.load(Ordering::Relaxed) {
         let old = game.inactivity_timer.fetch_add(1, Ordering::Relaxed);
         if old == 256 * 5 && game.mode.load(Ordering::Relaxed) < GameMode::Running as u8 {
             game_pause(true);
@@ -508,7 +487,7 @@ pub fn do_game_ticker() {
     }
 
     // Miner animation
-    if game.music.load(Ordering::Relaxed) == MUS_PLAY as u8 {
+    if game.music.load(Ordering::Relaxed) {
         miner_inc_seq();
     }
 
@@ -517,7 +496,7 @@ pub fn do_game_ticker() {
         let mut timer = game.timer.lock().unwrap();
         timer_update(&mut timer)
     };
-    game.frame.store(frame, Ordering::Relaxed);
+    game.frame.store(frame != 0, Ordering::Relaxed);
     if frame == 0 {
         return;
     }
@@ -690,7 +669,7 @@ mod tests {
     #[test]
     fn change_level_above_guard() {
         let game = &*GAME_STATE;
-        let above = Direction::Above as i32;
+        let above = Direction::Above;
 
         // Set current room + Willy's x (tile kept consistent). Drops the
         // miner lock before returning — never hold it across game_change_level.
