@@ -111,7 +111,6 @@ static SDL_SCANCODES: LazyLock<[Scancode; 36]> = LazyLock::new(|| {
 
 use crate::audio::{audio_init, audio_output};
 use crate::loader::loader_action;
-use crate::video::buf_index;
 
 // libc rand/srand are vendored in safe Rust in src/rng.rs (glibc's TYPE_3
 // generator, pinned to libc's exact sequence by tests there), so no libc FFI
@@ -180,7 +179,7 @@ pub(crate) fn toggle_video_flash(bit: i32) {
 // locked SDL surface, makes the game's output independent of SDL.
 thread_local! {
     static EVENT_PUMP:  RefCell<Option<EventPump>>               = const { RefCell::new(None) };
-    static FRAMEBUFFER: RefCell<[u8; (WIDTH * HEIGHT) as usize]> = const { RefCell::new([0; (WIDTH * HEIGHT) as usize]) };
+    static FRAMEBUFFER: RefCell<[u8; WIDTH as usize * HEIGHT as usize]> = const { RefCell::new([0; WIDTH as usize * HEIGHT as usize]) };
     // In replay mode, the SDL keycodes the script is holding down this frame;
     // system_is_key reads this instead of SDL's keyboard state. None = live play.
     static REPLAY_HELD: RefCell<Option<Vec<i32>>> = const { RefCell::new(None) };
@@ -302,12 +301,12 @@ fn open_joystick(id: JoystickId) {
     });
 }
 
-pub fn system_set_pixel(pos: i32, index: i32) {
-    FRAMEBUFFER.with(|fb| fb.borrow_mut()[buf_index(pos)] = index as u8);
+pub fn system_set_pixel(pos: usize, index: u8) {
+    FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos] = index);
 }
 
-pub fn system_border(index: i32) {
-    BORDER_INDEX.store(index as usize, Relaxed);
+pub fn system_border(index: u8) {
+    BORDER_INDEX.store(usize::from(index), Relaxed);
 }
 
 // ---- Private SDL helpers ----------------------------------------------------
@@ -340,9 +339,8 @@ fn present_frame(texture: &mut Texture) {
         .with_lock(None, |buf: &mut [u8], pitch: usize| {
             FRAMEBUFFER.with(|fb| {
                 for (pos, &index) in fb.borrow().iter().enumerate() {
-                    let pos = pos as i32;
-                    let offset = ((pos / WIDTH) * pitch as i32 + (pos & 255) * 4) as usize;
-                    let [r, g, b] = colour_rgb(index as usize);
+                    let offset = (pos / WIDTH as usize) * pitch + (pos & 255) * 4;
+                    let [r, g, b] = colour_rgb(usize::from(index));
                     buf[offset] = b;
                     buf[offset + 1] = g;
                     buf[offset + 2] = r;

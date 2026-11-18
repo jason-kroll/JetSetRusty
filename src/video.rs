@@ -26,8 +26,12 @@ pub struct Pixel {
     point: u8,
 }
 
-pub static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> =
-    LazyLock::new(|| Mutex::new(vec![Pixel { ink: 0, point: 0 }; (WIDTH * HEIGHT) as usize]));
+pub static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> = LazyLock::new(|| {
+    Mutex::new(vec![
+        Pixel { ink: 0, point: 0 };
+        WIDTH as usize * HEIGHT as usize
+    ])
+});
 
 static TEXT_INK: Mutex<[u8; 2]> = Mutex::new([0, 0]);
 
@@ -270,7 +274,7 @@ pub(crate) fn buf_index(pos: i32) -> usize {
 
 fn video_set_pixel(pixel: &mut Pixel, pos: i32, ink: u8) {
     pixel.ink = ink;
-    system_set_pixel(pos, ink as i32);
+    system_set_pixel(buf_index(pos), ink);
 }
 
 pub fn video_get_pixel(pixel: &Pixel) -> i32 {
@@ -287,14 +291,15 @@ pub fn video_text_width(text: &[u8]) -> i32 {
 }
 
 // game.c and title.c
-pub fn video_cycle_colours() -> i32 {
+pub fn video_cycle_colours() -> u8 {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for (pos, pixel) in pixels.iter_mut().enumerate() {
         let ink = (pixel.ink + 3) & 0xf;
-        video_set_pixel(pixel, pos as i32, ink);
+        let pos = i32::try_from(pos).expect("framebuffer pos fits i32");
+        video_set_pixel(pixel, pos, ink);
     }
-    pixels[0].ink as i32
+    pixels[0].ink
 }
 
 // gameover.c, game.c

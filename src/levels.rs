@@ -4966,7 +4966,7 @@ struct Tile {
 pub fn level_set_border() {
     LEVEL_TILE.with(|tiles| {
         let t = &mut tiles.borrow_mut()[0];
-        system_border(t.ink[0].into());
+        system_border(t.ink[0]);
         t.ink[0] = (t.ink[0] + 3) & 0xf;
     });
 }

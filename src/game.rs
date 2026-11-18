@@ -214,7 +214,7 @@ pub fn game_init_room() {
 
     // system_border(levelBorder[gameLevel])
     let border_value = game.level_border.lock().unwrap()[current_level as usize];
-    system_border(border_value);
+    system_border(u8::try_from(border_value).expect("border palette index"));
 
     miner_save();
 
@@ -276,7 +276,7 @@ pub fn game_pause(state: bool) {
             game_draw_status();
             let level = game.level.load(Ordering::Relaxed);
             let border_value = game.level_border.lock().unwrap()[level as usize];
-            system_border(border_value);
+            system_border(u8::try_from(border_value).expect("border palette index"));
         }
     }
 }
@@ -416,7 +416,10 @@ pub fn game_cheat_enabled() {
         // game_draw_status(); system_border(levelBorder[gameLevel])
         game_draw_status();
         let level = game.level.load(Ordering::Relaxed);
-        system_border(game.level_border.lock().unwrap()[level as usize]);
+        system_border(
+            u8::try_from(game.level_border.lock().unwrap()[level as usize])
+                .expect("border palette index"),
+        );
     }
 
     // cheatEnabled = 1
