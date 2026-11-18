@@ -5068,15 +5068,12 @@ pub fn level_get_tile_ramp(tile: i32) -> TileType {
     tile_type_ramp_for(LEVEL_TILE.with(|t| t.borrow()[tile].tile_type))
 }
 
-pub fn level_get_tile_type(tile: i32) -> TileType {
+pub fn level_get_tile_type(tile: i32, air: i32, jump: i32) -> TileType {
     if tile < 0 || tile >= LEVEL_TILES as i32 {
         return TileType::Space;
     }
     let tile = usize::try_from(tile).expect("guarded to 0..512");
     let raw = LEVEL_TILE.with(|t| t.borrow()[tile].tile_type);
-    // Use atomic caches to avoid deadlocking
-    let air = GAME_STATE.miner_air.load(Ordering::Relaxed);
-    let jump = GAME_STATE.miner_jump.load(Ordering::Relaxed);
     tile_type_for(raw, air, jump)
 }
 

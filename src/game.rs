@@ -130,9 +130,6 @@ pub struct GameState {
     // miner.rs via GAME_STATE.
     pub miner_attr_split: AtomicI32,
     pub miner_willy_rope: AtomicI32,
-    // Atomic caches for level_get_tile_type to avoid deadlocks
-    pub miner_air: AtomicI32,
-    pub miner_jump: AtomicI32,
     // GameMode discriminant, written only by set_mode; the field is private
     // to force the typed accessors (mode()/set_mode()) on every user.
     mode: AtomicU8,
@@ -170,8 +167,6 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     miner: Mutex::new(Miner::default()),
     miner_attr_split: AtomicI32::new(6),
     miner_willy_rope: AtomicI32::new(0),
-    miner_air: AtomicI32::new(0),
-    miner_jump: AtomicI32::new(0),
     mode: AtomicU8::new(GameMode::Normal as u8),
     // C: `int gameMusic = MUS_PLAY;` — music on by default.
     music: AtomicBool::new(true),

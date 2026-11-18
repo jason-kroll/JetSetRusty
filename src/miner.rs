@@ -171,8 +171,6 @@ pub fn miner_restore() {
         miner.air = s.air;
         miner.jump = s.jump;
     });
-    GAME_STATE.miner_air.store(miner.air, Ordering::Relaxed);
-    GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 }
 
 pub fn miner_save() {
@@ -241,14 +239,15 @@ fn solid_check(tile: i32, lookup: &dyn Fn(i32) -> TileType, miner: &Miner) -> So
 }
 
 fn is_solid(tile: i32, miner: &mut Miner) -> bool {
-    match solid_check(tile, &level_get_tile_type, miner) {
+    // Copy the fields the lookup needs: the closure and the &mut miner must
+    // not borrow the same place.
+    let (air, jump) = (miner.air, miner.jump);
+    match solid_check(tile, &|t| level_get_tile_type(t, air, jump), miner) {
         SolidOutcome::Solid => true,
         SolidOutcome::Clear => false,
         SolidOutcome::Land => {
-            // the original C mutates air inside the probe; keeping the
-            // mutation beside its atomic store makes the core pure
+            // the original C mutates air inside the probe
             miner.air = 0;
-            GAME_STATE.miner_air.store(0, Ordering::Relaxed);
             false
         }
     }
@@ -482,8 +481,6 @@ fn update_dir(convey_dir: i32) {
     if (system_is_key(Key::Jump) || system_is_joy_fire()) && GAME_STATE.mode() < GameMode::Running {
         miner.air = 1;
         miner.jump = 0;
-        GAME_STATE.miner_air.store(1, Ordering::Relaxed);
-        GAME_STATE.miner_jump.store(0, Ordering::Relaxed);
         if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
             GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
             miner.y &= 120;
@@ -504,12 +501,10 @@ fn do_miner_ticker() {
     }
 
     if miner.air == 1 {
-        match jump_step(
-            miner.jump as usize,
-            miner.y,
-            miner.tile,
-            &level_get_tile_type,
-        ) {
+        let (air, jump) = (miner.air, miner.jump);
+        match jump_step(jump as usize, miner.y, miner.tile, &|t| {
+            level_get_tile_type(t, air, jump)
+        }) {
             JumpOutcome::Above => {
                 drop(miner);
                 game_change_level(Direction::Above);
@@ -522,7 +517,6 @@ fn do_miner_ticker() {
                 miner.align = 4;
                 miner.air = 2;
                 miner.move_ = 0;
-                GAME_STATE.miner_air.store(2, Ordering::Relaxed);
                 return;
             }
             JumpOutcome::Rise {
@@ -540,11 +534,9 @@ fn do_miner_ticker() {
                 miner.tile = tile;
                 miner.align = align;
                 miner.jump += 1;
-                GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 
                 if apex {
                     miner.air = 6;
-                    GAME_STATE.miner_air.store(6, Ordering::Relaxed);
                     return;
                 }
 
@@ -558,7 +550,8 @@ fn do_miner_ticker() {
     }
 
     if miner.align == 4 {
-        match ground_check(miner.tile, miner.air, &level_get_tile_type) {
+        let (air, jump) = (miner.air, miner.jump);
+        match ground_check(miner.tile, air, &|t| level_get_tile_type(t, air, jump)) {
             GroundOutcome::Below => {
                 drop(miner);
                 game_change_level(Direction::Below);
@@ -575,7 +568,6 @@ fn do_miner_ticker() {
             }
             GroundOutcome::Land { convey_dir } => {
                 miner.air = 0;
-                GAME_STATE.miner_air.store(0, Ordering::Relaxed);
                 drop(miner);
                 update_dir(convey_dir);
                 move_left_right();
@@ -594,13 +586,11 @@ fn do_miner_ticker() {
     miner.move_ = 0;
     if miner.air == 0 {
         miner.air = 2;
-        GAME_STATE.miner_air.store(2, Ordering::Relaxed);
         return;
     }
 
     let step = fall_step(miner.air, miner.y);
     miner.air = step.air;
-    GAME_STATE.miner_air.store(step.air, Ordering::Relaxed);
     set_audio_pan_x(miner.x);
     audio_willy_sfx(step.pitch, 4);
     miner.y = step.y;
@@ -620,6 +610,7 @@ pub fn miner_ticker() {
 
 pub fn miner_drawer() {
     let miner = GAME_STATE.miner.lock().unwrap();
+    let (air, jump) = (miner.air, miner.jump);
     let mut offset = 0;
     let mut align = miner.align;
 
@@ -646,7 +637,7 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if level_get_tile_type(tile) == TileType::Harm {
+        if level_get_tile_type(tile, air, jump) == TileType::Harm {
             queue_pending(Pending::Enter(Screen::Die(DiePhase::Init)));
             return;
         }
@@ -657,7 +648,7 @@ pub fn miner_drawer() {
     let mut tile = miner.tile;
     let mut adj = 1;
     for _ in 0..align {
-        if level_get_tile_type(tile) == TileType::Item {
+        if level_get_tile_type(tile, air, jump) == TileType::Item {
             level_erase_item(tile);
             game_got_item();
         }
@@ -674,7 +665,6 @@ pub fn miner_init() {
     miner.align = 4;
     miner.move_ = 0;
     miner.air = 0;
-    GAME_STATE.miner_air.store(0, Ordering::Relaxed);
     drop(miner);
 
     miner_save();
