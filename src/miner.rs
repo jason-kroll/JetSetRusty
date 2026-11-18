@@ -240,6 +240,52 @@ fn is_solid(tile: i32, miner: &mut Miner) -> bool {
     solid
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JumpOutcome {
+    Above,
+    BumpHead {
+        y: i32,
+        tile: i32,
+    },
+    Rise {
+        y: i32,
+        tile: i32,
+        align: i32,
+        pitch: i32,
+        length: i32,
+        apex: bool,
+    },
+}
+
+// Pure core of the air == 1 (jumping) branch of do_miner_ticker.
+fn jump_step(
+    jump_idx: usize,
+    y: i32,
+    tile: i32,
+    lookup: &dyn Fn(usize) -> TileType,
+) -> JumpOutcome {
+    let j = JUMP_INFO[jump_idx];
+    let ny = y + j.jump;
+    if ny < 0 {
+        return JumpOutcome::Above;
+    }
+    let nt = tile + j.tile;
+    if lookup(nt as usize) == TileType::Solid || lookup((nt + 1) as usize) == TileType::Solid {
+        return JumpOutcome::BumpHead {
+            y: (ny + 8) & 120,
+            tile: nt + 32,
+        };
+    }
+    JumpOutcome::Rise {
+        y: ny,
+        tile: nt,
+        align: j.align,
+        pitch: j.pitch,
+        length: j.length,
+        apex: jump_idx + 1 == 18,
+    }
+}
+
 fn move_left_right() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     let mut y = 0;
@@ -384,49 +430,56 @@ fn do_miner_ticker() {
     }
 
     if miner.air == 1 {
-        let jump_info = JUMP_INFO[miner.jump as usize];
-        let y = miner.y + jump_info.jump;
+        match jump_step(
+            miner.jump as usize,
+            miner.y,
+            miner.tile,
+            &level_get_tile_type,
+        ) {
+            JumpOutcome::Above => {
+                drop(miner);
+                game_change_level(Direction::Above as i32);
+                return;
+            }
+            JumpOutcome::BumpHead { y, tile } => {
+                // we need to re-align Willy
+                miner.y = y;
+                miner.tile = tile;
+                miner.align = 4;
+                miner.air = 2;
+                miner.move_ = 0;
+                GAME_STATE.miner_air.store(2, Ordering::Relaxed);
+                return;
+            }
+            JumpOutcome::Rise {
+                y,
+                tile,
+                align,
+                pitch,
+                length,
+                apex,
+            } => {
+                set_audio_pan_x(miner.x);
+                audio_willy_sfx(pitch, length);
 
-        if y < 0 {
-            drop(miner);
-            game_change_level(Direction::Above as i32);
-            return;
-        }
+                miner.y = y;
+                miner.tile = tile;
+                miner.align = align;
+                miner.jump += 1;
+                GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
 
-        let tile = miner.tile + jump_info.tile;
-        if level_get_tile_type(tile as usize) == TileType::Solid
-            || level_get_tile_type((tile + 1) as usize) == TileType::Solid
-        {
-            // we need to re-align Willy
-            miner.y = (y + 8) & 120;
-            miner.tile = tile + 32;
-            miner.align = 4;
+                if apex {
+                    miner.air = 6;
+                    GAME_STATE.miner_air.store(6, Ordering::Relaxed);
+                    return;
+                }
 
-            miner.air = 2;
-            miner.move_ = 0;
-            GAME_STATE.miner_air.store(2, Ordering::Relaxed);
-            return;
-        }
-
-        set_audio_pan_x(miner.x);
-        audio_willy_sfx(jump_info.pitch, jump_info.length);
-
-        miner.y = y;
-        miner.tile = tile;
-        miner.align = jump_info.align;
-        miner.jump += 1;
-        GAME_STATE.miner_jump.store(miner.jump, Ordering::Relaxed);
-
-        if miner.jump == 18 {
-            miner.air = 6;
-            GAME_STATE.miner_air.store(6, Ordering::Relaxed);
-            return;
-        }
-
-        if miner.jump != 13 && miner.jump != 16 {
-            drop(miner);
-            move_left_right();
-            return;
+                if miner.jump != 13 && miner.jump != 16 {
+                    drop(miner);
+                    move_left_right();
+                    return;
+                }
+            }
         }
     }
 
@@ -667,5 +720,69 @@ mod tests {
         let mut m = miner_with(4, 1, 9);
         assert!(!is_solid_with(100, &lookup, &mut m));
         assert_eq!(m.air, 1);
+    }
+
+    #[test]
+    fn jump_step_rises_using_jump_table() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        // JUMP_INFO[0] = jmp(-4, -32, 6, 5, 72)
+        assert_eq!(
+            jump_step(0, 10, 100, &lookup),
+            JumpOutcome::Rise {
+                y: 6,
+                tile: 68,
+                align: 6,
+                pitch: 72,
+                length: 5,
+                apex: false,
+            }
+        );
+    }
+
+    #[test]
+    fn jump_step_above_when_y_goes_negative() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        assert_eq!(jump_step(0, 2, 100, &lookup), JumpOutcome::Above);
+    }
+
+    #[test]
+    fn jump_step_bumps_head_on_solid() {
+        let mut tiles = [TileType::Space; 512];
+        tiles[100] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        // JUMP_INFO[1] = jmp(-4, 0, 4, 5, 74): ny = 96, nt = 100
+        assert_eq!(
+            jump_step(1, 100, 100, &lookup),
+            JumpOutcome::BumpHead { y: 104, tile: 132 }
+        );
+
+        // solid only at nt + 1 also bumps
+        let mut tiles = [TileType::Space; 512];
+        tiles[101] = TileType::Solid;
+        let lookup = lookup_of(&tiles);
+        assert_eq!(
+            jump_step(1, 100, 100, &lookup),
+            JumpOutcome::BumpHead { y: 104, tile: 132 }
+        );
+    }
+
+    #[test]
+    fn jump_step_apex_on_last_table_entry() {
+        let tiles = [TileType::Space; 512];
+        let lookup = lookup_of(&tiles);
+        // JUMP_INFO[17] = jmp(4, 32, 4, 5, 72)
+        assert_eq!(
+            jump_step(17, 100, 100, &lookup),
+            JumpOutcome::Rise {
+                y: 104,
+                tile: 132,
+                align: 4,
+                pitch: 72,
+                length: 5,
+                apex: true,
+            }
+        );
     }
 }
