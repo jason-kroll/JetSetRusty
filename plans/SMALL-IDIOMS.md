@@ -104,4 +104,19 @@ Phase 1: ~6 lines in 2 files. Phase 2: ~25 lines in 1 file (incl. tests).
 Phase 3: ~8 lines in 3 files. Phase 4: docs. Each phase one commit, all gates
 green, goldens byte-identical throughout.
 
-## Status: DRAFT — pending reviewer pass
+## Status: COMPLETE (2026-11-18)
+
+- `df256da` Plan added (reviewer-sorted: joy-test range :844-893,
+  replay timer_set citation replay.rs:210).
+- `a6dfd39` Phase 1 — `VIDEO_FLASH` is `Cell<bool>`; the rate==0
+  invariant (timer_update yields only 0/1) is pinned in comments at
+  both `timer_set` sites; levels.rs indexers use `usize::from`.
+  Goldens byte-identical.
+- `603c977` Phase 2 — `JOY_STATE` is `Cell<JoyState>` with named fields;
+  `map_joy_event` and its unit tests use struct literals. Goldens
+  byte-identical.
+- `5c45703` Phase 3 — `main() -> ExitCode` → `run() -> ExitCode` →
+  `replay::main() -> ExitCode`; the `process::exit` call is gone, exit
+  codes 0/1/2 verified unchanged live. Goldens byte-identical.
+- Phase 4 (docs) — AGENTS.md joystick bullet updated; this plan marked
+  COMPLETE.
