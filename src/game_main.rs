@@ -123,6 +123,23 @@ use crate::audio::{audio_init, audio_output};
 // main-thread only (the SDL audio callback never touches them), so
 // thread-local Cells are sound and need no unsafe. This replaces the old
 // #[no_mangle] static mut globals from the C port.
+// Upstream joyState[3]: [left, right, fire] (fire = any joystick button).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct JoyState {
+    left: bool,
+    right: bool,
+    fire: bool,
+}
+impl JoyState {
+    const fn new() -> Self {
+        Self {
+            left: false,
+            right: false,
+            fire: false,
+        }
+    }
+}
+
 thread_local! {
     static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
     static VIDEO_FLASH: Cell<bool> = const { Cell::new(false) };
@@ -157,10 +174,9 @@ thread_local! {
     // In replay mode, the SDL keycodes the script is holding down this frame;
     // system_is_key reads this instead of SDL's keyboard state. None = live play.
     static REPLAY_HELD: RefCell<Option<Vec<i32>>> = const { RefCell::new(None) };
-    // Upstream joyState[3]: [left, right, fire] (fire = any joystick button).
-    // Set from joystick events in live play; stays false in replay mode, where
-    // the SDL event loop never runs, so replays are unaffected.
-    static JOY_STATE: Cell<[bool; 3]> = const { Cell::new([false; 3]) };
+    // Set from joystick events in live play; stays all-false in replay mode,
+    // where the SDL event loop never runs, so replays are unaffected.
+    static JOY_STATE: Cell<JoyState> = const { Cell::new(JoyState::new()) };
     static JOYSTICK: RefCell<Option<Joystick>> = const { RefCell::new(None) };
     static JOY_SUBSYSTEM: RefCell<Option<JoystickSubsystem>> = const { RefCell::new(None) };
 }
@@ -206,23 +222,23 @@ pub(crate) fn system_is_key(key: Key) -> bool {
 
 // Joystick state polled by the game (upstream System_IsJoyLeft/Right/Fire).
 pub(crate) fn system_is_joy_left() -> bool {
-    JOY_STATE.with(|s| s.get()[0])
+    JOY_STATE.with(|s| s.get().left)
 }
 pub(crate) fn system_is_joy_right() -> bool {
-    JOY_STATE.with(|s| s.get()[1])
+    JOY_STATE.with(|s| s.get().right)
 }
 pub(crate) fn system_is_joy_fire() -> bool {
-    JOY_STATE.with(|s| s.get()[2])
+    JOY_STATE.with(|s| s.get().fire)
 }
 
-fn set_joy_state(left: bool, right: bool, fire: bool) {
-    JOY_STATE.with(|s| s.set([left, right, fire]));
+fn set_joy_state(state: JoyState) {
+    JOY_STATE.with(|s| s.set(state));
 }
 
 // Upstream 69070b9 joystick events. The mapping from event to state lives in
 // the pure map_joy_event below so it is unit-testable — replay mode never runs
-// the SDL event loop (JOY_STATE stays zero there), so the golden hashes cannot
-// cover it.
+// the SDL event loop (JOY_STATE stays all-false there), so the golden hashes
+// cannot cover it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum JoyEvent {
     ButtonDown,
@@ -230,13 +246,25 @@ enum JoyEvent {
     Axis0(i16),
 }
 
-// Map a joystick event to (new [left, right, fire] state, one-shot game input).
+// Map a joystick event to (new joy state, one-shot game input).
 // Any button is "fire" (plus a one-shot Key::Else input); axis 0 beyond
 // +/-255 is left/right, inside the deadzone the reading is ignored.
-fn map_joy_event(state: [bool; 3], ev: JoyEvent) -> ([bool; 3], Key) {
+fn map_joy_event(state: JoyState, ev: JoyEvent) -> (JoyState, Key) {
     match ev {
-        JoyEvent::ButtonDown => ([state[0], state[1], true], Key::Else),
-        JoyEvent::ButtonUp => ([state[0], state[1], false], Key::None),
+        JoyEvent::ButtonDown => (
+            JoyState {
+                fire: true,
+                ..state
+            },
+            Key::Else,
+        ),
+        JoyEvent::ButtonUp => (
+            JoyState {
+                fire: false,
+                ..state
+            },
+            Key::None,
+        ),
         JoyEvent::Axis0(value) => {
             let (left, right) = if value < -255 {
                 (true, false)
@@ -245,14 +273,21 @@ fn map_joy_event(state: [bool; 3], ev: JoyEvent) -> ([bool; 3], Key) {
             } else {
                 (false, false)
             };
-            ([left, right, state[2]], Key::None)
+            (
+                JoyState {
+                    left,
+                    right,
+                    ..state
+                },
+                Key::None,
+            )
         }
     }
 }
 
 fn apply_joy_event(ev: JoyEvent) {
     let (state, input) = map_joy_event(JOY_STATE.with(|s| s.get()), ev);
-    set_joy_state(state[0], state[1], state[2]);
+    set_joy_state(state);
     set_game_input(input);
 }
 
@@ -844,34 +879,83 @@ mod tests {
     // plus a one-shot Key::Else input, and everything else emits no input.
     #[test]
     fn joy_axis_threshold_is_pinned() {
-        let s = [false, false, false];
+        let s = JoyState::new();
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(-256)),
-            ([true, false, false], Key::None)
+            (
+                JoyState {
+                    left: true,
+                    right: false,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(-255)),
-            ([false, false, false], Key::None)
+            (
+                JoyState {
+                    left: false,
+                    right: false,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(0)),
-            ([false, false, false], Key::None)
+            (
+                JoyState {
+                    left: false,
+                    right: false,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(255)),
-            ([false, false, false], Key::None)
+            (
+                JoyState {
+                    left: false,
+                    right: false,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(256)),
-            ([false, true, false], Key::None)
+            (
+                JoyState {
+                    left: false,
+                    right: true,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(i16::MIN)),
-            ([true, false, false], Key::None)
+            (
+                JoyState {
+                    left: true,
+                    right: false,
+                    fire: false
+                },
+                Key::None
+            )
         );
         assert_eq!(
             map_joy_event(s, JoyEvent::Axis0(i16::MAX)),
-            ([false, true, false], Key::None)
+            (
+                JoyState {
+                    left: false,
+                    right: true,
+                    fire: false
+                },
+                Key::None
+            )
         );
     }
 
@@ -879,18 +963,60 @@ mod tests {
     fn joy_buttons_and_axis_preserve_the_other_channels() {
         // button down: fire=true and a one-shot Key::Else input, left/right kept
         assert_eq!(
-            map_joy_event([true, false, false], JoyEvent::ButtonDown),
-            ([true, false, true], Key::Else)
+            map_joy_event(
+                JoyState {
+                    left: true,
+                    right: false,
+                    fire: false
+                },
+                JoyEvent::ButtonDown
+            ),
+            (
+                JoyState {
+                    left: true,
+                    right: false,
+                    fire: true
+                },
+                Key::Else
+            )
         );
         // button up: fire=false, no one-shot input, left/right kept
         assert_eq!(
-            map_joy_event([false, true, true], JoyEvent::ButtonUp),
-            ([false, true, false], Key::None)
+            map_joy_event(
+                JoyState {
+                    left: false,
+                    right: true,
+                    fire: true
+                },
+                JoyEvent::ButtonUp
+            ),
+            (
+                JoyState {
+                    left: false,
+                    right: true,
+                    fire: false
+                },
+                Key::None
+            )
         );
         // axis motion: fire preserved, no one-shot input
         assert_eq!(
-            map_joy_event([false, false, true], JoyEvent::Axis0(300)),
-            ([false, true, true], Key::None)
+            map_joy_event(
+                JoyState {
+                    left: false,
+                    right: false,
+                    fire: true
+                },
+                JoyEvent::Axis0(300)
+            ),
+            (
+                JoyState {
+                    left: false,
+                    right: true,
+                    fire: true
+                },
+                Key::None
+            )
         );
     }
 
