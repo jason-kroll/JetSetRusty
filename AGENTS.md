@@ -134,6 +134,8 @@ Deliberate deviations *beyond* upstream (not ports of any commit): the `--window
 
 `CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. There are no `static mut`s left, but if one ever reappears, beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build (`4e36bf1`).
 
+The crate is a bin crate (tests drive it via `CARGO_BIN_EXE_jetsetrusty`), so no item is reachable outside it: everything in `src/` is `pub(crate)`, enforced by `[lints.rust] unreachable_pub = "deny"` in `Cargo.toml` (`f219d8a`). The lint covers items but not `pub` fields, so a visibility sweep must also grep for leftover `pub ` — see `plans/PUB-VISIBILITY-SWEEP.md`.
+
 The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian graphics in `robots.rs`, music/SFX tables in `audio.rs`, and friends) are protected with `#[rustfmt::skip]`, so running `cargo fmt` is safe and will not rewrite them.
 
 ## Regression tests

@@ -86,6 +86,16 @@ Phase 1: ~195 one-token edits across those 15 files + 3-line `Cargo.toml` additi
 this file. Both phases are independent commits with all gates green; goldens
 byte-identical throughout.
 
-## Status: REVIEWED — reviewer verdict accept (2026-11-18); all three
-revision rounds folded in (exact counts 195/93/41/61; lint does not cover
-fields, grep is the field backstop; belt-and-braces grep added)
+## Status: COMPLETE (2026-11-18)
+
+- `a9d832e` Plan added (reviewer-verified end to end in a scratch copy
+  before committing).
+- `f219d8a` Phase 1 — all 195 `pub` tokens in src/ swept to `pub(crate)`
+  (93 `pub fn`, 41 item decls, 61 struct fields, 15 files; both
+  verification greps empty), `[lints.rust] unreachable_pub = "deny"`
+  added to Cargo.toml, vestigial `#![warn(unused_unsafe)]` deleted from
+  game.rs:1. All gates green with the lint denied; 53 unit + 24 replay
+  goldens byte-identical (no tests/ file touched). Reviewer verdict on
+  the commit: accept.
+- Phase 2 (docs) — AGENTS.md *Lints* section records the ratchet and the
+  fields/grep caveat; this plan marked COMPLETE.
