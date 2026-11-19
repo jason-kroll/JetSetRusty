@@ -102,7 +102,7 @@ impl Key {
             Key::T,
         ];
         match c {
-            b'a'..=b't' => LEVEL_LETTERS[(c - b'a') as usize],
+            b'a'..=b't' => LEVEL_LETTERS[usize::from(c - b'a')],
             b'w' => Key::W,
             b'y' => Key::Y,
             _ => panic!("no Key variant names {}", c as char),

@@ -363,7 +363,7 @@ fn sfx_play(s: &mut AudioState) {
     let len = s.sfx[i].length;
     s.sfx[i].clock += len;
     s.sfx[i].pitch_idx += 1;
-    if SFX_PITCH[s.sfx[i].pitch_table as usize][s.sfx[i].pitch_idx] > 0 {
+    if SFX_PITCH[s.sfx[i].pitch_table.pitch_row()][s.sfx[i].pitch_idx] > 0 {
         return;
     }
     s.sfx[i].handler = Some(SfxHandler::Off);
@@ -584,7 +584,7 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
     for ch in s.channels.iter_mut().take(music_channels) {
         if ch.on {
             // Square wave oscillator: phase MSB selects left[0]/left[1]
-            let phase = (ch.phase >> 31) as usize;
+            let phase = usize::try_from(ch.phase >> 31).expect("0/1");
             ch.left[2] = ch.left[phase];
             ch.right[2] = ch.right[phase];
             ch.phase = ch.phase.wrapping_add(ch.frequency);

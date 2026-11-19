@@ -166,7 +166,7 @@ fn write_ppm(path: &str) -> std::io::Result<()> {
     let mut out = format!("P6\n{WIDTH} {HEIGHT}\n255\n").into_bytes();
     with_framebuffer(|fb| {
         for &index in fb {
-            let c = &VIDEO_COLOUR[index as usize];
+            let c = &VIDEO_COLOUR[usize::from(index)];
             out.extend_from_slice(&[c.r, c.g, c.b]);
         }
     });
