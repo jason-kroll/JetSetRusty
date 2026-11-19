@@ -60,12 +60,12 @@ impl CodesState {
 
         self.needed = system_rnd() % 180;
 
-        location[2] = (self.needed % 18) as u8 + b'A';
+        location[2] = u8::try_from(self.needed % 18).expect("needed < 180 so %18 < 18") + b'A';
         location[3] = u8::try_from(self.needed / 18).expect("needed < 180 so /18 < 10") + b'0';
 
         video_write_large(29 * 8, 8 * 8, &location[..]);
 
-        self.needed = CODES_DIGIT[self.needed as usize];
+        self.needed = CODES_DIGIT[usize::try_from(self.needed).expect("needed 0..179")];
 
         self.code = [0; 4];
         self.key = -1;
@@ -110,7 +110,7 @@ impl CodesState {
         }
 
         self.pos_last = self.pos;
-        self.code[self.pos as usize] = self.key;
+        self.code[usize::try_from(self.pos).expect("cursor pos 0..=3")] = self.key;
         self.pos = (self.pos + 1) & 3;
     }
 

@@ -54,6 +54,20 @@ pub(crate) enum Sfx {
     None = 5,
 }
 
+impl Sfx {
+    // Row of SFX_PITCH for this effect (matches the C enum order); a match,
+    // not a cast, so no cast lint fires.
+    fn pitch_row(self) -> usize {
+        match self {
+            Sfx::Item => 0,
+            Sfx::Die => 1,
+            Sfx::Gameover => 2,
+            Sfx::Arrow => 3,
+            Sfx::None => 5,
+        }
+    }
+}
+
 // musicChannel[i] maps to audioChannel index
 const MUSIC_CH: [usize; NMUSIC] = [3, 4, 5, 6, 7];
 
@@ -342,7 +356,8 @@ fn sfx_off(s: &mut AudioState) {
 
 fn sfx_play(s: &mut AudioState) {
     let i = s.cur_sfx;
-    let pitch = SFX_PITCH[s.sfx[i].pitch_table as usize][s.sfx[i].pitch_idx] as usize;
+    let pitch = usize::try_from(SFX_PITCH[s.sfx[i].pitch_table.pitch_row()][s.sfx[i].pitch_idx])
+        .expect("pitch >= 0");
     let ch = s.sfx[i].channel;
     s.channels[ch].frequency = FREQUENCY_TABLE[pitch];
     let len = s.sfx[i].length;
@@ -424,9 +439,12 @@ pub(crate) fn audio_reduce_music_speed() {
 pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
     let mut s = AUDIO_STATE.lock().unwrap();
     let ch = s.sfx[0].channel;
-    s.channels[ch].frequency = FREQUENCY_TABLE[note as usize];
+    s.channels[ch].frequency = FREQUENCY_TABLE[usize::try_from(note).expect("note >= 0")];
     s.sfx[0].clock = s.sfx_clock;
-    channel_pan(&mut s.channels[ch], audio_pan_x() as usize);
+    channel_pan(
+        &mut s.channels[ch],
+        usize::try_from(audio_pan_x()).expect("pan >= 0"),
+    );
     s.sfx[0].length = length;
     s.sfx[0].handler = Some(SfxHandler::Willy);
 }
@@ -452,7 +470,7 @@ pub(crate) fn audio_sfx(sfx: Sfx) {
             s.sfx[1].pitch_table = Sfx::Item;
             s.sfx[1].pitch_idx = 0;
             let ch = s.sfx[1].channel;
-            channel_pan(&mut s.channels[ch], pan as usize);
+            channel_pan(&mut s.channels[ch], usize::try_from(pan).expect("pan >= 0"));
             s.sfx[1].play = Some(SfxHandler::Play);
         }
         Sfx::Arrow => {
@@ -468,7 +486,7 @@ pub(crate) fn audio_sfx(sfx: Sfx) {
             s.sfx[2].pitch_table = Sfx::Die;
             s.sfx[2].pitch_idx = 0;
             let ch = s.sfx[2].channel;
-            channel_pan(&mut s.channels[ch], pan as usize);
+            channel_pan(&mut s.channels[ch], usize::try_from(pan).expect("pan >= 0"));
             s.sfx[2].play = Some(SfxHandler::Play);
         }
         Sfx::Gameover => {
@@ -498,7 +516,7 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                 loop {
                     let data = MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx];
                     s.cur_music_idx += 1;
-                    let ch = (data & 0x0f) as usize;
+                    let ch = usize::try_from(data & 0x0f).expect("4-bit channel mask");
 
                     match data & 0xf0 {
                         EV_NOTE_ON => {
@@ -506,7 +524,8 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                                 MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx],
                             ) + s.music_pitch;
                             s.cur_music_idx += 1;
-                            s.channels[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
+                            s.channels[MUSIC_CH[ch]].frequency =
+                                FREQUENCY_TABLE[usize::try_from(note).expect("note >= 0")];
                             s.channels[MUSIC_CH[ch]].on = true;
                         }
                         EV_END => {

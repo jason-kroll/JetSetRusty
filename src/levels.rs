@@ -4972,7 +4972,7 @@ pub(crate) fn level_set_border() {
 }
 
 fn game_level() -> usize {
-    GAME_STATE.level.load(Ordering::Relaxed) as usize
+    usize::try_from(GAME_STATE.level.load(Ordering::Relaxed)).expect("level 0..59")
 }
 
 pub(crate) fn level_dir(dir: Direction) -> i32 {
@@ -4990,7 +4990,7 @@ fn restore_items() {
         *levels = LEVEL_DATA;
         for level in levels.iter_mut() {
             for &item in level.item.iter().take(level.item_count) {
-                let item_pos = item as usize;
+                let item_pos = usize::try_from(item).expect("item pos >= 0");
                 level.data[item_pos] = 1;
             }
         }
@@ -5131,7 +5131,7 @@ pub(crate) fn level_init() {
         LEVEL_TILE.with(|tiles| {
             let mut tiles = tiles.borrow_mut();
             for (cell, t) in tiles.iter_mut().enumerate() {
-                let last_data = level.data[cell] as usize;
+                let last_data = usize::try_from(level.data[cell]).expect("tile index 0..=9");
                 let info = &level.info[last_data];
 
                 t.tile_type = info.tile_type;

@@ -20,3 +20,4 @@ sdl3 = { version = "0.22", features = ["build-from-source-static"] }
 cast_lossless = "deny"
 cast_possible_truncation = "deny"
 cast_possible_wrap = "deny"
+cast_sign_loss = "deny"

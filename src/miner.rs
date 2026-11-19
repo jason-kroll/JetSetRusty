@@ -149,7 +149,7 @@ pub(crate) fn miner_inc_seq() {
 
 // Upstream Miner_DrawSprite: minerSequence[index & 7].
 pub(crate) fn miner_draw_sprite(pos: i32, paper: u8, ink: u8, index: i32) {
-    let row = MINER_SEQUENCE[(index & 7) as usize];
+    let row = MINER_SEQUENCE[usize::try_from(index & 7).expect("3-bit mask")];
     video_draw_sprite(pos, &MINER_SPRITE[row], paper, ink);
 }
 
@@ -495,9 +495,12 @@ fn do_miner_ticker(miner: &mut Miner) {
 
     if miner.air == 1 {
         let (air, jump) = (miner.air, miner.jump);
-        match jump_step(jump as usize, miner.y, miner.tile, &|t| {
-            level_get_tile_type(t, air, jump)
-        }) {
+        match jump_step(
+            usize::try_from(jump).expect("jump row >= 0"),
+            miner.y,
+            miner.tile,
+            &|t| level_get_tile_type(t, air, jump),
+        ) {
             JumpOutcome::Above => {
                 game_change_level(Direction::Above, miner);
                 return;
@@ -608,7 +611,8 @@ pub(crate) fn miner_drawer(miner: &Miner) {
         }
     }
 
-    let row = miner_frame() + ((miner.dir << 2) | miner.frame) as usize;
+    let row = miner_frame()
+        + usize::try_from((miner.dir << 2) | miner.frame).expect("dir/frame bits >= 0");
     if video_draw_miner(
         ((miner.y + offset) << 8) | miner.x,
         &MINER_SPRITE[row],

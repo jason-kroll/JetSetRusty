@@ -201,7 +201,8 @@ pub(crate) fn game_init_room(miner: &mut Miner) {
     let current_level = game.level.load(Ordering::Relaxed);
 
     // system_border(levelBorder[gameLevel])
-    let border_value = game.level_border.lock().unwrap()[current_level as usize];
+    let border_value =
+        game.level_border.lock().unwrap()[usize::try_from(current_level).expect("level 0..59")];
     system_border(u8::try_from(border_value).expect("border palette index"));
 
     miner_save(miner);
@@ -259,7 +260,8 @@ pub(crate) fn game_pause(state: bool) {
         if !game.cheat_enabled.load(Ordering::Relaxed) {
             game_draw_status();
             let level = game.level.load(Ordering::Relaxed);
-            let border_value = game.level_border.lock().unwrap()[level as usize];
+            let border_value =
+                game.level_border.lock().unwrap()[usize::try_from(level).expect("level 0..59")];
             system_border(u8::try_from(border_value).expect("border palette index"));
         }
     }
@@ -404,8 +406,10 @@ pub(crate) fn game_cheat_enabled() {
         game_draw_status();
         let level = game.level.load(Ordering::Relaxed);
         system_border(
-            u8::try_from(game.level_border.lock().unwrap()[level as usize])
-                .expect("border palette index"),
+            u8::try_from(
+                game.level_border.lock().unwrap()[usize::try_from(level).expect("level 0..59")],
+            )
+            .expect("border palette index"),
         );
     }
 
@@ -613,7 +617,7 @@ pub(crate) fn clock_ticker() {
 
 pub(crate) fn game_draw_lives() {
     let game = &*GAME_STATE;
-    let lives = game.lives.load(Ordering::Relaxed) as usize;
+    let lives = usize::try_from(game.lives.load(Ordering::Relaxed)).expect("lives >= 0 at draw");
 
     for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;

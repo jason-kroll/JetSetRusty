@@ -331,7 +331,7 @@ impl AudioCallback<i16> for SdlAudioCallback {
         // `requested` is the number of interleaved i16 samples SDL wants
         // (SDL3's additional_amount is in bytes; the crate divides by the
         // sample size).
-        let mut buf = vec![0i16; requested.max(0) as usize];
+        let mut buf = vec![0i16; usize::try_from(requested.max(0)).expect("clamped >= 0")];
         for frame in buf.as_chunks_mut::<2>().0 {
             audio_output(frame);
         }
@@ -521,7 +521,7 @@ pub(crate) fn map_keycode(sym: i32) -> Key {
     } else if sym == keycode_i32(Keycode::LAlt) || sym == keycode_i32(Keycode::RAlt) {
         Key::Mute
     } else if (keycode_i32(Keycode::_1)..=keycode_i32(Keycode::_4)).contains(&sym) {
-        DIGITS[(sym - keycode_i32(Keycode::_1)) as usize]
+        DIGITS[usize::try_from(sym - keycode_i32(Keycode::_1)).expect("digit offset 0..=3")]
     } else {
         match LETTER_INPUTS
             .iter()
@@ -624,7 +624,11 @@ pub(crate) fn run() -> ExitCode {
     let window = if flags.windowed {
         let (ww, wh) = windowed_size(mode.w, mode.h);
         video
-            .window("Jet-Set Willy", ww as u32, wh as u32)
+            .window(
+                "Jet-Set Willy",
+                u32::try_from(ww).expect("window width fits u32"),
+                u32::try_from(wh).expect("window height fits u32"),
+            )
             .position_centered()
             .resizable()
             .build()
@@ -646,8 +650,8 @@ pub(crate) fn run() -> ExitCode {
     let mut target = texture_creator
         .create_texture_target(
             PixelFormat::ARGB8888,
-            (WIDTH * multiply) as u32,
-            (HEIGHT * multiply) as u32,
+            u32::try_from(WIDTH * multiply).expect("texture width fits u32"),
+            u32::try_from(HEIGHT * multiply).expect("texture height fits u32"),
         )
         .expect("create target texture");
     let mut texture = texture_creator
@@ -784,8 +788,8 @@ pub(crate) fn run() -> ExitCode {
             target = texture_creator
                 .create_texture_target(
                     PixelFormat::ARGB8888,
-                    (WIDTH * multiply) as u32,
-                    (HEIGHT * multiply) as u32,
+                    u32::try_from(WIDTH * multiply).expect("texture width fits u32"),
+                    u32::try_from(HEIGHT * multiply).expect("texture height fits u32"),
                 )
                 .expect("create target texture");
             target.set_blend_mode(BlendMode::None);
@@ -802,7 +806,12 @@ pub(crate) fn run() -> ExitCode {
             })
             .expect("render target support");
         if vw > 0 && vh > 0 {
-            let viewport = Rect::new(vx, vy, vw as u32, vh as u32);
+            let viewport = Rect::new(
+                vx,
+                vy,
+                u32::try_from(vw).expect("viewport width fits u32"),
+                u32::try_from(vh).expect("viewport height fits u32"),
+            );
             canvas
                 .copy(&target, None, viewport)
                 .expect("copy target to window");

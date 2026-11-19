@@ -1289,7 +1289,7 @@ fn do_draw_robot(robot: &Robot) {
     let gfx = robot.gfx.expect("do_draw_robot: robot has no gfx");
     video_draw_robot(
         robot.pos,
-        &gfx[(robot.f_index & robot.f_mask) as usize],
+        &gfx[usize::try_from(robot.f_index & robot.f_mask).expect("masked frame index")],
         robot.ink,
     );
 }
@@ -1298,7 +1298,7 @@ fn do_draw_toilet(robot: &Robot) {
     let gfx = robot.gfx.expect("do_draw_toilet: robot has no gfx");
     video_draw_sprite(
         robot.pos,
-        &gfx[(robot.f_index & robot.f_mask) as usize],
+        &gfx[usize::try_from(robot.f_index & robot.f_mask).expect("masked frame index")],
         0x0,
         0x7,
     );
@@ -1331,7 +1331,8 @@ pub(crate) fn robots_drawer() {
 pub(crate) fn robots_init() {
     ROBOT_THIS.with(|robots| {
         let mut robots = robots.borrow_mut();
-        *robots = ROBOT_START[GAME_STATE.level.load(Ordering::Relaxed) as usize];
+        *robots = ROBOT_START
+            [usize::try_from(GAME_STATE.level.load(Ordering::Relaxed)).expect("level 0..59")];
 
         // Once Maria has been dealt with, the Master Bedroom robots (her two
         // colour layers) are gone.

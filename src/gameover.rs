@@ -47,7 +47,11 @@ pub(crate) fn gameover_drawer() {
     let ticks = boot_ticks();
     if ticks <= 96 {
         video_draw_sprite((ticks & 126) * WIDTH + 15 * 8, &BOOT_SPRITE, 0x0, 0x7);
-        video_pixel_paper_fill(0, 128 * WIDTH, ((ticks & 12) >> 2) as u8);
+        video_pixel_paper_fill(
+            0,
+            128 * WIDTH,
+            u8::try_from((ticks & 12) >> 2).expect("masked to 2 bits"),
+        );
     }
 
     if ticks < 96 {
@@ -61,21 +65,21 @@ pub(crate) fn gameover_drawer() {
 pub(crate) fn gameover_ticker() {
     let mut c = boot_ticks() >> 2;
 
-    set_text_game_byte(3, (c & 0x7) as u8);
+    set_text_game_byte(3, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(7, (c & 0x7) as u8);
+    set_text_game_byte(7, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(11, (c & 0x7) as u8);
+    set_text_game_byte(11, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(15, (c & 0x7) as u8);
+    set_text_game_byte(15, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(3, (c & 0x7) as u8);
+    set_text_over_byte(3, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(7, (c & 0x7) as u8);
+    set_text_over_byte(7, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(11, (c & 0x7) as u8);
+    set_text_over_byte(11, u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(15, (c & 0x7) as u8);
+    set_text_over_byte(15, u8::try_from(c & 0x7).expect("3-bit mask"));
 
     set_boot_ticks(boot_ticks() + 1);
 

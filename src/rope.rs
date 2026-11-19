@@ -189,7 +189,7 @@ use crate::game::{GAME_STATE, Miner};
 // ----------------------------------------------------------------------------
 
 fn do_rope_drawer(miner: &mut Miner) {
-    let data_idx = ROPE.pos.load(Ordering::Relaxed) as usize;
+    let data_idx = usize::try_from(ROPE.pos.load(Ordering::Relaxed)).expect("rope pos >= 0");
     let ink = ROPE.ink.load(Ordering::Relaxed);
 
     let mut x = ROPE.x.load(Ordering::Relaxed) * 8;
@@ -205,7 +205,8 @@ fn do_rope_drawer(miner: &mut Miner) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
     for (seg, data) in (1..ROPE_SEGS).zip(ROPE_DATA.iter().skip(data_idx)) {
         y += data.y;
-        x -= data.x * ROPE_MOVE[ROPE.side.load(Ordering::Relaxed) as usize];
+        x -= data.x
+            * ROPE_MOVE[usize::try_from(ROPE.side.load(Ordering::Relaxed)).expect("rope side 0/1")];
 
         let pos = y * WIDTH + x;
 
@@ -254,7 +255,8 @@ fn do_rope_drawer(miner: &mut Miner) {
             let dir = ROPE.dir.load(Ordering::Relaxed);
             let willy_dir = miner.dir;
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
-            let seg = current_rope + ROPE_MOVE[(dir ^ willy_dir) as usize];
+            let seg =
+                current_rope + ROPE_MOVE[usize::try_from(dir ^ willy_dir).expect("dir bit 0/1")];
 
             let level_dir = level_dir(Direction::Above);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
@@ -276,7 +278,7 @@ fn do_rope_drawer(miner: &mut Miner) {
 fn do_rope_ticker() {
     let dir = ROPE.dir.load(Ordering::Relaxed);
     let side = ROPE.side.load(Ordering::Relaxed);
-    let step = ROPE_MOVE[(dir ^ side) as usize] * 2;
+    let step = ROPE_MOVE[usize::try_from(dir ^ side).expect("dir bit 0/1")] * 2;
 
     let new_pos = ROPE.pos.load(Ordering::Relaxed) + step;
     ROPE.pos.store(new_pos, Ordering::Relaxed);

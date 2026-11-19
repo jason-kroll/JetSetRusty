@@ -137,7 +137,7 @@ pub(crate) fn do_title_drawer() {
     video_write_large(
         -(text_frame() & 6),
         19 * 8,
-        &TEXT_TICKER[text_pos() as usize..],
+        &TEXT_TICKER[usize::try_from(text_pos()).expect("text pos >= 0")..],
     );
 }
 
