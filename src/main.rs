@@ -18,6 +18,8 @@ mod rope;
 mod title;
 mod video;
 
-fn main() {
-    game_main::run();
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    game_main::run()
 }

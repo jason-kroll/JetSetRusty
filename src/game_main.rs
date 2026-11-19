@@ -12,6 +12,7 @@ use sdl3::pixels::{Color, PixelFormat};
 use sdl3::rect::Rect;
 use sdl3::render::{BlendMode, ScaleMode, Texture};
 use std::cell::{Cell, RefCell};
+use std::process::ExitCode;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 
@@ -578,12 +579,12 @@ fn next_frame_time(now_ms: u64) -> u64 {
     now_ms * TICKRATE as u64 + 1000
 }
 
-pub(crate) fn run() {
+pub(crate) fn run() -> ExitCode {
     // `jetsetrusty --replay <script>`: headless, deterministic run for the
     // regression tests (see replay.rs). No SDL is initialised.
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--replay") {
-        std::process::exit(crate::replay::main(&args[2..]));
+        return crate::replay::main(&args[2..]);
     }
     let flags = parse_flags(&args[1..]);
     if let Some(v) = flags.items {
@@ -804,6 +805,7 @@ pub(crate) fn run() {
 
     // Teardown: SDL_Quit and friends run via Drop when sdl, canvas, the
     // textures, and the audio stream go out of scope.
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]

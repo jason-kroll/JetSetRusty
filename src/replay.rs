@@ -46,6 +46,7 @@ use crate::misc::{Timer, VIDEO_COLOUR, timer_set};
 // are still their ASCII codes, so script key names map exactly as before.
 use sdl3::sys::keycode as K;
 use std::io::Write;
+use std::process::ExitCode;
 
 struct Press {
     frame: u32,
@@ -172,11 +173,11 @@ fn write_ppm(path: &str) -> std::io::Result<()> {
     std::fs::write(path, out)
 }
 
-pub(crate) fn main(args: &[String]) -> i32 {
+pub(crate) fn main(args: &[String]) -> ExitCode {
     let usage = "usage: jetsetrusty --replay <script> [--dump <frame> <out.ppm>]...";
     let Some(path) = args.first() else {
         eprintln!("{usage}");
-        return 2;
+        return ExitCode::from(2);
     };
     let mut dumps: Vec<(u32, String)> = Vec::new();
     let mut rest = args[1..].iter();
@@ -187,7 +188,7 @@ pub(crate) fn main(args: &[String]) -> i32 {
             }
             _ => {
                 eprintln!("{usage}");
-                return 2;
+                return ExitCode::from(2);
             }
         }
     }
@@ -198,7 +199,7 @@ pub(crate) fn main(args: &[String]) -> i32 {
         Ok(s) => s,
         Err(e) => {
             eprintln!("replay: {e}");
-            return 2;
+            return ExitCode::from(2);
         }
     };
 
@@ -282,15 +283,15 @@ pub(crate) fn main(args: &[String]) -> i32 {
         fnv1a(&mut video_hash, &[border_index() as u8]);
 
         if writeln!(out, "{frame:06} {video_hash:016x} {audio_hash:016x}").is_err() {
-            return 1;
+            return ExitCode::from(1);
         }
         for (_, dump_path) in dumps.iter().filter(|(f, _)| *f == frame) {
             if let Err(e) = write_ppm(dump_path) {
                 eprintln!("replay: {dump_path}: {e}");
-                return 1;
+                return ExitCode::from(1);
             }
         }
     }
     set_replay_held(None);
-    0
+    ExitCode::SUCCESS
 }
