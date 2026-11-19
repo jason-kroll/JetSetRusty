@@ -286,7 +286,7 @@ pub(crate) fn video_text_width(text: &[u8]) -> i32 {
     let end = text.iter().position(|&b| b == 0).unwrap_or(text.len());
     text[..end]
         .iter()
-        .map(|&ch| CHAR_SET[ch as usize][0] as i32)
+        .map(|&ch| i32::from(CHAR_SET[usize::from(ch)][0]))
         .sum()
 }
 

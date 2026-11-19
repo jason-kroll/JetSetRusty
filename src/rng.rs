@@ -37,7 +37,7 @@ impl GlibcRand {
             // Schrage's trick for (16807 * word) mod 2147483647, computed in
             // i64 and truncated back to i32 exactly like glibc's int32_t word
             // (C's / and % truncate toward zero, as does Rust's).
-            let w = word as i64;
+            let w = i64::from(word);
             let hi = w / 127773;
             let lo = w % 127773;
             let mut next = 16807 * lo - 2836 * hi;

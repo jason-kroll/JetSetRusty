@@ -30,6 +30,18 @@ pub(crate) enum MusicScore {
     Loader = 2,
 }
 
+impl MusicScore {
+    // Row of MUSIC_SCORE for this score (matches the C enum order); a match,
+    // not a cast, so no cast lint fires.
+    fn score_row(self) -> usize {
+        match self {
+            MusicScore::Title => 0,
+            MusicScore::Game => 1,
+            MusicScore::Loader => 2,
+        }
+    }
+}
+
 // Matches audio.h SFX_* enum order; also indexes SFX_PITCH. SFX_WILLY (4)
 // has no variant — the willy handler never reads a pitch table, so in
 // the port that row is unreachable, exactly as in C.
@@ -484,22 +496,23 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
             if s.music_delta == s.music_clock {
                 // Process all events due this tick (time==0 events chain immediately).
                 loop {
-                    let data = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx];
+                    let data = MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx];
                     s.cur_music_idx += 1;
                     let ch = (data & 0x0f) as usize;
 
                     match data & 0xf0 {
                         EV_NOTE_ON => {
-                            let note = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx]
-                                as i32
-                                + s.music_pitch;
+                            let note = i32::from(
+                                MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx],
+                            ) + s.music_pitch;
                             s.cur_music_idx += 1;
                             s.channels[MUSIC_CH[ch]].frequency = FREQUENCY_TABLE[note as usize];
                             s.channels[MUSIC_CH[ch]].on = true;
                         }
                         EV_END => {
-                            let playing =
-                                MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx] as i32;
+                            let playing = i32::from(
+                                MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx],
+                            );
                             AUDIO_MUSIC_PLAYING.store(playing != 0, Ordering::Relaxed);
                             music_reset(&mut s);
                             // MUS_PLAY → time=0 → continue loop from top of reset score
@@ -515,7 +528,8 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                         _ => music_note_off(&mut s, ch),
                     }
 
-                    let time = MUSIC_SCORE[s.cur_music_table as usize][s.cur_music_idx] as i32;
+                    let time =
+                        i32::from(MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx]);
                     s.cur_music_idx += 1;
                     s.music_delta += time;
                     if time != 0 {

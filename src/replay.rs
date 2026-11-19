@@ -156,7 +156,7 @@ fn parse_script(text: &str) -> Result<Script, String> {
 // FNV-1a 64.
 fn fnv1a(hash: &mut u64, bytes: &[u8]) {
     for &b in bytes {
-        *hash ^= b as u64;
+        *hash ^= u64::from(b);
         *hash = hash.wrapping_mul(0x100000001b3);
     }
 }
@@ -268,7 +268,7 @@ pub(crate) fn main(args: &[String]) -> ExitCode {
         game_frame(&mut timer_flash, || events.next());
 
         // Exactly SAMPLERATE samples per TICKRATE frames (367 or 368 each).
-        let f = frame as u64;
+        let f = u64::from(frame);
         let samples = (f + 1) * rate / tick - f * rate / tick;
         let mut audio_hash = FNV_OFFSET;
         let mut stereo = [0i16; 2];
