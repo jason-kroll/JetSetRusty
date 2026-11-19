@@ -125,7 +125,7 @@ use crate::audio::{audio_init, audio_output};
 // #[no_mangle] static mut globals from the C port.
 thread_local! {
     static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
-    static VIDEO_FLASH: Cell<i32> = const { Cell::new(0) };
+    static VIDEO_FLASH: Cell<bool> = const { Cell::new(false) };
 }
 
 pub(crate) fn set_game_input(key: Key) {
@@ -135,10 +135,10 @@ pub(crate) fn game_input() -> Key {
     GAME_INPUT.with(Cell::get)
 }
 pub(crate) fn video_flash() -> bool {
-    VIDEO_FLASH.with(|c| c.get() != 0)
+    VIDEO_FLASH.with(Cell::get)
 }
-pub(crate) fn toggle_video_flash(bit: i32) {
-    VIDEO_FLASH.with(|c| c.set(c.get() ^ bit));
+pub(crate) fn toggle_video_flash(flip: bool) {
+    VIDEO_FLASH.with(|c| c.set(c.get() ^ flip));
 }
 
 // ---- Module-private state ---------------------------------------------------
@@ -341,7 +341,9 @@ pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -
     set_game_input(Key::None);
     crate::dispatch::run_ticker();
     crate::dispatch::run_drawer();
-    toggle_video_flash(timer_update(timer_flash));
+    // timer_flash keeps rate == 0 (25 / (TICKRATE * 8) = 25/480), so
+    // timer_update returns only 0 or 1 and `!= 0` is the exact bool flip.
+    toggle_video_flash(timer_update(timer_flash) != 0);
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,

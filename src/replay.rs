@@ -207,6 +207,8 @@ pub(crate) fn main(args: &[String]) -> i32 {
     seed_rng(script.seed);
     audio_init();
     let mut timer_flash = Timer::default();
+    // rate == 0 here (25/480): timer_update yields only 0/1, the exact bool
+    // that toggle_video_flash expects (same invariant as game_main.rs).
     timer_set(&mut timer_flash, 25, TICKRATE * 8);
 
     let stdout = std::io::stdout();

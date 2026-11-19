@@ -5009,8 +5009,8 @@ fn do_item(tile: &mut Tile) {
 }
 
 fn do_flash(tile: &mut Tile) {
-    tile.paper[2] = tile.paper[video_flash() as usize];
-    tile.ink[2] = tile.ink[video_flash() as usize];
+    tile.paper[2] = tile.paper[usize::from(video_flash())];
+    tile.ink[2] = tile.ink[usize::from(video_flash())];
 }
 
 pub(crate) fn level_erase_item(tile: i32) {
