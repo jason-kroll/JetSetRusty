@@ -160,4 +160,29 @@ of sign_loss after phase 2. Phase 4: audit only. Phase 5: ~16 sites, one
 file + the newtype (~25 lines). Phase 6: docs. Goldens byte-identical
 throughout.
 
-## Status: DRAFT — pending reviewer pass
+## Status: COMPLETE
+
+Six commits, all gates green after each (fmt, clippy `-D warnings`,
+53 unit + 24 replay tests, build); goldens byte-identical throughout
+(never `UPDATE_GOLDEN=1`):
+
+- `53b4172` this plan (reviewer accept after seven measured-count and
+  direction corrections were folded in).
+- `45af60d` Phase 1 — `cast_lossless` denied; 7 fires converted with
+  `From` (MusicScore gains match-based `score_row()`).
+- `99864e6` Phase 2 — `cast_possible_truncation` + `cast_possible_wrap`
+  denied; ~41 sites retyped with `try_from().expect(named invariant)`,
+  mask-then-convert, or `from_ne_bytes` for bit-exact C semantics
+  (rng seed/Schrage, srand time_t). MUS_STOP/MUS_PLAY → i16 consts;
+  LevelData.item_count → usize; TEXT_END stays usize.
+- `07f5053` Phase 3 — `cast_sign_loss` denied; all 45 fires (all
+  signed→unsigned, as measured) retyped; Sfx gains match-based
+  `pitch_row()`.
+- `df82ce7` Phase 4 — residual audit: 159 → 42 textual `as` hits
+  (41 real casts) at HEAD, every survivor classified as a
+  lint-invisible stay (list in the commit body); four lossless sites
+  converted.
+- `c59d646` Phase 5 — `PixelFlags(u8)` newtype over `Pixel.point`
+  (16 sites, `ink` deliberately raw); video.rs index casts →
+  `usize::from`.
+- Phase 6 (this docs commit) — AGENTS.md Lints/Graphics Model updated.

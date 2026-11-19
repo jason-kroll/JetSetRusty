@@ -89,8 +89,8 @@ Everything else is Rust-to-Rust and idiomatically named: there are no `allow` at
 
 ### Graphics Model
 
-- Internal 256×192 `videoPixel` array of `Pixel { ink: u8, point: u8 }` structs
-- Per-pixel bit flags in `Pixel.point`: `B_LEVEL=1`, `B_ROBOT=2`, `B_WILLY=4` (private to `video.rs`; read via `video_pixel_has_willy`)
+- Internal 256×192 `videoPixel` array of `Pixel { ink: u8, flags: PixelFlags }` structs
+- Per-pixel bit flags in `Pixel.flags: PixelFlags`: `B_LEVEL=1`, `B_ROBOT=2`, `B_WILLY=4` (private to `video.rs`; read via `video_pixel_has_willy`)
 - Text uses embedded control bytes: `\x01` = set paper (next byte = index), `\x02` = set ink
 - `TILE2PIXEL(t)` macro converts tile coordinates to pixel buffer offsets
 - Output path: `video.rs` → `system_set_pixel(pos, palette_index)` → `FRAMEBUFFER` (a 256×192 thread-local `[u8]` of palette indices in `game_main.rs`). Once per frame `present_frame()` converts the whole buffer to RGB on the SDL texture. The buffer persists across frames because the game only redraws pixels that change. The palette (`VIDEO_COLOUR`) is an immutable `static`, and the border is a separate palette index (`system_border`).
@@ -135,6 +135,8 @@ Deliberate deviations *beyond* upstream (not ports of any commit): the `--window
 `CONVENTIONS.md` asks for code to pass `cargo clippy --all-targets -- -D warnings`; the crate has been clean under that since `f807297`. There are no `static mut`s left, but if one ever reappears, beware `cargo clippy --fix`: its `deref_addrof` suggestion rewrites the `&mut *(&raw mut STATIC)` workaround into `&mut STATIC`, which the deny-by-default `static_mut_refs` lint rejects and breaks the build (`4e36bf1`).
 
 The crate is a bin crate (tests drive it via `CARGO_BIN_EXE_jetsetrusty`), so no item is reachable outside it: everything in `src/` is `pub(crate)`, enforced by `[lints.rust] unreachable_pub = "deny"` in `Cargo.toml` (`f219d8a`). The lint covers items but not `pub` fields, so a visibility sweep must also grep for leftover `pub ` — see `plans/PUB-VISIBILITY-SWEEP.md`.
+
+Silent `as` casts are denied too: `[lints.clippy]` in `Cargo.toml` denies `cast_lossless`, `cast_possible_truncation`, `cast_possible_wrap`, and `cast_sign_loss`, so every remaining `as` in `src/` is a deliberate, lint-invisible stay (const-eval on literals, enum discriminant pins, masked lossless narrowing) — see `plans/NARROW-TYPES-RESIDUAL.md`. The crate still has zero `#[allow]`/`#[expect]` attributes; fix casts by retyping, never by suppressing.
 
 The crate is `cargo fmt --check` clean. The hand-aligned data tables (guardian graphics in `robots.rs`, music/SFX tables in `audio.rs`, and friends) are protected with `#[rustfmt::skip]`, so running `cargo fmt` is safe and will not rewrite them.
 
