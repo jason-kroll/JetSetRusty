@@ -83,7 +83,8 @@ Four commits, all gates green after each (fmt, clippy `-D warnings`,
 - `b7a0f3a` Phase 2 — `&mut Miner` through `game_change_level` /
   `game_init_room` / `miner_save` / `miner_restore`, incl. all three
   `game_init_room` call sites. Goldens byte-identical.
-- `089a0ee` Phase 3 — single miner lock per ticker/drawer pass; the
+- `7f5508a` Phase 3 (reworded from `089a0ee` to fix the f401 wording) —
+  single miner lock per ticker/drawer pass; the
   ~16 `drop(miner)` sites and the `try_lock` are gone. **Behavior fix
   (C parity)**: the `try_lock`'s death resurrected `game_got_item`'s
   dead pan write (`set_audio_pan_x(miner.x)`, matching C's

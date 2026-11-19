@@ -2,9 +2,9 @@
 // Maria, and the two screen-crossing arrows.
 //
 // This is a faithful, behaviour-preserving port. Like miner.rs, it runs
-// mid-frame inside do_game_ticker/do_game_drawer, reading shared state straight
-// from GAME_STATE: Willy's position via the `miner` mutex, and `clock_ticks`,
-// `level`, and `mode` via plain atomic loads.
+// mid-frame inside do_game_ticker/do_game_drawer, receiving Willy as `&Miner`
+// from the caller's single pass lock, and reading `clock_ticks`, `level`, and
+// `mode` via plain atomic loads from GAME_STATE.
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is

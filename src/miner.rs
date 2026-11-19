@@ -4,8 +4,8 @@
 // This is a faithful, behaviour-preserving port. It now operates directly on
 // GAME_STATE.miner (the Rust-owned state) rather than a C-ABI global. The
 // minerWillyRope field lives in GAME_STATE.miner_willy_rope (atomic).
-// Other modules (robots.rs, levels.rs, die.rs, rope.rs, cheat.rs) read miner
-// state through GAME_STATE as well.
+// die.rs and cheat.rs read miner state through GAME_STATE (rope.rs reads
+// `miner_willy_rope`); the ticker/drawer paths receive the miner as a parameter.
 
 use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
