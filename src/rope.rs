@@ -2,7 +2,7 @@
 use crate::common::WIDTH;
 use crate::game::{COLDSTORE, Direction, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
 use crate::video::{
-    VIDEO_PIXEL, buf_index, video_draw_rope_seg, video_draw_rope_seg_inner, video_get_pixel,
+    VIDEO_PIXEL, buf_index, video_draw_rope_seg, video_draw_rope_seg_inner, video_pixel_has_willy,
 };
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
@@ -184,9 +184,6 @@ pub(crate) fn rope_draw(miner: &mut Miner) {
 
 use crate::game::{GAME_STATE, Miner};
 
-// Level constants
-const B_WILLY: i32 = 4;
-
 // ----------------------------------------------------------------------------
 // Internal implementation
 // ----------------------------------------------------------------------------
@@ -213,9 +210,8 @@ fn do_rope_drawer(miner: &mut Miner) {
         let pos = y * WIDTH + x;
 
         // Check for Willy collision
-        let pixel_val = video_get_pixel(&pixels[buf_index(pos)]);
         let willy_rope_zero = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) == 0;
-        if willy_rope_zero && (pixel_val & B_WILLY) != 0 {
+        if willy_rope_zero && video_pixel_has_willy(&pixels[buf_index(pos)]) {
             GAME_STATE.miner_willy_rope.store(seg, Ordering::Relaxed);
             ROPE.hold.store(true, Ordering::Relaxed);
         }

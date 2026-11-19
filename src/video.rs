@@ -277,8 +277,8 @@ fn video_set_pixel(pixel: &mut Pixel, pos: i32, ink: u8) {
     system_set_pixel(buf_index(pos), ink);
 }
 
-pub(crate) fn video_get_pixel(pixel: &Pixel) -> i32 {
-    pixel.point as i32
+pub(crate) fn video_pixel_has_willy(pixel: &Pixel) -> bool {
+    pixel.point & B_WILLY != 0
 }
 
 pub(crate) fn video_text_width(text: &[u8]) -> i32 {
