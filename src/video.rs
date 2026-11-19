@@ -11,6 +11,44 @@ const B_LEVEL: u8 = 1;
 const B_ROBOT: u8 = 2;
 const B_WILLY: u8 = 4;
 
+/// The `point` half of a pixel: the B_* flag bitfield (level ink, robot
+/// ink, Willy), kept separate from the palette `ink`. Same bits as C's
+/// `pixel.point`; the flag constants stay private to this module.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PixelFlags(u8);
+
+impl PixelFlags {
+    pub(crate) const EMPTY: Self = Self(0);
+    pub(crate) const LEVEL: Self = Self(B_LEVEL);
+    pub(crate) const ROBOT: Self = Self(B_ROBOT);
+    pub(crate) const WILLY: Self = Self(B_WILLY);
+
+    pub(crate) const fn from_bits(bits: u8) -> Self {
+        Self(bits)
+    }
+
+    pub(crate) const fn contains(self, flag: Self) -> bool {
+        self.0 & flag.0 != 0
+    }
+
+    pub(crate) const fn has_willy(self) -> bool {
+        self.contains(Self::WILLY)
+    }
+}
+
+impl std::ops::BitOr for PixelFlags {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for PixelFlags {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
 pub(crate) const CHAR_WIDTH: usize = 8; // width of a character in pixels
 pub(crate) const CHAR_HEIGHT: usize = 8;
 pub(crate) const CHAR_HEIGHT_LARGE: usize = CHAR_HEIGHT * 2;
@@ -23,12 +61,15 @@ pub(crate) const fn tile_2_pixel(t: i32) -> i32 {
 #[derive(Clone, Copy)]
 pub(crate) struct Pixel {
     ink: u8,
-    point: u8,
+    flags: PixelFlags,
 }
 
 pub(crate) static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> = LazyLock::new(|| {
     Mutex::new(vec![
-        Pixel { ink: 0, point: 0 };
+        Pixel {
+            ink: 0,
+            flags: PixelFlags::EMPTY,
+        };
         WIDTH as usize * HEIGHT as usize
     ])
 });
@@ -278,7 +319,7 @@ fn video_set_pixel(pixel: &mut Pixel, pos: i32, ink: u8) {
 }
 
 pub(crate) fn video_pixel_has_willy(pixel: &Pixel) -> bool {
-    pixel.point & B_WILLY != 0
+    pixel.flags.has_willy()
 }
 
 pub(crate) fn video_text_width(text: &[u8]) -> i32 {
@@ -308,7 +349,7 @@ pub(crate) fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
 
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
-        if (pixel.point & 1) == 0 {
+        if !pixel.flags.contains(PixelFlags::LEVEL) {
             video_set_pixel(pixel, p, ink);
         }
     }
@@ -319,7 +360,7 @@ pub(crate) fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
-        if (pixel.point & 1) != 0 {
+        if pixel.flags.contains(PixelFlags::LEVEL) {
             video_set_pixel(pixel, p, ink);
         }
     }
@@ -329,7 +370,7 @@ pub(crate) fn video_pixel_fill(pos: i32, size: i32) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
-        pixel.point = 0;
+        pixel.flags = PixelFlags::EMPTY;
         video_set_pixel(pixel, p, 0x0);
     }
 }
@@ -341,7 +382,7 @@ pub(crate) fn video_draw_rope_seg(pos: i32, ink: u8) {
 
 pub(crate) fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
     let pixel = &mut pixels[buf_index(pos)];
-    pixel.point = 1;
+    pixel.flags = PixelFlags::LEVEL;
     video_set_pixel(pixel, pos, ink);
 }
 
@@ -352,20 +393,20 @@ pub(crate) fn video_draw_arrow(pos: i32, dir: i32) {
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
-    pixels[buf_index(pos)].point |= B_ROBOT | 1;
+    pixels[buf_index(pos)].flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
     video_set_pixel(&mut pixels[buf_index(pos)], pos, 7);
-    pixels[buf_index(pos + 6)].point |= B_ROBOT | 1;
+    pixels[buf_index(pos + 6)].flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
     video_set_pixel(&mut pixels[buf_index(pos + 6)], pos + 6, 7);
     pos += width;
-    pixels[buf_index(pos + width)].point |= B_ROBOT | 1;
+    pixels[buf_index(pos + width)].flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
     video_set_pixel(&mut pixels[buf_index(pos + width)], pos + width, 7);
-    pixels[buf_index(pos + width + 6)].point |= B_ROBOT | 1;
+    pixels[buf_index(pos + width + 6)].flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
     video_set_pixel(&mut pixels[buf_index(pos + width + 6)], pos + width + 6, 7);
     pos -= dir;
     for i in 0..8 {
         let p = pos + i;
         let pixel = &mut pixels[buf_index(p)];
-        pixel.point |= B_ROBOT | 1;
+        pixel.flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
         video_set_pixel(pixel, p, 7);
     }
 }
@@ -381,8 +422,8 @@ pub(crate) fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
             let d = (byte >> bit) & B_LEVEL;
             let p = pos - bit;
             let pixel = &mut pixels[buf_index(p)];
-            pixel.point = d;
-            video_set_pixel(pixel, p, colour[d as usize]);
+            pixel.flags = PixelFlags::from_bits(d);
+            video_set_pixel(pixel, p, colour[usize::from(d)]);
         }
         pos += WIDTH;
     }
@@ -406,10 +447,10 @@ pub(crate) fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
             if ((word >> bit) & 1) != 0 {
                 let p = pos - bit;
                 let pixel = &mut pixels[buf_index(p)];
-                if (pixel.point & B_ROBOT) != 0 {
+                if pixel.flags.contains(PixelFlags::ROBOT) {
                     die = true;
                 }
-                pixel.point |= B_WILLY | 1;
+                pixel.flags |= PixelFlags::WILLY | PixelFlags::LEVEL;
                 video_set_pixel(pixel, p, ink);
             }
         }
@@ -430,7 +471,7 @@ pub(crate) fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
             if ((word >> bit) & 1) != 0 {
                 let p = pos - bit;
                 let pixel = &mut pixels[buf_index(p)];
-                pixel.point |= B_ROBOT | 1;
+                pixel.flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
                 video_set_pixel(pixel, p, ink);
             }
         }
@@ -459,11 +500,11 @@ pub(crate) fn video_draw_sprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) 
 
     for &word in line {
         for bit in 0..16 {
-            let d = (word >> bit) & 1;
+            let d = u8::try_from((word >> bit) & 1).expect("bit is 0/1");
             let p = pos - bit;
             let pixel = &mut pixels[buf_index(p)];
-            pixel.point = d as u8;
-            video_set_pixel(pixel, p, colour[d as usize]);
+            pixel.flags = PixelFlags::from_bits(d);
+            video_set_pixel(pixel, p, colour[usize::from(d)]);
         }
         pos += WIDTH;
     }
@@ -501,7 +542,8 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
             continue;
         }
 
-        let ch = (text[i] - b' ') as usize; // Space is the offset for start of alphabet
+        // Space is the offset for start of alphabet
+        let ch = usize::from(text[i] - b' ');
         let byte = &CHAR_SET_LARGE[ch];
         for line in byte.iter().take(CHAR_WIDTH).copied() {
             if (0..WIDTH).contains(&x) {
@@ -509,7 +551,7 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
                 for row in 0..i32::try_from(CHAR_HEIGHT_LARGE).expect("char height fits i32") {
                     let p = start + row * WIDTH;
                     let pixel = &mut pixels[buf_index(p)];
-                    let bit = ((line >> row) & 1) as usize;
+                    let bit = usize::from((line >> row) & 1);
                     video_set_pixel(pixel, p, ink[bit]);
                 }
             }
@@ -552,15 +594,15 @@ pub(crate) fn video_write(pos: i32, text: &[u8]) {
             continue;
         }
 
-        let ch = text[i] as usize;
+        let ch = usize::from(text[i]);
         let row = &CHAR_SET[ch];
-        let width = row[0] as usize;
+        let width = usize::from(row[0]);
         for line in row.iter().take(width + 1).skip(1).copied() {
             for idx in 0..i32::try_from(CHAR_HEIGHT).expect("char height fits i32") {
                 let p = pos + idx * WIDTH;
                 let pixel = &mut pixels[buf_index(p)];
-                let bit = ((line >> idx) & 1) as usize;
-                pixel.point = u8::try_from(bit).expect("bit is 0/1");
+                let bit = usize::from((line >> idx) & 1);
+                pixel.flags = PixelFlags::from_bits(u8::try_from(bit).expect("bit is 0/1"));
                 video_set_pixel(pixel, p, ink[bit]);
             }
             pos += 1;
