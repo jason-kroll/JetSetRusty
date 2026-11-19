@@ -172,7 +172,7 @@ fn write_ppm(path: &str) -> std::io::Result<()> {
     std::fs::write(path, out)
 }
 
-pub fn main(args: &[String]) -> i32 {
+pub(crate) fn main(args: &[String]) -> i32 {
     let usage = "usage: jetsetrusty --replay <script> [--dump <frame> <out.ppm>]...";
     let Some(path) = args.first() else {
         eprintln!("{usage}");

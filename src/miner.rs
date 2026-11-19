@@ -136,18 +136,18 @@ const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
 }
 
-pub fn miner_set_seq(index: i32, speed: i32) {
+pub(crate) fn miner_set_seq(index: i32, speed: i32) {
     MINER_TIMER.with(|t| timer_set(&mut t.borrow_mut(), 1, speed));
     set_miner_seq_index(index as u8);
 }
 
-pub fn miner_inc_seq() {
+pub(crate) fn miner_inc_seq() {
     let next = MINER_TIMER.with(|t| timer_update(&mut t.borrow_mut())) as u8;
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 
 // Upstream Miner_DrawSprite: minerSequence[index & 7].
-pub fn miner_draw_sprite(pos: i32, paper: u8, ink: u8, index: i32) {
+pub(crate) fn miner_draw_sprite(pos: i32, paper: u8, ink: u8, index: i32) {
     let row = MINER_SEQUENCE[(index & 7) as usize];
     video_draw_sprite(pos, &MINER_SPRITE[row], paper, ink);
 }
@@ -157,7 +157,7 @@ thread_local! {
     static MINER_STORE: RefCell<Miner> = const { RefCell::new(MINER_ZERO) };
 }
 
-pub fn miner_restore(miner: &mut Miner) {
+pub(crate) fn miner_restore(miner: &mut Miner) {
     MINER_STORE.with(|s| {
         let s = s.borrow();
         miner.x = s.x;
@@ -172,7 +172,7 @@ pub fn miner_restore(miner: &mut Miner) {
     });
 }
 
-pub fn miner_save(miner: &Miner) {
+pub(crate) fn miner_save(miner: &Miner) {
     MINER_STORE.with(|s| {
         let mut s = s.borrow_mut();
         s.x = miner.x;
@@ -584,7 +584,7 @@ fn do_miner_ticker(miner: &mut Miner) {
     miner.tile += step.tile_add;
 }
 
-pub fn miner_ticker(miner: &mut Miner) {
+pub(crate) fn miner_ticker(miner: &mut Miner) {
     do_miner_ticker(miner);
 
     if miner.y < 0 {
@@ -592,7 +592,7 @@ pub fn miner_ticker(miner: &mut Miner) {
     }
 }
 
-pub fn miner_drawer(miner: &Miner) {
+pub(crate) fn miner_drawer(miner: &Miner) {
     let (air, jump) = (miner.air, miner.jump);
     let mut offset = 0;
     let mut align = miner.align;
@@ -640,7 +640,7 @@ pub fn miner_drawer(miner: &Miner) {
     }
 }
 
-pub fn miner_init() {
+pub(crate) fn miner_init() {
     let mut miner = GAME_STATE.miner.lock().unwrap();
     miner.x = 20 * 8;
     miner.y = 13 * 8;

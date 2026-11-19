@@ -48,12 +48,12 @@ const LEVEL_KEYS: [Key; 30] = [
 /// Which cheat handler the game responder runs — chosen from cheat_enabled
 /// (was a fn-pointer return before the typed enum).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CheatHandler {
+pub(crate) enum CheatHandler {
     LevelSelect,
     CodeEntry,
 }
 
-pub fn cheat_handler() -> CheatHandler {
+pub(crate) fn cheat_handler() -> CheatHandler {
     if GAME_STATE.cheat_enabled.load(Ordering::Relaxed) {
         CheatHandler::LevelSelect
     } else {

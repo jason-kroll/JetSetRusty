@@ -19,12 +19,12 @@ const EV_NOTE_OFF: i16 = 0x00;
 const EV_NOTE_ON: i16 = 0x10;
 const EV_END: i16 = 0x40;
 
-pub const MUS_STOP: i32 = 0;
-pub const MUS_PLAY: i32 = 1;
+pub(crate) const MUS_STOP: i32 = 0;
+pub(crate) const MUS_PLAY: i32 = 1;
 
 // Matches audio.h MUS_* enum order; also indexes MUSIC_SCORE.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MusicScore {
+pub(crate) enum MusicScore {
     Title = 0,
     Game = 1,
     Loader = 2,
@@ -34,7 +34,7 @@ pub enum MusicScore {
 // has no variant — the willy handler never reads a pitch table, so in
 // the port that row is unreachable, exactly as in C.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Sfx {
+pub(crate) enum Sfx {
     Item = 0,
     Die = 1,
     Gameover = 2,
@@ -213,20 +213,20 @@ thread_local! {
     static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
 }
 
-pub fn audio_music_playing() -> bool {
+pub(crate) fn audio_music_playing() -> bool {
     AUDIO_MUSIC_PLAYING.load(Ordering::Relaxed)
 }
 
 // Upstream a53b948 animates the lives icons with musicClock >> 4.
-pub fn audio_music_clock() -> i32 {
+pub(crate) fn audio_music_clock() -> i32 {
     AUDIO_STATE.lock().unwrap().music_clock
 }
 
-pub fn audio_pan_x() -> i32 {
+pub(crate) fn audio_pan_x() -> i32 {
     AUDIO_PAN_X.with(Cell::get)
 }
 
-pub fn set_audio_pan_x(pan: i32) {
+pub(crate) fn set_audio_pan_x(pan: i32) {
     AUDIO_PAN_X.with(|c| c.set(pan));
 }
 
@@ -401,7 +401,7 @@ fn music_note_off(s: &mut AudioState, ch: usize) {
 
 // ---- public API -------------------------------------------------------------
 
-pub fn audio_reduce_music_speed() {
+pub(crate) fn audio_reduce_music_speed() {
     let mut s = AUDIO_STATE.lock().unwrap();
     s.music_pitch -= 1;
     s.music_tempo -= 6;
@@ -409,7 +409,7 @@ pub fn audio_reduce_music_speed() {
     timer_set(&mut s.timer_music, SAMPLERATE, tempo);
 }
 
-pub fn audio_willy_sfx(note: i32, length: i32) {
+pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
     let mut s = AUDIO_STATE.lock().unwrap();
     let ch = s.sfx[0].channel;
     s.channels[ch].frequency = FREQUENCY_TABLE[note as usize];
@@ -419,7 +419,7 @@ pub fn audio_willy_sfx(note: i32, length: i32) {
     s.sfx[0].handler = Some(SfxHandler::Willy);
 }
 
-pub fn audio_sfx(sfx: Sfx) {
+pub(crate) fn audio_sfx(sfx: Sfx) {
     let mut s = AUDIO_STATE.lock().unwrap();
     let pan = audio_pan_x();
 
@@ -474,7 +474,7 @@ pub fn audio_sfx(sfx: Sfx) {
     s.sfx[target_slot].clock = s.sfx_clock;
 }
 
-pub fn audio_output(output: &mut [i16; 2]) {
+pub(crate) fn audio_output(output: &mut [i16; 2]) {
     let mut s = AUDIO_STATE.lock().unwrap();
 
     if s.samples_music == 0 {
@@ -570,13 +570,13 @@ pub fn audio_output(output: &mut [i16; 2]) {
     s.samples_sfx -= 1;
 }
 
-pub fn audio_play(playing: bool) {
+pub(crate) fn audio_play(playing: bool) {
     AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
     let mut s = AUDIO_STATE.lock().unwrap();
     s.music_channels = if playing { NCHANNELS } else { NSFX };
 }
 
-pub fn audio_music(music: MusicScore, playing: bool) {
+pub(crate) fn audio_music(music: MusicScore, playing: bool) {
     {
         let mut s = AUDIO_STATE.lock().unwrap();
         s.music_index = music;
@@ -594,7 +594,7 @@ pub fn audio_music(music: MusicScore, playing: bool) {
     audio_play(playing);
 }
 
-pub fn audio_init() {
+pub(crate) fn audio_init() {
     let mut s = AUDIO_STATE.lock().unwrap();
     timer_set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
 }

@@ -10,15 +10,15 @@ use std::sync::Mutex;
 
 static CODES_STATE: Mutex<CodesState> = Mutex::new(CodesState::new());
 
-pub fn do_codes_responder() {
+pub(crate) fn do_codes_responder() {
     CODES_STATE.lock().unwrap().do_codes_responder();
 }
 
-pub fn do_codes_ticker() {
+pub(crate) fn do_codes_ticker() {
     CODES_STATE.lock().unwrap().do_codes_ticker();
 }
 
-pub fn do_codes_drawer() {
+pub(crate) fn do_codes_drawer() {
     CODES_STATE.lock().unwrap().do_codes_drawer();
 }
 
@@ -28,18 +28,18 @@ pub(crate) fn codes_enter() {
     CODES_STATE.lock().unwrap().codes_enter();
 }
 
-pub struct CodesState {
-    pub attempt: i32,
-    pub needed: i32,
-    pub pos: i32,
-    pub pos_last: i32,
-    pub code: [i32; 4],
-    pub key: i32,
-    pub cell: [u8; 7],
+pub(crate) struct CodesState {
+    pub(crate) attempt: i32,
+    pub(crate) needed: i32,
+    pub(crate) pos: i32,
+    pub(crate) pos_last: i32,
+    pub(crate) code: [i32; 4],
+    pub(crate) key: i32,
+    pub(crate) cell: [u8; 7],
 }
 
 impl CodesState {
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             attempt: 1,
             needed: 0,

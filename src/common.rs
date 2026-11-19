@@ -1,6 +1,6 @@
 // Screen dimensions, i32 as per original C
-pub const WIDTH: i32 = 256;
-pub const HEIGHT: i32 = 192;
+pub(crate) const WIDTH: i32 = 256;
+pub(crate) const HEIGHT: i32 = 192;
 
 // Key codes enum. The discriminants mirror the C original's KEY enum
 // (reference/c-original/src/common.h) wherever the game can observe them,
@@ -12,7 +12,7 @@ pub const HEIGHT: i32 = 192;
 // Escape is pinned at C's KEY_ESCAPE value and Else/None sit at 45/46.
 // The mapping is pinned by the discriminants_match_the_c_original test.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Key {
+pub(crate) enum Key {
     Left,
     Right,
     Jump,
@@ -64,7 +64,7 @@ pub enum Key {
 impl Key {
     /// The lowercase ASCII byte this letter key names, or `None` for every
     /// non-letter key. Cheat code-word matching goes through this.
-    pub fn letter(self) -> Option<u8> {
+    pub(crate) fn letter(self) -> Option<u8> {
         let offset = self as i32 - Key::A as i32;
         (0..=25).contains(&offset).then(|| b'a' + offset as u8)
     }
@@ -75,7 +75,7 @@ impl Key {
     /// ever produces the seven code-word letters, so this constructor
     /// exists for tests (C's cheat.c spelled inputs as KEY_A + offset).
     #[cfg(test)]
-    pub fn from_letter(c: u8) -> Key {
+    pub(crate) fn from_letter(c: u8) -> Key {
         assert!(c.is_ascii_lowercase(), "{c} is not a letter key");
         const LEVEL_LETTERS: [Key; 20] = [
             Key::A,

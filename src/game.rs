@@ -1,4 +1,3 @@
-#![warn(unused_unsafe)]
 use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
 use crate::game_main::game_input;
 use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
@@ -28,20 +27,20 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 use std::sync::{LazyLock, Mutex};
 
 // Public constants (from game.h)
-pub const LIVES: usize = (18 * 8 + 4) * WIDTH as usize + 4;
-pub const STATUS: usize = 21 * 8 + 4;
+pub(crate) const LIVES: usize = (18 * 8 + 4) * WIDTH as usize + 4;
+pub(crate) const STATUS: usize = 21 * 8 + 4;
 
 // Level constants
-pub const THEDRIVE: i32 = 4;
-pub const QUIRKAFLEEG: i32 = 16;
-pub const ONTHEROOF: i32 = 18;
-pub const COLDSTORE: i32 = 25;
-pub const FIRSTLANDING: i32 = 28;
-pub const NIGHTMAREROOM: i32 = 29;
-pub const SWIMMINGPOOL: i32 = 31;
-pub const THEBATHROOM: i32 = 33;
-pub const MASTERBEDROOM: i32 = 35;
-pub const THEBEACH: i32 = 57;
+pub(crate) const THEDRIVE: i32 = 4;
+pub(crate) const QUIRKAFLEEG: i32 = 16;
+pub(crate) const ONTHEROOF: i32 = 18;
+pub(crate) const COLDSTORE: i32 = 25;
+pub(crate) const FIRSTLANDING: i32 = 28;
+pub(crate) const NIGHTMAREROOM: i32 = 29;
+pub(crate) const SWIMMINGPOOL: i32 = 31;
+pub(crate) const THEBATHROOM: i32 = 33;
+pub(crate) const MASTERBEDROOM: i32 = 35;
+pub(crate) const THEBEACH: i32 = 57;
 
 // life ink colors for drawing lives
 const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
@@ -67,7 +66,7 @@ fn set_clock_redraw(v: bool) {
 // (GM_NORMAL < GM_MARIA < GM_RUNNING < GM_TOILET) — what the original's
 // `gameMode < GM_RUNNING` integer comparisons meant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub enum GameMode {
+pub(crate) enum GameMode {
     Normal = 0,
     Maria,
     Running,
@@ -91,7 +90,7 @@ impl GameMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Direction {
+pub(crate) enum Direction {
     Above = 0,
     Right,
     Below,
@@ -100,46 +99,46 @@ pub enum Direction {
 
 // miner struct (from game.h)
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Miner {
+pub(crate) struct Miner {
     // Initialize to all zeros w/ Default
-    pub x: i32,
-    pub y: i32,
-    pub tile: i32,
-    pub align: i32,
-    pub frame: i32,
-    pub dir: i32,
-    pub move_: i32, // renamed from 'move' which is a Rust keyword
-    pub air: i32,
-    pub jump: i32,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) tile: i32,
+    pub(crate) align: i32,
+    pub(crate) frame: i32,
+    pub(crate) dir: i32,
+    pub(crate) move_: i32, // renamed from 'move' which is a Rust keyword
+    pub(crate) air: i32,
+    pub(crate) jump: i32,
 }
 
 // Game state structure (private)
-pub struct GameState {
-    pub miner: Mutex<Miner>,
+pub(crate) struct GameState {
+    pub(crate) miner: Mutex<Miner>,
 
     // Frequently accessed, thread-safe, atomic fields (cheap access)
-    pub cheat_enabled: AtomicBool,
-    pub clock_ticks: AtomicI32,
-    pub frame: AtomicBool,
-    pub game_paused: AtomicI32, // counter: 0 = unpaused, counts up while paused
-    pub inactivity_timer: AtomicI32,
-    pub item_count: AtomicI32,
-    pub level: AtomicI32,
-    pub lives: AtomicI32,
+    pub(crate) cheat_enabled: AtomicBool,
+    pub(crate) clock_ticks: AtomicI32,
+    pub(crate) frame: AtomicBool,
+    pub(crate) game_paused: AtomicI32, // counter: 0 = unpaused, counts up while paused
+    pub(crate) inactivity_timer: AtomicI32,
+    pub(crate) item_count: AtomicI32,
+    pub(crate) level: AtomicI32,
+    pub(crate) lives: AtomicI32,
     // Sole owner (no longer synced to/from a C global); read directly by
     // miner.rs via GAME_STATE.
-    pub miner_attr_split: AtomicI32,
-    pub miner_willy_rope: AtomicI32,
+    pub(crate) miner_attr_split: AtomicI32,
+    pub(crate) miner_willy_rope: AtomicI32,
     // GameMode discriminant, written only by set_mode; the field is private
     // to force the typed accessors (mode()/set_mode()) on every user.
     mode: AtomicU8,
-    pub music: AtomicBool,
+    pub(crate) music: AtomicBool,
 
     // Less frequent, needs interior mutability, mutex-protected fields (more expensive)
-    pub level_border: Mutex<[i32; 60]>,
-    pub score_clock: Mutex<[u8; 3]>,
-    pub score_items: Mutex<u8>,
-    pub timer: Mutex<Timer>,
+    pub(crate) level_border: Mutex<[i32; 60]>,
+    pub(crate) score_clock: Mutex<[u8; 3]>,
+    pub(crate) score_items: Mutex<u8>,
+    pub(crate) timer: Mutex<Timer>,
 }
 
 // Per-room border colour, indexed by level. Was the `levelBorder` C global (in
@@ -154,7 +153,7 @@ const LEVEL_BORDER: [i32; 60] = [
     5, 2, 1, 2, 5, 1, 2, 2, 5, 5, //
 ];
 
-pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
+pub(crate) static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     cheat_enabled: AtomicBool::new(false),
     clock_ticks: AtomicI32::new(0),
     frame: AtomicBool::new(false),
@@ -179,11 +178,11 @@ pub static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
 // and `gameMode < GM_RUNNING` integer handling. Same Relaxed atomic as
 // before; only the API is typed.
 impl GameState {
-    pub fn mode(&self) -> GameMode {
+    pub(crate) fn mode(&self) -> GameMode {
         GameMode::from_u8(self.mode.load(Ordering::Relaxed))
     }
 
-    pub fn set_mode(&self, m: GameMode) {
+    pub(crate) fn set_mode(&self, m: GameMode) {
         self.mode.store(m as u8, Ordering::Relaxed);
     }
 }
@@ -193,7 +192,7 @@ impl GameState {
 // Runs exactly once as the Game(Init) phase's ticker: it sets up the room,
 // then moves the phase to Play (or PausedDrawOnce when paused). Takes the
 // miner explicitly — callers hold the one miner lock for the whole call.
-pub fn game_init_room(miner: &mut Miner) {
+pub(crate) fn game_init_room(miner: &mut Miner) {
     level_init();
     robots_init();
     rope_init();
@@ -228,7 +227,7 @@ pub fn game_init_room(miner: &mut Miner) {
     }
 }
 
-pub fn game_pause(state: bool) {
+pub(crate) fn game_pause(state: bool) {
     let game = &*GAME_STATE;
 
     if (game.game_paused.load(Ordering::Relaxed) != 0) == state || game.mode() >= GameMode::Running
@@ -266,7 +265,7 @@ pub fn game_pause(state: bool) {
     }
 }
 
-pub fn do_game_responder() {
+pub(crate) fn do_game_responder() {
     let game = &*GAME_STATE;
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
@@ -286,7 +285,7 @@ pub fn do_game_responder() {
     }
 }
 
-pub fn do_game_drawer() {
+pub(crate) fn do_game_drawer() {
     let game = &*GAME_STATE;
 
     if !game.frame.load(Ordering::Relaxed) {
@@ -318,7 +317,7 @@ pub fn do_game_drawer() {
     }
 }
 
-pub fn do_draw_clock() {
+pub(crate) fn do_draw_clock() {
     let game = &*GAME_STATE;
 
     let mut text: Vec<u8> = vec![
@@ -340,7 +339,7 @@ pub fn do_draw_clock() {
     set_clock_redraw(false);
 }
 
-pub fn do_pause_ticker() {
+pub(crate) fn do_pause_ticker() {
     let game = &*GAME_STATE;
 
     let old_paused = game.game_paused.fetch_add(1, Ordering::Relaxed);
@@ -349,7 +348,7 @@ pub fn do_pause_ticker() {
     }
 }
 
-pub fn do_pause_drawer() {
+pub(crate) fn do_pause_drawer() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) == 16 * 5 {
@@ -358,7 +357,7 @@ pub fn do_pause_drawer() {
     }
 }
 
-pub fn game_game_reset() {
+pub(crate) fn game_game_reset() {
     let game = &*GAME_STATE;
 
     // gameScoreItems = 0
@@ -387,7 +386,7 @@ pub fn game_game_reset() {
     audio_music(MusicScore::Game, music);
 }
 
-pub fn game_cheat_enabled() {
+pub(crate) fn game_cheat_enabled() {
     let game = &*GAME_STATE;
 
     if game.game_paused.load(Ordering::Relaxed) != 0 {
@@ -413,7 +412,7 @@ pub fn game_cheat_enabled() {
     robots_draw_cheat();
 }
 
-pub fn game_change_level(dir: Direction, miner: &mut Miner) {
+pub(crate) fn game_change_level(dir: Direction, miner: &mut Miner) {
     let game = &*GAME_STATE;
 
     // int level = level_dir(dir)
@@ -473,14 +472,14 @@ pub fn game_change_level(dir: Direction, miner: &mut Miner) {
     game_init_room(miner);
 }
 
-pub fn do_draw_once() {
+pub(crate) fn do_draw_once() {
     do_game_drawer();
 
     // The old DRAWER-slot clear after the one-shot draw.
     set_screen(Screen::Game(GamePhase::PauseCheat));
 }
 
-pub fn do_game_ticker() {
+pub(crate) fn do_game_ticker() {
     let game = &*GAME_STATE;
 
     // Inactivity check: pause after 5 minutes when music stopped
@@ -554,7 +553,7 @@ pub fn do_game_ticker() {
     clock_ticker();
 }
 
-pub fn game_got_item(pan_x: i32) {
+pub(crate) fn game_got_item(pan_x: i32) {
     let game = &*GAME_STATE;
 
     // gameScoreItems++
@@ -575,7 +574,7 @@ pub fn game_got_item(pan_x: i32) {
 }
 
 // Port of C's ClockTicker; called once per game frame from do_game_ticker.
-pub fn clock_ticker() {
+pub(crate) fn clock_ticker() {
     // [ed: porting comments over directly]
     // 256 frames = 1 game minute
     // 19 game hours = 6.75... actual hours (19 * 60 * 256 / 12 / 60 / 60)
@@ -608,7 +607,7 @@ pub fn clock_ticker() {
     set_clock_redraw(true);
 }
 
-pub fn game_draw_lives() {
+pub(crate) fn game_draw_lives() {
     let game = &*GAME_STATE;
     let lives = game.lives.load(Ordering::Relaxed) as usize;
 
@@ -619,7 +618,7 @@ pub fn game_draw_lives() {
     }
 }
 
-pub fn game_draw_status() {
+pub(crate) fn game_draw_status() {
     let game = &*GAME_STATE;
 
     // video_pixel_paper_fill(128 * WIDTH, 64 * WIDTH, 0x0);

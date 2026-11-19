@@ -1,13 +1,13 @@
 use crate::common::{HEIGHT, WIDTH};
 
 // Colour table ----------------------------------------------------------------
-pub struct Colour {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
+pub(crate) struct Colour {
+    pub(crate) r: u8,
+    pub(crate) g: u8,
+    pub(crate) b: u8,
 }
 
-pub static VIDEO_COLOUR: [Colour; 16] = [
+pub(crate) static VIDEO_COLOUR: [Colour; 16] = [
     Colour {
         r: 0x00,
         g: 0x00,
@@ -94,22 +94,22 @@ pub static VIDEO_COLOUR: [Colour; 16] = [
 // present path (texture upload and border) ultimately shows, so it is
 // pinned entry-by-entry by the unit test below — an SDL3 migration must
 // reproduce these exact bytes.
-pub fn colour_rgb(index: usize) -> [u8; 3] {
+pub(crate) fn colour_rgb(index: usize) -> [u8; 3] {
     let c = &VIDEO_COLOUR[index];
     [c.r, c.g, c.b]
 }
 
 // Timer -----------------------------------------------------------------------
 #[derive(Clone, Copy, Default)]
-pub struct Timer {
+pub(crate) struct Timer {
     // Field order matches the original C `TIMER` ({rate, acc, remainder,
     // divisor}) for provenance. This used to be a live ABI contract — the
     // struct was aliased over the C `gameTimer` global — but with no FFI left
     // the `#[repr(C)]` is gone and only the field order remains as a nod to C.
-    pub rate: i32,
-    pub acc: i32,
-    pub remainder: i32,
-    pub divisor: i32,
+    pub(crate) rate: i32,
+    pub(crate) acc: i32,
+    pub(crate) remainder: i32,
+    pub(crate) divisor: i32,
 }
 
 impl std::fmt::Debug for Timer {
@@ -123,14 +123,14 @@ impl std::fmt::Debug for Timer {
     }
 }
 
-pub fn timer_set(timer: &mut Timer, numerator: i32, divisor: i32) {
+pub(crate) fn timer_set(timer: &mut Timer, numerator: i32, divisor: i32) {
     timer.acc = 0;
     timer.rate = numerator / divisor;
     timer.remainder = numerator - timer.rate * divisor;
     timer.divisor = divisor;
 }
 
-pub fn timer_update(timer: &mut Timer) -> i32 {
+pub(crate) fn timer_update(timer: &mut Timer) -> i32 {
     timer.acc += timer.remainder;
     if timer.acc < timer.divisor {
         return timer.rate;
@@ -148,14 +148,14 @@ pub fn timer_update(timer: &mut Timer) -> i32 {
 /// geometry; the returned multiply is the game texture's integer scale for the
 /// target texture. (Pure — the C original wrote five out-params through
 /// pointers; the shape lives in the tests as the pinned tuple.)
-pub struct Viewport {
-    pub x: i32,
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
+pub(crate) struct Viewport {
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) w: i32,
+    pub(crate) h: i32,
 }
 
-pub fn video_viewport(width: i32, height: i32) -> (Viewport, i32) {
+pub(crate) fn video_viewport(width: i32, height: i32) -> (Viewport, i32) {
     let (w, h) = if height * 4 / 3 <= width {
         // landscape
         let h = (HEIGHT * height) / (HEIGHT + 16);
@@ -184,7 +184,7 @@ pub fn video_viewport(width: i32, height: i32) -> (Viewport, i32) {
 // opens as a crisp integer upscale (1088x832 on a 1080p display). A tiling
 // window manager can then reshape it freely; the per-frame letterbox in
 // game_main keeps the game at 4:3 whatever size it ends up.
-pub fn windowed_size(display_w: i32, display_h: i32) -> (i32, i32) {
+pub(crate) fn windowed_size(display_w: i32, display_h: i32) -> (i32, i32) {
     const MAX_MULTIPLY: i32 = 4;
     let screen_w = WIDTH + 16;
     let screen_h = HEIGHT + 16;

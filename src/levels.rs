@@ -12,7 +12,7 @@ const LEVEL_TILES: usize = LEVEL_W * LEVEL_HEIGHT; // 32 * 16 is 512
 // PartialOrd derives the C declaration order — what the physics meant by
 // `tile > T_SPACE as int`: Item < Space < everything floor-like < Harm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub enum TileType {
+pub(crate) enum TileType {
     Item,
     Space,
     Solid,
@@ -29,19 +29,19 @@ pub enum TileType {
 
 #[derive(Clone, Copy)]
 struct LevelInfo {
-    pub attr: u16,
-    pub tile_type: TileType,
+    pub(crate) attr: u16,
+    pub(crate) tile_type: TileType,
 }
 
 #[derive(Clone, Copy)]
 struct LevelData {
-    pub title: &'static str,
-    pub map: [i32; 4],
-    pub data: [i32; LEVEL_TILES],
-    pub gfx: [[u8; 8]; 10],
-    pub info: [LevelInfo; 10],
-    pub item_count: i32,
-    pub item: [i32; 12],
+    pub(crate) title: &'static str,
+    pub(crate) map: [i32; 4],
+    pub(crate) data: [i32; LEVEL_TILES],
+    pub(crate) gfx: [[u8; 8]; 10],
+    pub(crate) info: [LevelInfo; 10],
+    pub(crate) item_count: i32,
+    pub(crate) item: [i32; 12],
 }
 
 // ---- level! DSL -----------------------------------------------------------------------
@@ -4949,21 +4949,21 @@ thread_local! {
 static GFX_SPACE: [u8; 8] = [0u8; 8];
 
 #[derive(Clone, Copy)]
-pub enum DrawMode {
+pub(crate) enum DrawMode {
     Tile,
     Item,
     Flash,
 }
 
 struct Tile {
-    pub tile_type: TileType,
-    pub gfx: [u8; 8],
-    pub paper: [u8; 3],
-    pub ink: [u8; 3],
-    pub draw_mode: DrawMode,
+    pub(crate) tile_type: TileType,
+    pub(crate) gfx: [u8; 8],
+    pub(crate) paper: [u8; 3],
+    pub(crate) ink: [u8; 3],
+    pub(crate) draw_mode: DrawMode,
 }
 
-pub fn level_set_border() {
+pub(crate) fn level_set_border() {
     LEVEL_TILE.with(|tiles| {
         let t = &mut tiles.borrow_mut()[0];
         system_border(t.ink[0]);
@@ -4975,11 +4975,11 @@ fn game_level() -> usize {
     GAME_STATE.level.load(Ordering::Relaxed) as usize
 }
 
-pub fn level_dir(dir: Direction) -> i32 {
+pub(crate) fn level_dir(dir: Direction) -> i32 {
     LEVEL_DATA[game_level()].map[dir as usize]
 }
 
-pub fn level_item_count() -> i32 {
+pub(crate) fn level_item_count() -> i32 {
     LEVEL_DATA.iter().map(|l| l.item_count).sum()
 }
 
@@ -4996,7 +4996,7 @@ fn restore_items() {
     });
 }
 
-pub fn level_restore_items() {
+pub(crate) fn level_restore_items() {
     restore_items();
 }
 
@@ -5013,7 +5013,7 @@ fn do_flash(tile: &mut Tile) {
     tile.ink[2] = tile.ink[video_flash() as usize];
 }
 
-pub fn level_erase_item(tile: i32) {
+pub(crate) fn level_erase_item(tile: i32) {
     let tile = usize::try_from(tile).expect("item tile is non-negative");
     let level = game_level();
     let attr = ACTIVE_LEVELS.with(|a| {
@@ -5032,7 +5032,7 @@ pub fn level_erase_item(tile: i32) {
 }
 
 // Pure mapping cores of level_get_tile_type / level_get_tile_ramp.
-pub fn tile_type_for(raw: TileType, air: i32, jump: i32) -> TileType {
+pub(crate) fn tile_type_for(raw: TileType, air: i32, jump: i32) -> TileType {
     match raw {
         TileType::RampLC => TileType::ConveyR,
         TileType::RampRC => TileType::ConveyL,
@@ -5047,7 +5047,7 @@ pub fn tile_type_for(raw: TileType, air: i32, jump: i32) -> TileType {
     }
 }
 
-pub fn tile_type_ramp_for(raw: TileType) -> TileType {
+pub(crate) fn tile_type_ramp_for(raw: TileType) -> TileType {
     match raw {
         TileType::RampLC => TileType::RampL,
         TileType::RampRC => TileType::RampR,
@@ -5060,7 +5060,7 @@ pub fn tile_type_ramp_for(raw: TileType) -> TileType {
 // Space by stated design — the same result the old `as usize` wrap produced
 // by landing on the >= LEVEL_TILES guard — and the single checked
 // conversion happens here, after the guard.
-pub fn level_get_tile_ramp(tile: i32) -> TileType {
+pub(crate) fn level_get_tile_ramp(tile: i32) -> TileType {
     if tile < 0 || tile >= LEVEL_TILES as i32 {
         return TileType::Space;
     }
@@ -5068,7 +5068,7 @@ pub fn level_get_tile_ramp(tile: i32) -> TileType {
     tile_type_ramp_for(LEVEL_TILE.with(|t| t.borrow()[tile].tile_type))
 }
 
-pub fn level_get_tile_type(tile: i32, air: i32, jump: i32) -> TileType {
+pub(crate) fn level_get_tile_type(tile: i32, air: i32, jump: i32) -> TileType {
     if tile < 0 || tile >= LEVEL_TILES as i32 {
         return TileType::Space;
     }
@@ -5077,7 +5077,7 @@ pub fn level_get_tile_type(tile: i32, air: i32, jump: i32) -> TileType {
     tile_type_for(raw, air, jump)
 }
 
-pub fn level_ticker() {
+pub(crate) fn level_ticker() {
     let (left_offset, right_offset) = CONVEY_ROTATE.with(|c| (c.borrow()[0], c.borrow()[1]));
     LEVEL_TILE.with(|tiles| {
         for t in tiles.borrow_mut().iter_mut() {
@@ -5095,7 +5095,7 @@ pub fn level_ticker() {
 }
 
 // game.c
-pub fn level_drawer() {
+pub(crate) fn level_drawer() {
     LEVEL_TILE.with(|tiles| {
         for (cell, t) in tiles.borrow_mut().iter_mut().enumerate() {
             match t.draw_mode {
@@ -5114,7 +5114,7 @@ pub fn level_drawer() {
 }
 
 // c"" literals forbid the interior nul bytes these control strings carry
-pub fn level_init() {
+pub(crate) fn level_init() {
     let level_idx = game_level();
 
     ACTIVE_LEVELS.with(|a| {

@@ -75,12 +75,12 @@ thread_local! {
 }
 
 /// libc srand(): seed the generator. Main thread only (all game code runs there).
-pub fn srand(seed: u32) {
+pub(crate) fn srand(seed: u32) {
     RNG.with(|r| r.borrow_mut().srand(seed));
 }
 
 /// libc rand(): next pseudo-random value in [0, 2^31).
-pub fn rand() -> i32 {
+pub(crate) fn rand() -> i32 {
     RNG.with(|r| r.borrow_mut().rand())
 }
 

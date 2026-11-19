@@ -3,6 +3,12 @@ name = "jetsetrusty"
 version = "0.1.0"
 edition = "2024"
 
+# Bin crate: no item is reachable outside it, so deny any `pub` — everything
+# is pub(crate). The grep-level backstop for pub fields (which this lint does
+# not cover) is part of the sweep's verification, not of the build.
+[lints.rust]
+unreachable_pub = "deny"
+
 [dependencies]
 # build-from-source-static: sdl3-sys compiles SDL3 from source and links it
 # statically, so no system SDL3 package is needed (Ubuntu/Pop!_OS 24.04 does

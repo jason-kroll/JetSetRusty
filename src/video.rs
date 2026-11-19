@@ -11,22 +11,22 @@ const B_LEVEL: u8 = 1;
 const B_ROBOT: u8 = 2;
 const B_WILLY: u8 = 4;
 
-pub const CHAR_WIDTH: usize = 8; // width of a character in pixels
-pub const CHAR_HEIGHT: usize = 8;
-pub const CHAR_HEIGHT_LARGE: usize = CHAR_HEIGHT * 2;
+pub(crate) const CHAR_WIDTH: usize = 8; // width of a character in pixels
+pub(crate) const CHAR_HEIGHT: usize = 8;
+pub(crate) const CHAR_HEIGHT_LARGE: usize = CHAR_HEIGHT * 2;
 
 #[inline]
-pub const fn tile_2_pixel(t: i32) -> i32 {
+pub(crate) const fn tile_2_pixel(t: i32) -> i32 {
     ((t & 992) << 6) | ((t & 31) << 3)
 }
 
 #[derive(Clone, Copy)]
-pub struct Pixel {
+pub(crate) struct Pixel {
     ink: u8,
     point: u8,
 }
 
-pub static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> = LazyLock::new(|| {
+pub(crate) static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> = LazyLock::new(|| {
     Mutex::new(vec![
         Pixel { ink: 0, point: 0 };
         WIDTH as usize * HEIGHT as usize
@@ -277,11 +277,11 @@ fn video_set_pixel(pixel: &mut Pixel, pos: i32, ink: u8) {
     system_set_pixel(buf_index(pos), ink);
 }
 
-pub fn video_get_pixel(pixel: &Pixel) -> i32 {
+pub(crate) fn video_get_pixel(pixel: &Pixel) -> i32 {
     pixel.point as i32
 }
 
-pub fn video_text_width(text: &[u8]) -> i32 {
+pub(crate) fn video_text_width(text: &[u8]) -> i32 {
     // Same semantics as the old CStr::from_ptr: stop at the first NUL byte.
     let end = text.iter().position(|&b| b == 0).unwrap_or(text.len());
     text[..end]
@@ -291,7 +291,7 @@ pub fn video_text_width(text: &[u8]) -> i32 {
 }
 
 // game.c and title.c
-pub fn video_cycle_colours() -> u8 {
+pub(crate) fn video_cycle_colours() -> u8 {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for (pos, pixel) in pixels.iter_mut().enumerate() {
@@ -303,7 +303,7 @@ pub fn video_cycle_colours() -> u8 {
 }
 
 // gameover.c, game.c
-pub fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
+pub(crate) fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for p in pos..pos + size {
@@ -315,7 +315,7 @@ pub fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
 }
 
 // game.c is still using this
-pub fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
+pub(crate) fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
@@ -325,7 +325,7 @@ pub fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
     }
 }
 
-pub fn video_pixel_fill(pos: i32, size: i32) {
+pub(crate) fn video_pixel_fill(pos: i32, size: i32) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
@@ -334,19 +334,19 @@ pub fn video_pixel_fill(pos: i32, size: i32) {
     }
 }
 
-pub fn video_draw_rope_seg(pos: i32, ink: u8) {
+pub(crate) fn video_draw_rope_seg(pos: i32, ink: u8) {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
     video_draw_rope_seg_inner(&mut pixels, pos, ink);
 }
 
-pub fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
+pub(crate) fn video_draw_rope_seg_inner(pixels: &mut [Pixel], pos: i32, ink: u8) {
     let pixel = &mut pixels[buf_index(pos)];
     pixel.point = 1;
     video_set_pixel(pixel, pos, ink);
 }
 
 // robots.c
-pub fn video_draw_arrow(pos: i32, dir: i32) {
+pub(crate) fn video_draw_arrow(pos: i32, dir: i32) {
     let width = WIDTH;
     let mut pos = pos + dir;
 
@@ -370,7 +370,7 @@ pub fn video_draw_arrow(pos: i32, dir: i32) {
     }
 }
 
-pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
+pub(crate) fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
     let mut pos = tile_2_pixel(tile) + 7;
     let colour = [paper, ink];
 
@@ -389,7 +389,7 @@ pub fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
 }
 
 // miner.c still needs this
-pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
+pub(crate) fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
     let attr = [0x8u8, 0x8, 0x8, 0x1];
     let mut die = false;
 
@@ -419,7 +419,7 @@ pub fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
 }
 
 // robots.c needs this
-pub fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
+pub(crate) fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
     let mut pos = pos + 15;
 
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
@@ -437,7 +437,7 @@ pub fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
     }
 }
 
-pub fn video_draw_robot_i32(pos: i32, line: &[i32; 16], ink: u8) {
+pub(crate) fn video_draw_robot_i32(pos: i32, line: &[i32; 16], ink: u8) {
     // The C original passed an int[16] where a u16* was expected, so the
     // raster lines are the interleaved low/high halves of the first 8 i32s
     // (all values are < 2^16, so the high halves are zero). Reproduce that
@@ -450,7 +450,7 @@ pub fn video_draw_robot_i32(pos: i32, line: &[i32; 16], ink: u8) {
     video_draw_robot(pos, &words, ink);
 }
 
-pub fn video_draw_sprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) {
+pub(crate) fn video_draw_sprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) {
     let colour = [paper, ink];
     let mut pos = pos + 15;
 
@@ -483,7 +483,7 @@ fn text_code(text: &[u8], ink: &mut [u8; 2]) -> bool {
 }
 
 // used by game.c
-pub fn video_write_large(x: i32, y: i32, text: &[u8]) {
+pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
     let mut x = x;
     let pos = y * WIDTH;
 
@@ -535,7 +535,7 @@ fn find_string_end(text: &[u8]) -> usize {
 }
 
 // game.c
-pub fn video_write(pos: i32, text: &[u8]) {
+pub(crate) fn video_write(pos: i32, text: &[u8]) {
     let text = &text[..find_string_end(text)];
 
     // WARN: Locks

@@ -15,8 +15,8 @@ use std::cell::{Cell, RefCell};
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering::Relaxed};
 
-pub const SAMPLERATE: i32 = 22050;
-pub const TICKRATE: i32 = 60;
+pub(crate) const SAMPLERATE: i32 = 22050;
+pub(crate) const TICKRATE: i32 = 60;
 
 // SDL3 keycodes are u32 (SDL_Keycode); the game's input mapping works in i32.
 fn keycode_i32(k: Keycode) -> i32 {
@@ -175,20 +175,20 @@ pub(crate) static DEBUG_ITEM_COUNT: AtomicI32 = AtomicI32::new(-1);
 
 // ---- Exported helpers -------------------------------------------------------
 
-pub fn do_quit() {
+pub(crate) fn do_quit() {
     // As in the C original: the main loop exits on this atomic. The old
     // slot-clearing writes are gone — the dispatcher has no slots to clear.
     GAME_RUNNING.store(false, Relaxed);
 }
 
-pub fn system_rnd() -> i32 {
+pub(crate) fn system_rnd() -> i32 {
     crate::rng::rand()
 }
 
 /// Is this key held? Maps the Key to its SDL keycode/scancode through the
 /// poll tables, which are indexed by Key value (C's sdlKey layout — only
 /// Left..=T, values 0..=35, have slots).
-pub fn system_is_key(key: Key) -> bool {
+pub(crate) fn system_is_key(key: Key) -> bool {
     let sym = SDL_KEYS[key as usize];
     if let Some(held) = REPLAY_HELD.with(|h| h.borrow().as_ref().map(|keys| keys.contains(&sym))) {
         return held;
@@ -272,11 +272,11 @@ fn open_joystick(id: JoystickId) {
     });
 }
 
-pub fn system_set_pixel(pos: usize, index: u8) {
+pub(crate) fn system_set_pixel(pos: usize, index: u8) {
     FRAMEBUFFER.with(|fb| fb.borrow_mut()[pos] = index);
 }
 
-pub fn system_border(index: u8) {
+pub(crate) fn system_border(index: u8) {
     BORDER_INDEX.store(usize::from(index), Relaxed);
 }
 
@@ -502,10 +502,10 @@ pub(crate) fn map_keycode(sym: i32) -> Key {
 pub(crate) struct DevFlags {
     // Open a resizable window instead of fullscreen; the game is letterboxed
     // to 4:3 inside whatever size the window manager gives the window.
-    pub windowed: bool,
+    pub(crate) windowed: bool,
     // `--items N`: debug override for the remaining-item count at game start
     // (None = unset).
-    pub items: Option<i32>,
+    pub(crate) items: Option<i32>,
 }
 
 pub(crate) fn parse_flags(args: &[String]) -> DevFlags {
@@ -541,7 +541,7 @@ fn next_frame_time(now_ms: u64) -> u64 {
     now_ms * TICKRATE as u64 + 1000
 }
 
-pub fn run() {
+pub(crate) fn run() {
     // `jetsetrusty --replay <script>`: headless, deterministic run for the
     // regression tests (see replay.rs). No SDL is initialised.
     let args: Vec<String> = std::env::args().collect();

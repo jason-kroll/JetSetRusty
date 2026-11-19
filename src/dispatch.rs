@@ -82,8 +82,8 @@ pub(crate) enum Pending {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Dispatch {
-    pub screen: Screen,
-    pub pending: Option<Pending>,
+    pub(crate) screen: Screen,
+    pub(crate) pending: Option<Pending>,
 }
 
 thread_local! {

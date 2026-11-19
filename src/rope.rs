@@ -164,7 +164,7 @@ fn set_rope_active(active: bool) {
 }
 
 /// Tick the rope if the current room has one (called from the game ticker).
-pub fn rope_tick() {
+pub(crate) fn rope_tick() {
     if ROPE_ACTIVE.with(Cell::get) {
         do_rope_ticker();
     }
@@ -172,7 +172,7 @@ pub fn rope_tick() {
 
 /// Draw the rope if the current room has one (called from the game drawer,
 /// which holds the one miner lock).
-pub fn rope_draw(miner: &mut Miner) {
+pub(crate) fn rope_draw(miner: &mut Miner) {
     if ROPE_ACTIVE.with(Cell::get) {
         do_rope_drawer(miner);
     }
@@ -292,7 +292,7 @@ fn do_rope_ticker() {
     }
 }
 
-pub fn rope_init() {
+pub(crate) fn rope_init() {
     let level = GAME_STATE.level.load(Ordering::Relaxed);
     let (x, ink) = match level {
         QUIRKAFLEEG => (16, 6),
