@@ -21,7 +21,9 @@ pub(crate) const TICKRATE: i32 = 60;
 
 // SDL3 keycodes are u32 (SDL_Keycode); the game's input mapping works in i32.
 fn keycode_i32(k: Keycode) -> i32 {
-    sdl3::sys::keycode::SDL_Keycode::from(k).0 as i32
+    // SDL keycodes are < 2^31 (scancode-masked keys are < 0x4000_0200 and
+    // unicode keycodes are <= 0x10_FFFF), so the conversion cannot fail.
+    i32::try_from(sdl3::sys::keycode::SDL_Keycode::from(k).0).expect("SDL keycode < 2^31")
 }
 
 // SDL keycodes indexed by Key value 0..=35 (Key::Left=0 .. Key::T=35, the
@@ -698,7 +700,9 @@ pub(crate) fn run() -> ExitCode {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    crate::rng::srand(now as u32);
+    // C's srand(time(NULL)) truncates time_t to unsigned int: keep the low
+    // 32 bits exactly.
+    crate::rng::srand(u32::try_from(now & 0xffff_ffff).expect("masked to 32 bits"));
 
     audio_init();
 
@@ -763,7 +767,10 @@ pub(crate) fn run() -> ExitCode {
         let (win_w, win_h) = canvas
             .output_size()
             .unwrap_or_else(|_| canvas.window().size());
-        let (fit, new_multiply) = video_viewport(win_w as i32, win_h as i32);
+        let (fit, new_multiply) = video_viewport(
+            i32::try_from(win_w).expect("window width < 2^31"),
+            i32::try_from(win_h).expect("window height < 2^31"),
+        );
         let Viewport {
             x: vx,
             y: vy,
@@ -831,7 +838,11 @@ mod tests {
     fn map_keycode_pins_digits() {
         let base = keycode_i32(Kc::_1);
         for (i, expected) in [Key::K1, Key::K2, Key::K3, Key::K4].iter().enumerate() {
-            assert_eq!(map_keycode(base + i as i32), *expected, "digit {i}");
+            assert_eq!(
+                map_keycode(base + i32::try_from(i).expect("digit index fits i32")),
+                *expected,
+                "digit {i}"
+            );
         }
         for kc in [Kc::_0, Kc::_5, Kc::_6, Kc::_7, Kc::_8, Kc::_9] {
             assert_eq!(map_keycode(keycode_i32(kc)), Key::Else);
@@ -846,7 +857,7 @@ mod tests {
         for offset in 0..26 {
             let sym = keycode_i32(Kc::A) + offset;
             let expected = if mapped.contains(&offset) {
-                Key::from_letter(b'a' + offset as u8)
+                Key::from_letter(b'a' + u8::try_from(offset).expect("letter offset 0..25"))
             } else {
                 Key::Else
             };

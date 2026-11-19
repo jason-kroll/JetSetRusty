@@ -19,8 +19,8 @@ const EV_NOTE_OFF: i16 = 0x00;
 const EV_NOTE_ON: i16 = 0x10;
 const EV_END: i16 = 0x40;
 
-pub(crate) const MUS_STOP: i32 = 0;
-pub(crate) const MUS_PLAY: i32 = 1;
+pub(crate) const MUS_STOP: i16 = 0;
+pub(crate) const MUS_PLAY: i16 = 1;
 
 // Matches audio.h MUS_* enum order; also indexes MUSIC_SCORE.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,7 +164,7 @@ static MUSIC_SCORE_0: &[i16] = &[
     16, 44, 0, 19, 63, 0, 20, 75, 13, 3, 1, 19, 68, 13, 3, 1, 19, 71, 13, 3, 1, 19, 63, 13, 3, 1, 19, 68, 13, 3, 1, 19, 71, 13, 0, 0, 3, 0, 4, 1, 16, 49, 0, 19, 64, 0, 20, 76, 13, 3, 1, 19, 68, 13, 0, 0, 3, 0, 4, 1, 19, 70, 13, 3, 1, 19, 61, 0, 20, 73, 0, 16, 52, 13, 3, 1, 19, 68, 13, 3, 0, 4, 1, 19, 70, 13, 0, 0, 3, 1, 19, 63, 0, 20, 75, 0,
     16, 51, 13, 3, 1, 19, 68, 13, 3, 1, 19, 71, 13, 3, 1, 19, 63, 13, 3, 1, 19, 68, 13, 3, 1, 19, 71, 13, 3, 0, 4, 0, 0, 1, 16, 51, 0, 19, 63, 0, 20, 75, 13, 3, 1, 19, 67, 13, 3, 1, 19, 70, 13, 3, 1, 19, 63, 13, 3, 1, 19, 67, 13, 3, 1, 19, 70, 13, 0, 0, 3, 0, 4, 1,
     16, 56, 0, 19, 68, 13, 3, 1, 19, 71, 13, 3, 1, 19, 75, 13, 3, 1, 19, 68, 13, 3, 1, 19, 71, 13, 3, 1, 19, 75, 13, 3, 1, 19, 68, 83, 0, 0, 3, 1,
-    EV_END, MUS_STOP as i16,
+    EV_END, MUS_STOP,
 ];
 
 #[rustfmt::skip]
@@ -185,13 +185,13 @@ static MUSIC_SCORE_1: &[i16] = &[
     16, 48, 0, 17, 51, 0, 19, 63, 11, 3, 1, 19, 62, 11, 0, 0, 1, 0, 3, 0, 19, 60, 11, 3, 1, 19, 62, 11, 0, 0, 3, 1, 16, 48, 0, 19, 60, 0, 20, 64, 23, 0, 1, 16, 46, 23, 0, 0, 3, 0, 4, 1,
     16, 45, 0, 17, 54, 0, 19, 63, 11, 3, 1, 19, 62, 11, 0, 0, 1, 0, 3, 0, 19, 60, 11, 3, 1, 19, 64, 11, 0, 0, 3, 1, 16, 43, 0, 17, 53, 0, 19, 62, 11, 3, 1, 19, 60, 11, 0, 0, 1, 0, 3, 0, 19, 59, 11, 3, 1, 19, 62, 11, 0, 0, 3, 1,
     16, 48, 0, 17, 52, 0, 19, 60, 23, 0, 0, 1, 0, 3, 49,
-    EV_END, MUS_PLAY as i16,
+    EV_END, MUS_PLAY,
 ];
 
 #[rustfmt::skip]
 static MUSIC_SCORE_2: &[i16] = &[
     0, 30, 16, 60, 6, 16, 62, 6, 16, 64, 6, 16, 65, 6, 16, 67, 6, 16, 69, 6, 16, 71, 6, 16, 72, 6, 0, 0,
-    EV_END, MUS_STOP as i16,
+    EV_END, MUS_STOP,
 ];
 
 static MUSIC_SCORE: [&[i16]; 3] = [MUSIC_SCORE_0, MUSIC_SCORE_1, MUSIC_SCORE_2];
@@ -517,7 +517,7 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                             music_reset(&mut s);
                             // MUS_PLAY → time=0 → continue loop from top of reset score
                             // MUS_STOP → time=1 → break
-                            if playing == MUS_STOP {
+                            if playing == i32::from(MUS_STOP) {
                                 break;
                             }
                             continue;
@@ -573,8 +573,9 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
             ch.left[2] = 0;
             ch.right[2] = 0;
         }
-        out_l = out_l.wrapping_add(ch.left[2] as i16);
-        out_r = out_r.wrapping_add(ch.right[2] as i16);
+        // Sample amplitudes are bounded by VOLUME (8192), so they fit i16.
+        out_l = out_l.wrapping_add(i16::try_from(ch.left[2]).expect("amplitude <= VOLUME"));
+        out_r = out_r.wrapping_add(i16::try_from(ch.right[2]).expect("amplitude <= VOLUME"));
     }
 
     output[0] = out_l;

@@ -18,3 +18,5 @@ sdl3 = { version = "0.22", features = ["build-from-source-static"] }
 
 [lints.clippy]
 cast_lossless = "deny"
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"

@@ -66,7 +66,7 @@ pub(crate) fn cheat_level_select() {
 
     for (i, &key) in LEVEL_KEYS.iter().enumerate() {
         if system_is_key(key) {
-            level = (i + 1) as i32;
+            level = i32::try_from(i + 1).expect("LEVEL_KEYS index fits i32");
             break;
         }
     }

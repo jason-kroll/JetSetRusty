@@ -335,7 +335,11 @@ pub(crate) fn do_draw_clock() {
         text[4] = (score_clock[1] / 10) + b'0';
     }
 
-    video_write_large(WIDTH - 60, STATUS as i32, &text[..]);
+    video_write_large(
+        WIDTH - 60,
+        i32::try_from(STATUS).expect("STATUS row fits i32"),
+        &text[..],
+    );
     set_clock_redraw(false);
 }
 
@@ -614,7 +618,12 @@ pub(crate) fn game_draw_lives() {
     for (l, &ink) in LIFE_INK.iter().enumerate().take(lives) {
         let pos = LIVES + l * 16;
         // Upstream a53b948: lives animate with musicClock >> 4, as in the original.
-        miner_draw_sprite(pos as i32, 0x0, ink, audio_music_clock() >> 4);
+        miner_draw_sprite(
+            i32::try_from(pos).expect("lives row position fits i32"),
+            0x0,
+            ink,
+            audio_music_clock() >> 4,
+        );
     }
 }
 
@@ -632,7 +641,11 @@ pub(crate) fn game_draw_status() {
     let items_label: Vec<u8> = vec![
         0x1, 0x0, 0x2, 0x1, b'I', 0x2, 0x2, b't', 0x2, 0x3, b'e', 0x2, 0x4, b'm', 0x2, 0x5, b's', 0,
     ];
-    video_write_large(4, STATUS as i32, &items_label[..]);
+    video_write_large(
+        4,
+        i32::try_from(STATUS).expect("STATUS row fits i32"),
+        &items_label[..],
+    );
 
     // DrawItems() equivalent
     let score_items = *game.score_items.lock().unwrap();
@@ -643,7 +656,11 @@ pub(crate) fn game_draw_status() {
         items_text[4] = (score_items / 10) + b'0';
     }
 
-    video_write_large(6 * 8 + 4, STATUS as i32, &items_text[..]);
+    video_write_large(
+        6 * 8 + 4,
+        i32::try_from(STATUS).expect("STATUS row fits i32"),
+        &items_text[..],
+    );
 
     // do_draw_clock();
     do_draw_clock();

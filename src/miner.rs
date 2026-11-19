@@ -138,11 +138,12 @@ const fn yalign(y: i32) -> i32 {
 
 pub(crate) fn miner_set_seq(index: i32, speed: i32) {
     MINER_TIMER.with(|t| timer_set(&mut t.borrow_mut(), 1, speed));
-    set_miner_seq_index(index as u8);
+    set_miner_seq_index(u8::try_from(index).expect("seq index 0..=7"));
 }
 
 pub(crate) fn miner_inc_seq() {
-    let next = MINER_TIMER.with(|t| timer_update(&mut t.borrow_mut())) as u8;
+    let next = u8::try_from(MINER_TIMER.with(|t| timer_update(&mut t.borrow_mut())))
+        .expect("timer delta fits u8");
     set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
 }
 

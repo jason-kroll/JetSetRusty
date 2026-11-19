@@ -24,7 +24,11 @@ fn set_die_level(v: i32) {
 }
 
 pub(crate) fn die_drawer() {
-    video_pixel_ink_fill(0, 128 * WIDTH, (die_level() >> 1) as u8);
+    video_pixel_ink_fill(
+        0,
+        128 * WIDTH,
+        u8::try_from(die_level() >> 1).expect("die level 0..=15"),
+    );
 }
 
 pub(crate) fn die_ticker() {
@@ -41,7 +45,8 @@ pub(crate) fn die_ticker() {
     }
 
     video_draw_sprite(
-        LIVES as i32 + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
+        i32::try_from(LIVES).expect("LIVES fits i32")
+            + GAME_STATE.lives.load(Ordering::Relaxed) * 16,
         &DIE_BLANK,
         0x0,
         0x0,

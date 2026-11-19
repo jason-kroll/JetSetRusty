@@ -59,7 +59,7 @@ fn set_text_jsw_byte(i: usize, v: u8) {
 
 static TEXT_TICKER: &[u8] = b"      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      \0";
 
-static TEXT_END: i32 = (TEXT_TICKER.len() - 33) as i32;
+static TEXT_END: usize = TEXT_TICKER.len() - 33;
 
 static COLOUR_CYCLE_ADJ: [u8; 6] = [1, 2, 3, 4, 5, 1];
 
@@ -106,7 +106,7 @@ pub(crate) fn do_title_ticker() {
 
     set_colour_cycle(COLOUR_CYCLE_ADJ[colour_cycle() as usize]);
 
-    if text_pos() < TEXT_END {
+    if text_pos() < i32::try_from(TEXT_END).expect("TEXT_END fits i32") {
         if text_frame() < 6 {
             set_text_frame(text_frame() + 2);
             return;

@@ -91,7 +91,7 @@ fn keycode(name: &str) -> Option<i32> {
             };
         }
     };
-    Some(named.0 as i32)
+    Some(i32::try_from(named.0).expect("SDL keycode < 2^31"))
 }
 
 fn parse_script(text: &str) -> Result<Script, String> {
@@ -280,7 +280,10 @@ pub(crate) fn main(args: &[String]) -> ExitCode {
 
         let mut video_hash = FNV_OFFSET;
         with_framebuffer(|fb| fnv1a(&mut video_hash, fb));
-        fnv1a(&mut video_hash, &[border_index() as u8]);
+        fnv1a(
+            &mut video_hash,
+            &[u8::try_from(border_index()).expect("palette index fits u8")],
+        );
 
         if writeln!(out, "{frame:06} {video_hash:016x} {audio_hash:016x}").is_err() {
             return ExitCode::from(1);

@@ -40,7 +40,7 @@ struct LevelData {
     pub(crate) data: [i32; LEVEL_TILES],
     pub(crate) gfx: [[u8; 8]; 10],
     pub(crate) info: [LevelInfo; 10],
-    pub(crate) item_count: i32,
+    pub(crate) item_count: usize,
     pub(crate) item: [i32; 12],
 }
 
@@ -105,8 +105,8 @@ const fn item_positions(list: &[i32]) -> [i32; 12] {
 }
 
 /// The count the flattened literal stored beside the padded list.
-const fn item_count_of(list: &[i32]) -> i32 {
-    list.len() as i32
+const fn item_count_of(list: &[i32]) -> usize {
+    list.len()
 }
 
 /// `gfx *` — the blank sprite every unfilled slot shares.
@@ -4980,7 +4980,8 @@ pub(crate) fn level_dir(dir: Direction) -> i32 {
 }
 
 pub(crate) fn level_item_count() -> i32 {
-    LEVEL_DATA.iter().map(|l| l.item_count).sum()
+    let total: usize = LEVEL_DATA.iter().map(|l| l.item_count).sum();
+    i32::try_from(total).expect("total item count fits i32")
 }
 
 fn restore_items() {
@@ -4988,7 +4989,7 @@ fn restore_items() {
         let levels = &mut *a.borrow_mut();
         *levels = LEVEL_DATA;
         for level in levels.iter_mut() {
-            for &item in level.item.iter().take(level.item_count as usize) {
+            for &item in level.item.iter().take(level.item_count) {
                 let item_pos = item as usize;
                 level.data[item_pos] = 1;
             }
@@ -5001,7 +5002,12 @@ pub(crate) fn level_restore_items() {
 }
 
 fn do_tile(cell: usize, tile: &Tile) {
-    video_draw_tile(cell as i32, tile.gfx, tile.paper[2], tile.ink[2]);
+    video_draw_tile(
+        i32::try_from(cell).expect("tile cell < 512"),
+        tile.gfx,
+        tile.paper[2],
+        tile.ink[2],
+    );
 }
 
 fn do_item(tile: &mut Tile) {
@@ -5025,7 +5031,7 @@ pub(crate) fn level_erase_item(tile: i32) {
         let t = &mut tiles.borrow_mut()[tile];
         t.tile_type = TileType::Space;
         t.gfx = GFX_SPACE;
-        t.paper[0] = (attr >> 4) as u8;
+        t.paper[0] = u8::try_from(attr >> 4).expect("attr high nibble fits u8");
         t.ink[0] = (attr & 15) as u8;
         t.draw_mode = DrawMode::Tile;
     });
@@ -5061,7 +5067,7 @@ pub(crate) fn tile_type_ramp_for(raw: TileType) -> TileType {
 // by landing on the >= LEVEL_TILES guard — and the single checked
 // conversion happens here, after the guard.
 pub(crate) fn level_get_tile_ramp(tile: i32) -> TileType {
-    if tile < 0 || tile >= LEVEL_TILES as i32 {
+    if tile < 0 || tile >= i32::try_from(LEVEL_TILES).expect("LEVEL_TILES = 512 fits i32") {
         return TileType::Space;
     }
     let tile = usize::try_from(tile).expect("guarded to 0..512");
@@ -5069,7 +5075,7 @@ pub(crate) fn level_get_tile_ramp(tile: i32) -> TileType {
 }
 
 pub(crate) fn level_get_tile_type(tile: i32, air: i32, jump: i32) -> TileType {
-    if tile < 0 || tile >= LEVEL_TILES as i32 {
+    if tile < 0 || tile >= i32::try_from(LEVEL_TILES).expect("LEVEL_TILES = 512 fits i32") {
         return TileType::Space;
     }
     let tile = usize::try_from(tile).expect("guarded to 0..512");

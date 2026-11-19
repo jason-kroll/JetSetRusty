@@ -400,7 +400,8 @@ pub(crate) fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
     let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
 
     for (row, word) in line.iter().copied().enumerate() {
-        let ink = attr[((y0 + row as i32) >> level) as usize];
+        let row_i = i32::try_from(row).expect("sprite row < 16");
+        let ink = attr[usize::try_from((y0 + row_i) >> level).expect("attr index 0..=3")];
         for bit in 0..16 {
             if ((word >> bit) & 1) != 0 {
                 let p = pos - bit;
@@ -444,8 +445,8 @@ pub(crate) fn video_draw_robot_i32(pos: i32, line: &[i32; 16], ink: u8) {
     // byte layout exactly.
     let mut words = [0u16; 16];
     for (i, &v) in line[..8].iter().enumerate() {
-        words[2 * i] = v as u16;
-        words[2 * i + 1] = (v >> 16) as u16;
+        words[2 * i] = u16::try_from(v & 0xffff).expect("low 16 bits");
+        words[2 * i + 1] = u16::try_from((v >> 16) & 0xffff).expect("high 16 bits");
     }
     video_draw_robot(pos, &words, ink);
 }
@@ -505,7 +506,7 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
         for line in byte.iter().take(CHAR_WIDTH).copied() {
             if (0..WIDTH).contains(&x) {
                 let start = pos + x;
-                for row in 0..CHAR_HEIGHT_LARGE as i32 {
+                for row in 0..i32::try_from(CHAR_HEIGHT_LARGE).expect("char height fits i32") {
                     let p = start + row * WIDTH;
                     let pixel = &mut pixels[buf_index(p)];
                     let bit = ((line >> row) & 1) as usize;
@@ -555,11 +556,11 @@ pub(crate) fn video_write(pos: i32, text: &[u8]) {
         let row = &CHAR_SET[ch];
         let width = row[0] as usize;
         for line in row.iter().take(width + 1).skip(1).copied() {
-            for idx in 0..CHAR_HEIGHT as i32 {
+            for idx in 0..i32::try_from(CHAR_HEIGHT).expect("char height fits i32") {
                 let p = pos + idx * WIDTH;
                 let pixel = &mut pixels[buf_index(p)];
                 let bit = ((line >> idx) & 1) as usize;
-                pixel.point = bit as u8;
+                pixel.point = u8::try_from(bit).expect("bit is 0/1");
                 video_set_pixel(pixel, p, ink[bit]);
             }
             pos += 1;

@@ -29,9 +29,13 @@ impl GlibcRand {
     }
 
     fn srand(&mut self, seed: u32) {
-        // state[0] = seed == 0 ? 1 : seed, converted to int32 with C's
-        // wrapping unsigned->signed semantics.
-        let mut word: i32 = if seed == 0 { 1 } else { seed as i32 };
+        // state[0] = seed == 0 ? 1 : seed, reinterpreted as int32 with C's
+        // wrapping unsigned->signed semantics (from_ne_bytes is bit-exact).
+        let mut word: i32 = if seed == 0 {
+            1
+        } else {
+            i32::from_ne_bytes(seed.to_ne_bytes())
+        };
         self.state[0] = word;
         for slot in self.state[1..].iter_mut() {
             // Schrage's trick for (16807 * word) mod 2147483647, computed in
@@ -44,7 +48,12 @@ impl GlibcRand {
             if next < 0 {
                 next += 2147483647;
             }
-            word = next as i32;
+            // Truncate to the low 32 bits exactly like glibc's int32_t word.
+            word = i32::from_ne_bytes(
+                u32::try_from(next & 0xffff_ffff)
+                    .expect("masked to 32 bits")
+                    .to_ne_bytes(),
+            );
             *slot = word;
         }
         self.f = SEP;

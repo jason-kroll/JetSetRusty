@@ -66,7 +66,9 @@ impl Key {
     /// non-letter key. Cheat code-word matching goes through this.
     pub(crate) fn letter(self) -> Option<u8> {
         let offset = self as i32 - Key::A as i32;
-        (0..=25).contains(&offset).then(|| b'a' + offset as u8)
+        (0..=25)
+            .contains(&offset)
+            .then(|| b'a' + u8::try_from(offset).expect("letter offset 0..=25"))
     }
 
     /// The letter key naming this lowercase ASCII byte — the inverse of

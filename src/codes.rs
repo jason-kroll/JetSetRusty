@@ -61,7 +61,7 @@ impl CodesState {
         self.needed = system_rnd() % 180;
 
         location[2] = (self.needed % 18) as u8 + b'A';
-        location[3] = (self.needed / 18) as u8 + b'0';
+        location[3] = u8::try_from(self.needed / 18).expect("needed < 180 so /18 < 10") + b'0';
 
         video_write_large(29 * 8, 8 * 8, &location[..]);
 
@@ -88,7 +88,9 @@ impl CodesState {
             return;
         }
 
-        self.cell[3] = self.code[self.pos_last as usize] as u8;
+        self.cell[3] =
+            u8::try_from(self.code[usize::try_from(self.pos_last).expect("cursor pos 0..=3")])
+                .expect("code char fits u8");
         draw_cursor(&self.code, &mut self.cell, self.pos_last);
 
         self.key = 0;
@@ -205,7 +207,8 @@ const CODES_SPRITE: [[i32; 16]; 4] =
 fn draw_cursor(code: &[i32; 4], cell: &mut [u8; 7], pos: i32) {
     let pixel = 88 * WIDTH + 16 * 8;
     // In the original code, cell[1] gets mutated. Don't immediately know why or what for.
-    cell[1] = code[pos as usize] as u8;
+    cell[1] = u8::try_from(code[usize::try_from(pos).expect("cursor pos 0..=3")])
+        .expect("code char fits u8");
     video_write(pixel + pos * 24, &cell[..]);
     video_write(pixel + 8 * WIDTH + pos * 24, &cell[..]);
 }

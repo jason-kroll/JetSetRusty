@@ -1358,6 +1358,7 @@ pub(crate) fn robots_flush() {
 
 pub(crate) fn robots_draw_cheat() {
     // Maria's two colour layers, drawn next to the lives in the status area.
-    video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[43][0], 0x7);
-    video_draw_robot(LIVES as i32 + WIDTH - 24, &ROBOT_GFX[44][0], 0x5);
+    let pos = i32::try_from(LIVES).expect("LIVES fits i32") + WIDTH - 24;
+    video_draw_robot(pos, &ROBOT_GFX[43][0], 0x7);
+    video_draw_robot(pos, &ROBOT_GFX[44][0], 0x5);
 }
