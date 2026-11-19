@@ -50,4 +50,13 @@ constant lives in exactly one place and `Pixel`'s fields stay private.
 
 Phase 1: ~6 lines across 2 files. Phase 2: this file. Goldens byte-identical.
 
-## Status: DRAFT — pending reviewer pass
+## Status: COMPLETE
+
+- `9173c6f` this plan (reviewer pass folded the AGENTS.md ink/point defect
+  into phase 2 before committing).
+- `b75c1cc` Phase 1 — `video_get_pixel` replaced by
+  `video_pixel_has_willy`; rope.rs's duplicate `B_WILLY` and stray comment
+  deleted. All gates green; 53 unit + 24 replay tests pass, goldens
+  byte-identical (pure refactor).
+- Phase 2 (this docs commit) — AGENTS.md Graphics Model bullet corrected
+  (`ink` → `Pixel.point`).

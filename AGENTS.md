@@ -90,7 +90,7 @@ Everything else is Rust-to-Rust and idiomatically named: there are no `allow` at
 ### Graphics Model
 
 - Internal 256×192 `videoPixel` array of `Pixel { ink: u8, point: u8 }` structs
-- Per-pixel bit flags in `ink`: `B_LEVEL=1`, `B_ROBOT=2`, `B_WILLY=4`
+- Per-pixel bit flags in `Pixel.point`: `B_LEVEL=1`, `B_ROBOT=2`, `B_WILLY=4` (private to `video.rs`; read via `video_pixel_has_willy`)
 - Text uses embedded control bytes: `\x01` = set paper (next byte = index), `\x02` = set ink
 - `TILE2PIXEL(t)` macro converts tile coordinates to pixel buffer offsets
 - Output path: `video.rs` → `system_set_pixel(pos, palette_index)` → `FRAMEBUFFER` (a 256×192 thread-local `[u8]` of palette indices in `game_main.rs`). Once per frame `present_frame()` converts the whole buffer to RGB on the SDL texture. The buffer persists across frames because the game only redraws pixels that change. The palette (`VIDEO_COLOUR`) is an immutable `static`, and the border is a separate palette index (`system_border`).
