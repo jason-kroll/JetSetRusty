@@ -1,20 +1,16 @@
 use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::dispatch::{GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
-use crate::game::{GAME_STATE, game_draw_status, game_game_reset};
-use crate::game_main::{game_input, video_flash};
+use crate::game::{GAME_STATE, GameMode, game_draw_status, game_game_reset};
+use crate::game_main::{do_quit, game_input, system_border, system_is_joy_fire, video_flash};
 use crate::levels::{level_item_count, level_restore_items};
 use crate::miner::miner_init;
 use crate::robots::robots_draw_cheat;
-use crate::video::{tile_2_pixel, video_pixel_fill};
+use crate::video::{
+    tile_2_pixel, video_cycle_colours, video_pixel_fill, video_write, video_write_large,
+};
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
-
-use crate::game::GameMode;
-
-use crate::video::{video_cycle_colours, video_write, video_write_large};
-
-use crate::game_main::{do_quit, system_border, system_is_joy_fire};
 
 const THEBATHROOM: i32 = 33;
 
@@ -121,7 +117,7 @@ pub(crate) fn do_title_ticker() {
 
 pub(crate) fn do_title_drawer() {
     if audio_music_playing() {
-        for &tile in TITLE_JSW.iter().take(100) {
+        for &tile in TITLE_JSW.iter() {
             TEXT_JSW.with(|t| {
                 video_write(tile_2_pixel(tile), &t.borrow()[..]);
             });

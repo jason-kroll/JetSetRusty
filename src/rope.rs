@@ -1,6 +1,9 @@
-/// rope.rs - Modernized version with proper FFI safety
+// Port of rope.c — the rope swing physics and rendering.
 use crate::common::WIDTH;
-use crate::game::{COLDSTORE, Direction, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH};
+use crate::game::{
+    COLDSTORE, Direction, GAME_STATE, Miner, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH,
+};
+use crate::levels::level_dir;
 use crate::video::{
     VIDEO_PIXEL, buf_index, video_draw_rope_seg, video_draw_rope_seg_inner, video_pixel_has_willy,
 };
@@ -179,12 +182,6 @@ pub(crate) fn rope_draw(miner: &mut Miner) {
 }
 
 // ----------------------------------------------------------------------------
-// Extern declarations - the real C globals shared with levels.rs and the C code
-// ----------------------------------------------------------------------------
-
-use crate::game::{GAME_STATE, Miner};
-
-// ----------------------------------------------------------------------------
 // Internal implementation
 // ----------------------------------------------------------------------------
 
@@ -313,5 +310,3 @@ pub(crate) fn rope_init() {
 
     set_rope_active(true);
 }
-
-use crate::levels::level_dir;

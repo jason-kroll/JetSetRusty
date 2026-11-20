@@ -8,9 +8,7 @@
 //
 // Robot state (C `robotThis[8]` and the `curRobot` cursor) was file-static in
 // robots.c and nothing else referenced it, so after this port it is
-// Rust-private: no `#[repr(C)]`, no `#[no_mangle]` globals. Only the five
-// `Robots_*` entry points keep their C ABI, because game.rs/title.rs still call
-// them by that name.
+// Rust-private: no `#[repr(C)]`, no `#[no_mangle]` globals.
 
 use crate::audio::{Sfx, audio_sfx, set_audio_pan_x};
 use crate::common::WIDTH;

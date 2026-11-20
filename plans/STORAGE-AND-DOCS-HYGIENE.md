@@ -57,8 +57,12 @@ class the last survey found:
    - misc.rs:115-123 hand-written `Debug for Timer` -> add `Debug` to
      the derive at :103 (field order rate/acc/remainder/divisor is
      declaration order, so derive output is byte-identical).
-   - game_main.rs:212 `.map(|keys| keys.contains(&sym))` ->
-     `.is_some_and(...)`.
+   - game_main.rs:212 `.map(..)` -> `.is_some_and(..)` was TRIED AND
+     REVERTED: the `if let Some(held)` form early-returns `false` when
+     REPLAY_HELD is `Some` but lacks the key (replay mode has no SDL
+     event pump, so falling through panics); `is_some_and` collapses
+     that case into the live-play branch. The map + if-let-Some form
+     is load-bearing, not a nit - do not "fix" it again.
    - title.rs: merge the blank-line-split `use` groups (:12-16);
      title.rs:124 `TITLE_JSW.iter().take(100)` on a `[i32; 100]` ->
      plain `.iter()`.
@@ -104,6 +108,10 @@ must still pass (import merging, derive).
 
 ## Risks
 
+- Replay-panic lesson (phase 3): any rewrite of `system_is_key`'s
+  REPLAY_HELD check must preserve the Some(false) early return; the 24
+  goldens caught the `is_some_and` version immediately (14 scenarios
+  panicked at the event-pump expect). Reverted before commit.
 - `score_items` u8 vs i32 at use sites: verify every read/write compiles
   with identical semantics (values 0..=255; item counts never exceed
   the per-room tile count).

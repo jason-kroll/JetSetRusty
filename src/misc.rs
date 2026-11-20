@@ -100,7 +100,7 @@ pub(crate) fn colour_rgb(index: usize) -> [u8; 3] {
 }
 
 // Timer -----------------------------------------------------------------------
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Timer {
     // Field order matches the original C `TIMER` ({rate, acc, remainder,
     // divisor}) for provenance. This used to be a live ABI contract — the
@@ -110,17 +110,6 @@ pub(crate) struct Timer {
     pub(crate) acc: i32,
     pub(crate) remainder: i32,
     pub(crate) divisor: i32,
-}
-
-impl std::fmt::Debug for Timer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Timer")
-            .field("rate", &self.rate)
-            .field("acc", &self.acc)
-            .field("remainder", &self.remainder)
-            .field("divisor", &self.divisor)
-            .finish()
-    }
 }
 
 pub(crate) fn timer_set(timer: &mut Timer, numerator: i32, divisor: i32) {

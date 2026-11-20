@@ -214,5 +214,3 @@ fn draw_cursor(code: &[i32; 4], cell: &mut [u8; 7], pos: i32) {
     video_write(pixel + pos * 24, &cell[..]);
     video_write(pixel + 8 * WIDTH + pos * 24, &cell[..]);
 }
-
-// jetset willy
