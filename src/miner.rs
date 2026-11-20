@@ -11,7 +11,7 @@ use crate::audio::{audio_willy_sfx, set_audio_pan_x};
 use crate::common::Key;
 use crate::dispatch::{DiePhase, Pending, Screen, queue_pending};
 use crate::game::{
-    Direction, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
+    Direction, Facing, GAME_STATE, GameMode, Miner, NIGHTMAREROOM, game_change_level, game_got_item,
 };
 use crate::game_main::{
     system_is_joy_fire, system_is_joy_left, system_is_joy_right, system_is_key,
@@ -21,9 +21,6 @@ use crate::misc::{Timer, timer_set, timer_update};
 use crate::video::{video_draw_miner, video_draw_sprite};
 use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
-
-const D_RIGHT: i32 = 0;
-const D_LEFT: i32 = 1;
 
 // Conveyor direction (game.h C_NONE/C_LEFT/C_RIGHT).
 const C_NONE: i32 = 0;
@@ -100,7 +97,7 @@ const MINER_ZERO: Miner = Miner {
     tile: 0,
     align: 0,
     frame: 0,
-    dir: D_RIGHT,
+    dir: Facing::Right,
     move_: 0,
     air: 0,
     jump: 0,
@@ -372,7 +369,7 @@ fn move_left_right(miner: &mut Miner) {
         return;
     }
 
-    if miner.dir == D_RIGHT {
+    if miner.dir == Facing::Right {
         if miner.frame < 3 {
             miner.frame += 1;
             return;
@@ -458,15 +455,15 @@ fn update_dir(convey_dir: i32, miner: &mut Miner) {
     if dir == 0 {
         miner.move_ = 0;
     } else if dir == 1 {
-        if miner.dir == D_RIGHT {
-            miner.dir = D_LEFT;
+        if miner.dir == Facing::Right {
+            miner.dir = Facing::Left;
             miner.move_ = 0;
         } else {
             miner.move_ = 1;
         }
     } else if dir == 2 {
-        if miner.dir == D_LEFT {
-            miner.dir = D_RIGHT;
+        if miner.dir == Facing::Left {
+            miner.dir = Facing::Right;
             miner.move_ = 0;
         } else {
             miner.move_ = 1;
@@ -612,7 +609,9 @@ pub(crate) fn miner_drawer(miner: &Miner) {
     }
 
     let row = miner_frame()
-        + usize::try_from((miner.dir << 2) | miner.frame).expect("dir/frame bits >= 0");
+        + miner
+            .dir
+            .sprite_row(usize::try_from(miner.frame).expect("frame 0..=3"));
     if video_draw_miner(
         ((miner.y + offset) << 8) | miner.x,
         &MINER_SPRITE[row],

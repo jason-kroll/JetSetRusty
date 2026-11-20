@@ -97,6 +97,27 @@ pub(crate) enum Direction {
     Left,
 }
 
+// Willy's facing (C's D_RIGHT/D_LEFT). The #[default] lands on Right so
+// Miner's derived Default stays zero-diff (D_RIGHT was 0). Not Direction:
+// that enum's Right/Left are 1/3, while the sprite packing needs 0/1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum Facing {
+    #[default]
+    Right,
+    Left,
+}
+
+impl Facing {
+    // Offset into the 8-row facing half of MINER_SPRITE for a walk frame:
+    // reproduces the old (dir << 2) packing with D_RIGHT=0/D_LEFT=1.
+    pub(crate) fn sprite_row(self, frame: usize) -> usize {
+        match self {
+            Facing::Right => frame,
+            Facing::Left => 4 + frame,
+        }
+    }
+}
+
 // miner struct (from game.h)
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Miner {
@@ -106,7 +127,7 @@ pub(crate) struct Miner {
     pub(crate) tile: i32,
     pub(crate) align: i32,
     pub(crate) frame: i32,
-    pub(crate) dir: i32,
+    pub(crate) dir: Facing,
     pub(crate) move_: i32, // renamed from 'move' which is a Rust keyword
     pub(crate) air: i32,
     pub(crate) jump: i32,
@@ -683,6 +704,16 @@ pub(crate) fn game_draw_status() {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering::Relaxed;
+
+    #[test]
+    fn facing_sprite_row_pins_the_c_packing() {
+        // C: (dir << 2) | frame with D_RIGHT=0, D_LEFT=1, frame 0..=3.
+        for frame in 0..4 {
+            assert_eq!(Facing::Right.sprite_row(frame), frame);
+            assert_eq!(Facing::Left.sprite_row(frame), 4 + frame);
+        }
+        assert_eq!(Facing::default(), Facing::Right);
+    }
 
     // The C original compares the mode as an int (`gameMode < GM_RUNNING`):
     // the derived PartialOrd must keep game.h's declaration order.

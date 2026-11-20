@@ -1,7 +1,7 @@
 // Port of rope.c — the rope swing physics and rendering.
 use crate::common::WIDTH;
 use crate::game::{
-    COLDSTORE, Direction, GAME_STATE, Miner, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH,
+    COLDSTORE, Direction, Facing, GAME_STATE, Miner, ONTHEROOF, QUIRKAFLEEG, SWIMMINGPOOL, THEBEACH,
 };
 use crate::levels::level_dir;
 use crate::video::{
@@ -250,10 +250,11 @@ fn do_rope_drawer(miner: &mut Miner) {
         let willy_moving = miner.move_ != 0;
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
-            let willy_dir = miner.dir;
+            // Old packing: dir ^ willy_dir with willy_dir = D_LEFT as 0/1.
+            let willy_left = i32::from(miner.dir == Facing::Left);
             let current_rope = GAME_STATE.miner_willy_rope.load(Ordering::Relaxed);
             let seg =
-                current_rope + ROPE_MOVE[usize::try_from(dir ^ willy_dir).expect("dir bit 0/1")];
+                current_rope + ROPE_MOVE[usize::try_from(dir ^ willy_left).expect("dir bit 0/1")];
 
             let level_dir = level_dir(Direction::Above);
             let adjusted_seg = if level_dir == 0 && seg < 15 { 15 } else { seg };
