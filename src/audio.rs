@@ -245,7 +245,10 @@ pub(crate) fn audio_music_playing() -> bool {
 
 // Upstream a53b948 animates the lives icons with musicClock >> 4.
 pub(crate) fn audio_music_clock() -> i32 {
-    AUDIO_STATE.lock().unwrap().music_clock
+    AUDIO_STATE
+        .lock()
+        .expect("AUDIO_STATE lock poisoned")
+        .music_clock
 }
 
 pub(crate) fn audio_pan_x() -> i32 {
@@ -429,7 +432,7 @@ fn music_note_off(s: &mut AudioState, ch: usize) {
 // ---- public API -------------------------------------------------------------
 
 pub(crate) fn audio_reduce_music_speed() {
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     s.music_pitch -= 1;
     s.music_tempo -= 6;
     let tempo = s.music_tempo;
@@ -437,7 +440,7 @@ pub(crate) fn audio_reduce_music_speed() {
 }
 
 pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     let ch = s.sfx[0].channel;
     s.channels[ch].frequency = FREQUENCY_TABLE[usize::try_from(note).expect("note >= 0")];
     s.sfx[0].clock = s.sfx_clock;
@@ -450,7 +453,7 @@ pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
 }
 
 pub(crate) fn audio_sfx(sfx: Sfx) {
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     let pan = audio_pan_x();
 
     let target_slot = if sfx == Sfx::Gameover || sfx == Sfx::Die {
@@ -505,7 +508,7 @@ pub(crate) fn audio_sfx(sfx: Sfx) {
 }
 
 pub(crate) fn audio_output(output: &mut [i16; 2]) {
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
 
     if s.samples_music == 0 {
         s.samples_music = timer_update(&mut s.timer_music);
@@ -606,13 +609,13 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
 
 pub(crate) fn audio_play(playing: bool) {
     AUDIO_MUSIC_PLAYING.store(playing, Ordering::Relaxed);
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     s.music_channels = if playing { NCHANNELS } else { NSFX };
 }
 
 pub(crate) fn audio_music(music: MusicScore, playing: bool) {
     {
-        let mut s = AUDIO_STATE.lock().unwrap();
+        let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
         s.music_index = music;
         music_reset(&mut s);
         s.music_pitch = 0;
@@ -629,6 +632,6 @@ pub(crate) fn audio_music(music: MusicScore, playing: bool) {
 }
 
 pub(crate) fn audio_init() {
-    let mut s = AUDIO_STATE.lock().unwrap();
+    let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     timer_set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
 }
