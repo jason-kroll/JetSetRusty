@@ -210,7 +210,11 @@ pub(crate) fn game_init_room(miner: &mut Miner) {
     }
 
     // Timer
-    timer_set(&mut game.timer.lock().unwrap(), 12, TICKRATE);
+    timer_set(
+        &mut game.timer.lock().expect("GAME_STATE.timer lock poisoned"),
+        12,
+        TICKRATE,
+    );
     game.frame.store(true, Ordering::Relaxed);
     game.inactivity_timer.store(0, Ordering::Relaxed);
     game.miner_willy_rope.store(0, Ordering::Relaxed);
@@ -304,7 +308,7 @@ pub(crate) fn do_game_drawer() {
     }
 
     // One miner lock for the miner and rope draw passes.
-    let mut miner = game.miner.lock().unwrap();
+    let mut miner = game.miner.lock().expect("GAME_STATE.miner lock poisoned");
     miner_drawer(&miner);
     rope::rope_draw(&mut miner);
     drop(miner);
@@ -322,7 +326,10 @@ pub(crate) fn do_draw_clock() {
         0x2, 0x2, b' ', 0x2, 0x1, b'm', 0,
     ];
 
-    let score_clock = *game.score_clock.lock().unwrap();
+    let score_clock = *game
+        .score_clock
+        .lock()
+        .expect("GAME_STATE.score_clock lock poisoned");
 
     text[19] = if score_clock[2] != 0 { b'p' } else { b'a' };
     text[16] = (score_clock[0] % 10) + b'0';
@@ -365,7 +372,10 @@ pub(crate) fn game_game_reset() {
     game.score_items.store(0, Ordering::Relaxed);
 
     // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
-    *game.score_clock.lock().unwrap() = [0, 7, 0];
+    *game
+        .score_clock
+        .lock()
+        .expect("GAME_STATE.score_clock lock poisoned") = [0, 7, 0];
 
     // DoClockUpdate = do_draw_clock
     set_clock_redraw(true);
@@ -499,7 +509,7 @@ pub(crate) fn do_game_ticker() {
 
     // Update game frame
     let frame = {
-        let mut timer = game.timer.lock().unwrap();
+        let mut timer = game.timer.lock().expect("GAME_STATE.timer lock poisoned");
         timer_update(&mut timer)
     };
     game.frame.store(frame != 0, Ordering::Relaxed);
@@ -510,7 +520,7 @@ pub(crate) fn do_game_ticker() {
     // Tick level and robots. The miner lock is taken once here and passed
     // down; nothing below re-locks it.
     level_ticker();
-    let mut miner = game.miner.lock().unwrap();
+    let mut miner = game.miner.lock().expect("GAME_STATE.miner lock poisoned");
     robots_ticker(&miner);
 
     // GM_TOILET mode: return to title after timeout
@@ -590,7 +600,10 @@ pub(crate) fn clock_ticker() {
 
     game.clock_ticks.store(0, Ordering::Relaxed);
 
-    let mut clock = game.score_clock.lock().unwrap();
+    let mut clock = game
+        .score_clock
+        .lock()
+        .expect("GAME_STATE.score_clock lock poisoned");
     clock[0] += 1;
     if clock[0] == 60 {
         clock[0] = 0;
@@ -711,14 +724,14 @@ mod tests {
         // Set current room + Willy's x (tile kept consistent).
         let setup = |level: i32, x: i32| {
             game.level.store(level, Relaxed);
-            let mut m = game.miner.lock().unwrap();
+            let mut m = game.miner.lock().expect("GAME_STATE.miner lock poisoned");
             m.x = x;
             m.y = 104;
             m.tile = 13 * 32 + (x / 8);
             m.air = 0;
         };
         let change = |dir: Direction| {
-            let mut m = game.miner.lock().unwrap();
+            let mut m = game.miner.lock().expect("GAME_STATE.miner lock poisoned");
             game_change_level(dir, &mut m);
         };
 
@@ -726,19 +739,34 @@ mod tests {
         setup(45, 25);
         change(above);
         assert_eq!(game.level.load(Relaxed), 45);
-        assert_eq!(game.miner.lock().unwrap().air, 2);
+        assert_eq!(
+            game.miner
+                .lock()
+                .expect("GAME_STATE.miner lock poisoned")
+                .air,
+            2
+        );
 
         // Guarded: entering First Landing from below with x > 182 is blocked.
         setup(22, 200);
         change(above);
         assert_eq!(game.level.load(Relaxed), 22);
-        assert_eq!(game.miner.lock().unwrap().air, 2);
+        assert_eq!(
+            game.miner
+                .lock()
+                .expect("GAME_STATE.miner lock poisoned")
+                .air,
+            2
+        );
 
         // Boundaries are strict: x == 22 and x == 182 are NOT blocked.
         setup(45, 22);
         change(above);
         assert_eq!(game.level.load(Relaxed), THEDRIVE); // 4
-        assert_eq!(game.miner.lock().unwrap().y, 104); // Above branch repositions
+        assert_eq!(
+            game.miner.lock().expect("GAME_STATE.miner lock poisoned").y,
+            104
+        ); // Above branch repositions
 
         setup(22, 182);
         change(above);
