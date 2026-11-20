@@ -6,26 +6,28 @@ use crate::dispatch::{Pending, Screen, TitlePhase, queue_pending};
 use crate::game_main::{do_quit, game_input, system_border, system_rnd, video_flash};
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
-use std::sync::Mutex;
+use std::cell::RefCell;
 
-static CODES_STATE: Mutex<CodesState> = Mutex::new(CodesState::new());
+thread_local! {
+    static CODES_STATE: RefCell<CodesState> = const { RefCell::new(CodesState::new()) };
+}
 
 pub(crate) fn do_codes_responder() {
-    CODES_STATE.lock().unwrap().do_codes_responder();
+    CODES_STATE.with(|c| c.borrow_mut().do_codes_responder());
 }
 
 pub(crate) fn do_codes_ticker() {
-    CODES_STATE.lock().unwrap().do_codes_ticker();
+    CODES_STATE.with(|c| c.borrow_mut().do_codes_ticker());
 }
 
 pub(crate) fn do_codes_drawer() {
-    CODES_STATE.lock().unwrap().do_codes_drawer();
+    CODES_STATE.with(|c| c.borrow_mut().do_codes_drawer());
 }
 
 /// The codes screen's enter work, run when Pending::Enter(Screen::Codes) is
 /// consumed; the screen itself is installed by the dispatcher.
 pub(crate) fn codes_enter() {
-    CODES_STATE.lock().unwrap().codes_enter();
+    CODES_STATE.with(|c| c.borrow_mut().codes_enter());
 }
 
 pub(crate) struct CodesState {

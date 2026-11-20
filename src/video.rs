@@ -1,6 +1,7 @@
 use crate::common::{HEIGHT, WIDTH};
 use crate::game_main::system_set_pixel;
 
+use std::cell::Cell;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
@@ -74,7 +75,9 @@ pub(crate) static VIDEO_PIXEL: LazyLock<Mutex<Vec<Pixel>>> = LazyLock::new(|| {
     ])
 });
 
-static TEXT_INK: Mutex<[u8; 2]> = Mutex::new([0, 0]);
+thread_local! {
+    static TEXT_INK: Cell<[u8; 2]> = const { Cell::new([0, 0]) };
+}
 
 static CHAR_SET: [[u8; 10]; 128] = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -533,7 +536,7 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
 
     // WARN: Locks!
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
-    let mut ink = TEXT_INK.lock().unwrap();
+    let mut ink = TEXT_INK.with(|t| t.get());
 
     let mut i = 0;
     while i < text.len() {
@@ -559,6 +562,8 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
         }
         i += 1;
     }
+
+    TEXT_INK.with(|t| t.set(ink));
 }
 
 // Length of the NUL-terminated string at the start of `text`. A NUL right
@@ -583,7 +588,7 @@ pub(crate) fn video_write(pos: i32, text: &[u8]) {
 
     // WARN: Locks
     let mut pixels = VIDEO_PIXEL.lock().unwrap();
-    let mut ink = TEXT_INK.lock().unwrap();
+    let mut ink = TEXT_INK.with(|t| t.get());
 
     let mut pos = pos;
     let mut i = 0;
@@ -609,4 +614,6 @@ pub(crate) fn video_write(pos: i32, text: &[u8]) {
         }
         i += 1;
     }
+
+    TEXT_INK.with(|t| t.set(ink));
 }
