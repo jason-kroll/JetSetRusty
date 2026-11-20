@@ -473,6 +473,23 @@ pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
     s.sfx[0].handler = Some(SfxHandler::Willy);
 }
 
+// Starts an SFX in the given slot: resets the pitch-row cursor, applies
+// the channel setup, then marks the slot playing.
+fn begin_sfx(
+    s: &mut AudioState,
+    slot: usize,
+    table: Sfx,
+    length: i32,
+    setup: impl FnOnce(&mut Channel),
+) {
+    s.sfx[slot].length = length;
+    s.sfx[slot].pitch_table = table;
+    s.sfx[slot].pitch_idx = 0;
+    let ch = s.sfx[slot].channel;
+    setup(&mut s.channels[ch]);
+    s.sfx[slot].play = Some(SfxHandler::Play);
+}
+
 pub(crate) fn audio_sfx(sfx: Sfx) {
     let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     let pan = audio_pan_x();
@@ -489,38 +506,18 @@ pub(crate) fn audio_sfx(sfx: Sfx) {
     };
 
     match sfx {
-        Sfx::Item => {
-            s.sfx[1].length = 1;
-            s.sfx[1].pitch_table = Sfx::Item;
-            s.sfx[1].pitch_idx = 0;
-            let ch = s.sfx[1].channel;
-            channel_pan(&mut s.channels[ch], usize::try_from(pan).expect("pan >= 0"));
-            s.sfx[1].play = Some(SfxHandler::Play);
-        }
-        Sfx::Arrow => {
-            s.sfx[2].length = 1;
-            s.sfx[2].pitch_table = Sfx::Arrow;
-            s.sfx[2].pitch_idx = 0;
-            let ch = s.sfx[2].channel;
-            channel_stereo(&mut s.channels[ch], 256 - pan, pan);
-            s.sfx[2].play = Some(SfxHandler::Play);
-        }
-        Sfx::Die => {
-            s.sfx[2].length = 1;
-            s.sfx[2].pitch_table = Sfx::Die;
-            s.sfx[2].pitch_idx = 0;
-            let ch = s.sfx[2].channel;
-            channel_pan(&mut s.channels[ch], usize::try_from(pan).expect("pan >= 0"));
-            s.sfx[2].play = Some(SfxHandler::Play);
-        }
-        Sfx::Gameover => {
-            s.sfx[2].length = 2;
-            s.sfx[2].pitch_table = Sfx::Gameover;
-            s.sfx[2].pitch_idx = 0;
-            let ch = s.sfx[2].channel;
-            channel_stereo(&mut s.channels[ch], 256, -256);
-            s.sfx[2].play = Some(SfxHandler::Play);
-        }
+        Sfx::Item => begin_sfx(&mut s, 1, Sfx::Item, 1, |ch| {
+            channel_pan(ch, usize::try_from(pan).expect("pan >= 0"));
+        }),
+        Sfx::Arrow => begin_sfx(&mut s, 2, Sfx::Arrow, 1, |ch| {
+            channel_stereo(ch, 256 - pan, pan);
+        }),
+        Sfx::Die => begin_sfx(&mut s, 2, Sfx::Die, 1, |ch| {
+            channel_pan(ch, usize::try_from(pan).expect("pan >= 0"));
+        }),
+        Sfx::Gameover => begin_sfx(&mut s, 2, Sfx::Gameover, 2, |ch| {
+            channel_stereo(ch, 256, -256);
+        }),
         _ => {}
     }
 
