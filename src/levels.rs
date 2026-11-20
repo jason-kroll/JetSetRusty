@@ -5173,7 +5173,7 @@ pub(crate) fn level_init() {
         // not a terminator; video_write skips control+argument pairs (as does the C original).
         video_write(0, b"\x01\x00\x02\x06\x00");
 
-        let title = std::ffi::CString::new(level.title).unwrap();
+        let title = std::ffi::CString::new(level.title).expect("level title has no interior NUL");
         let title_width = video_text_width(title.as_bytes_with_nul());
         video_write(
             (16 * 8 + 1) * WIDTH + (WIDTH - title_width) / 2,

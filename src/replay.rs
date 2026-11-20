@@ -100,7 +100,11 @@ fn parse_script(text: &str) -> Result<Script, String> {
     let mut presses = Vec::new();
     let mut sets = Vec::new();
     for (n, line) in text.lines().enumerate() {
-        let line = line.split('#').next().unwrap().trim();
+        let line = line
+            .split('#')
+            .next()
+            .expect("split always yields a first field")
+            .trim();
         if line.is_empty() {
             continue;
         }
@@ -184,7 +188,7 @@ pub(crate) fn main(args: &[String]) -> ExitCode {
     while let Some(arg) = rest.next() {
         match (arg.as_str(), rest.next(), rest.next()) {
             ("--dump", Some(f), Some(out)) if f.parse::<u32>().is_ok() => {
-                dumps.push((f.parse().unwrap(), out.clone()))
+                dumps.push((f.parse().expect("dump frame number parses"), out.clone()))
             }
             _ => {
                 eprintln!("{usage}");

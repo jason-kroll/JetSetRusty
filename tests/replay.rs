@@ -39,12 +39,13 @@ fn replay(scenario: &Path) -> String {
 // Replay a script given as text (written to Cargo's per-test temp dir).
 fn replay_text(name: &str, script: &str) -> String {
     let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.txt"));
-    std::fs::write(&path, script).unwrap();
+    std::fs::write(&path, script).expect("write scenario script to tempdir");
     replay(&path)
 }
 
 fn scenario_text(name: &str) -> String {
-    std::fs::read_to_string(root().join(format!("tests/scenarios/{name}.txt"))).unwrap()
+    std::fs::read_to_string(root().join(format!("tests/scenarios/{name}.txt")))
+        .expect("read scenario file")
 }
 
 #[derive(Debug, PartialEq)]
@@ -97,8 +98,9 @@ fn check(name: &str) {
     let actual = replay(&scenario);
 
     if std::env::var_os("UPDATE_GOLDEN").is_some() {
-        std::fs::create_dir_all(golden.parent().unwrap()).unwrap();
-        std::fs::write(&golden, &actual).unwrap();
+        std::fs::create_dir_all(golden.parent().expect("golden path has a parent"))
+            .expect("create golden dir");
+        std::fs::write(&golden, &actual).expect("write golden file");
         return;
     }
 

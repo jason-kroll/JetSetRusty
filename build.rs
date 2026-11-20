@@ -13,6 +13,9 @@ fn main() {
         .output()
         .expect("failed to run date!")
         .stdout;
-    let date = String::from_utf8(date).unwrap().trim().to_string();
+    let date = String::from_utf8(date)
+        .expect("date output is UTF-8")
+        .trim()
+        .to_string();
     println!("cargo:rustc-env=BUILD=1.0.0 {date}");
 }
