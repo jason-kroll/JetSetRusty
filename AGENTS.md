@@ -75,7 +75,7 @@ Note: `src/` is now **pure Rust** — no `.c`/`.h` files remain there. The compl
 
 ### GAME_STATE — the single source of truth (read before touching `game.rs`)
 
-`GAME_STATE` is a `LazyLock<GameState>` holding all shared game state; it is now the **authoritative store, not a shadow.** `GameState` mixes cheap `Atomic*` fields (`level`, `lives`, `frame`, `clock_ticks`, `item_count`, `mode`, `music`, `miner_willy_rope`, `miner_attr_split`, …) with a `Mutex<>` field for the compound one (`timer`) plus `score_clock`; `level_border` is now the `LEVEL_BORDER` const and `score_items` an `AtomicU8`. Every reader and writer is Rust and references `GAME_STATE` directly.
+`GAME_STATE` is a `LazyLock<GameState>` holding all shared game state; it is now the **authoritative store, not a shadow.** `GameState` mixes cheap `Atomic*` fields (`level`, `lives`, `frame`, `clock_ticks`, `item_count`, `mode`, `music`, `miner_willy_rope`, `miner_attr_split`, …) with `Mutex<>` fields for the compound ones (`miner`, `timer`) plus `score_clock`; `level_border` is now the `LEVEL_BORDER` const and `score_items` an `AtomicU8`. Every reader and writer is Rust and references `GAME_STATE` directly.
 
 **Historical sync model (deleted):** the port used to keep shared state in C-ABI globals and mirror it into `GAME_STATE` via two bridge functions — `sync_c_to_rust()` (globals → shadow) and `sync_rust_to_c()` (shadow → globals) — bracketing each Rust function that touched shared state. With every global dissolved they became no-ops and were removed. Old commits and memories that mention them describe that era.
 
