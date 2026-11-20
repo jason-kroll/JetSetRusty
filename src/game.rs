@@ -133,17 +133,15 @@ pub(crate) struct GameState {
     // to force the typed accessors (mode()/set_mode()) on every user.
     mode: AtomicU8,
     pub(crate) music: AtomicBool,
+    pub(crate) score_items: AtomicU8,
 
     // Less frequent, needs interior mutability, mutex-protected fields (more expensive)
-    pub(crate) level_border: Mutex<[i32; 60]>,
     pub(crate) score_clock: Mutex<[u8; 3]>,
-    pub(crate) score_items: Mutex<u8>,
     pub(crate) timer: Mutex<Timer>,
 }
 
 // Per-room border colour, indexed by level. Was the `levelBorder` C global (in
-// game.c, then cglobals.rs); now owned here as the initial value of
-// GAME_STATE.level_border. Constant data — never mutated at runtime.
+// game.c, then cglobals.rs); now a plain const — never mutated at runtime.
 const LEVEL_BORDER: [i32; 60] = [
     5, 4, 6, 2, 3, 1, 2, 1, 4, 2, //
     2, 4, 6, 5, 1, 3, 2, 1, 2, 1, //
@@ -161,7 +159,6 @@ pub(crate) static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     inactivity_timer: AtomicI32::new(0),
     item_count: AtomicI32::new(0),
     level: AtomicI32::new(0),
-    level_border: Mutex::new(LEVEL_BORDER),
     lives: AtomicI32::new(7),
     miner: Mutex::new(Miner::default()),
     miner_attr_split: AtomicI32::new(6),
@@ -169,8 +166,8 @@ pub(crate) static GAME_STATE: LazyLock<GameState> = LazyLock::new(|| GameState {
     mode: AtomicU8::new(GameMode::Normal as u8),
     // C: `int gameMusic = MUS_PLAY;` — music on by default.
     music: AtomicBool::new(true),
+    score_items: AtomicU8::new(0),
     score_clock: Mutex::new([0, 7, 0]), // 7:00 AM
-    score_items: Mutex::new(0),
     timer: Mutex::new(Timer::default()),
 });
 
@@ -201,8 +198,7 @@ pub(crate) fn game_init_room(miner: &mut Miner) {
     let current_level = game.level.load(Ordering::Relaxed);
 
     // system_border(levelBorder[gameLevel])
-    let border_value =
-        game.level_border.lock().unwrap()[usize::try_from(current_level).expect("level 0..59")];
+    let border_value = LEVEL_BORDER[usize::try_from(current_level).expect("level 0..59")];
     system_border(u8::try_from(border_value).expect("border palette index"));
 
     miner_save(miner);
@@ -260,8 +256,7 @@ pub(crate) fn game_pause(state: bool) {
         if !game.cheat_enabled.load(Ordering::Relaxed) {
             game_draw_status();
             let level = game.level.load(Ordering::Relaxed);
-            let border_value =
-                game.level_border.lock().unwrap()[usize::try_from(level).expect("level 0..59")];
+            let border_value = LEVEL_BORDER[usize::try_from(level).expect("level 0..59")];
             system_border(u8::try_from(border_value).expect("border palette index"));
         }
     }
@@ -367,7 +362,7 @@ pub(crate) fn game_game_reset() {
     let game = &*GAME_STATE;
 
     // gameScoreItems = 0
-    *game.score_items.lock().unwrap() = 0;
+    game.score_items.store(0, Ordering::Relaxed);
 
     // gameScoreClock[0] = 0; gameScoreClock[1] = 7; gameScoreClock[2] = 0
     *game.score_clock.lock().unwrap() = [0, 7, 0];
@@ -406,10 +401,8 @@ pub(crate) fn game_cheat_enabled() {
         game_draw_status();
         let level = game.level.load(Ordering::Relaxed);
         system_border(
-            u8::try_from(
-                game.level_border.lock().unwrap()[usize::try_from(level).expect("level 0..59")],
-            )
-            .expect("border palette index"),
+            u8::try_from(LEVEL_BORDER[usize::try_from(level).expect("level 0..59")])
+                .expect("border palette index"),
         );
     }
 
@@ -565,7 +558,7 @@ pub(crate) fn game_got_item(pan_x: i32) {
     let game = &*GAME_STATE;
 
     // gameScoreItems++
-    *game.score_items.lock().unwrap() += 1;
+    game.score_items.fetch_add(1, Ordering::Relaxed);
 
     // game_draw_status()
     game_draw_status();
@@ -652,7 +645,7 @@ pub(crate) fn game_draw_status() {
     );
 
     // DrawItems() equivalent
-    let score_items = *game.score_items.lock().unwrap();
+    let score_items = game.score_items.load(Ordering::Relaxed);
     let mut items_text: Vec<u8> = vec![0x1, 0x0, 0x2, 0x6, b' ', 0x2, 0x7, b' ', 0];
 
     items_text[7] = (score_items % 10) + b'0';
