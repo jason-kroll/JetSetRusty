@@ -235,7 +235,9 @@ be understood, not papered over.
 - The `Event = Option<fn()>` dispatcher.
 - `miner.dir`'s `D_RIGHT/D_LEFT` int consts and `update_dir`'s `dir += 1 /
   dir += 2` flag accumulation (same disease, but gameplay-logic-level;
-  propose separately if wanted).
+  propose separately if wanted). DONE by plans/MINER-FACING-TYPES.md:
+  `Facing` enum + `sprite_row`, `moving: bool`, `Conveyor` enum,
+  `decide_movement` pure core.
 - `codes.rs`'s internal `self.key: i32` digit state.
 - The `direction` enum array-index in `level_dir` (`map[dir as usize]`):
   left as-is; it is a single, deliberate table lookup. (If desired, a

@@ -71,7 +71,23 @@ unwrap_used are denied), `cargo test` (54 unit + new pins, 24 replay),
 type prefix, 72-col body, trailer. `Direction` (game.rs:92-98) and
 `level_dir`'s `dir as usize` map index stay untouched (separate concern).
 
-## Status: REVIEWED - accept, wording nits folded in (reviewer turn 30)
+## Status: COMPLETE
+
+Five commits, all gates green after each (fmt, clippy `-D warnings`,
+cargo test, build); goldens byte-identical throughout (never
+`UPDATE_GOLDEN=1`); unit count 54 -> 56 (+2 pin tests:
+facing_sprite_row, decide_movement):
+
+- `7a3c100` this plan (reviewer accept, wording nits folded in)
+- `1c8f977` Phase 1 — `Facing` enum for `Miner.dir`, `sprite_row`
+  method replacing the `(dir<<2)|frame` packing, rope xor bit via
+  `i32::from(dir == Facing::Left)`, D_* consts deleted, pin test
+- `4ca7721` Phase 2 — `move_` -> `moving: bool`, 13 sites
+- `a801dca` Phase 3 — `Conveyor` enum replacing C_NONE/C_LEFT/C_RIGHT
+- `4ed21db` Phase 4 — `decide_movement` pure core replacing update_dir's
+  flag accumulator, (true,true) fall-through preserved, pin test
+- Phase 5 (this commit) — ENUMS-AS-INTEGERS.md non-goal cross-ref;
+  plan marked COMPLETE
 
 ## Phase 1 - Facing enum for Miner.dir (+ sprite_row, rope bit); Miner field dir: i32 -> dir: Facing (game.rs:109), #[default] on Facing::Right
 
