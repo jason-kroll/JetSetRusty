@@ -19,6 +19,27 @@ const EV_NOTE_OFF: i16 = 0x00;
 const EV_NOTE_ON: i16 = 0x10;
 const EV_END: i16 = 0x40;
 
+// The event-type nibble (high 4 bits of a score word), decoded from C's
+// EV_* consts. The score tables keep the raw i16 consts; only the
+// decoder uses this enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EventKind {
+    NoteOff,
+    NoteOn,
+    End,
+}
+
+impl EventKind {
+    fn from_nibble(v: i16) -> Option<Self> {
+        match v {
+            EV_NOTE_OFF => Some(EventKind::NoteOff),
+            EV_NOTE_ON => Some(EventKind::NoteOn),
+            EV_END => Some(EventKind::End),
+            _ => None,
+        }
+    }
+}
+
 pub(crate) const MUS_STOP: i16 = 0;
 pub(crate) const MUS_PLAY: i16 = 1;
 
@@ -521,8 +542,8 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                     s.cur_music_idx += 1;
                     let ch = usize::try_from(data & 0x0f).expect("4-bit channel mask");
 
-                    match data & 0xf0 {
-                        EV_NOTE_ON => {
+                    match EventKind::from_nibble(data & 0xf0) {
+                        Some(EventKind::NoteOn) => {
                             let note = i32::from(
                                 MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx],
                             ) + s.music_pitch;
@@ -531,7 +552,7 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                                 FREQUENCY_TABLE[usize::try_from(note).expect("note >= 0")];
                             s.channels[MUSIC_CH[ch]].on = true;
                         }
-                        EV_END => {
+                        Some(EventKind::End) => {
                             let playing = i32::from(
                                 MUSIC_SCORE[s.cur_music_table.score_row()][s.cur_music_idx],
                             );
@@ -544,10 +565,9 @@ pub(crate) fn audio_output(output: &mut [i16; 2]) {
                             }
                             continue;
                         }
-                        EV_NOTE_OFF => music_note_off(&mut s, ch),
-                        // Unknown type nibble: C's switch has no default case,
-                        // but the port has always silenced here too
-                        _ => music_note_off(&mut s, ch),
+                        // EV_NOTE_OFF, and unknown nibbles: C's switch has no
+                        // default case, but the port has always silenced here too
+                        Some(EventKind::NoteOff) | None => music_note_off(&mut s, ch),
                     }
 
                     let time =
@@ -634,4 +654,18 @@ pub(crate) fn audio_music(music: MusicScore, playing: bool) {
 pub(crate) fn audio_init() {
     let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
     timer_set(&mut s.timer_sfx, SAMPLERATE, TICKRATE);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn event_kind_decodes_the_c_nibbles() {
+        assert_eq!(EventKind::from_nibble(0x00), Some(EventKind::NoteOff));
+        assert_eq!(EventKind::from_nibble(0x10), Some(EventKind::NoteOn));
+        assert_eq!(EventKind::from_nibble(0x40), Some(EventKind::End));
+        assert_eq!(EventKind::from_nibble(0x20), None);
+        assert_eq!(EventKind::from_nibble(0xf0), None);
+    }
 }
