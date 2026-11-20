@@ -144,21 +144,8 @@ impl JoyState {
 }
 
 thread_local! {
-    static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
-    static VIDEO_FLASH: Cell<bool> = const { Cell::new(false) };
-}
-
-pub(crate) fn set_game_input(key: Key) {
-    GAME_INPUT.with(|c| c.set(key));
-}
-pub(crate) fn game_input() -> Key {
-    GAME_INPUT.with(Cell::get)
-}
-pub(crate) fn video_flash() -> bool {
-    VIDEO_FLASH.with(Cell::get)
-}
-pub(crate) fn toggle_video_flash(flip: bool) {
-    VIDEO_FLASH.with(|c| c.set(c.get() ^ flip));
+    pub(crate) static GAME_INPUT: Cell<Key> = const { Cell::new(Key::None) };
+    pub(crate) static VIDEO_FLASH: Cell<bool> = const { Cell::new(false) };
 }
 
 // ---- Module-private state ---------------------------------------------------
@@ -291,7 +278,7 @@ fn map_joy_event(state: JoyState, ev: JoyEvent) -> (JoyState, Key) {
 fn apply_joy_event(ev: JoyEvent) {
     let (state, input) = map_joy_event(JOY_STATE.with(|s| s.get()), ev);
     set_joy_state(state);
-    set_game_input(input);
+    GAME_INPUT.with(|c| c.set(input));
 }
 
 // Open a joystick if none is open yet (startup + hotplug), as upstream's
@@ -370,18 +357,18 @@ fn present_frame(texture: &mut Texture) {
 pub(crate) fn game_frame(timer_flash: &mut Timer, mut next_input: impl FnMut() -> Option<Key>) {
     crate::dispatch::run_pending();
     while let Some(input) = next_input() {
-        set_game_input(input);
-        if game_input() != Key::None {
+        GAME_INPUT.with(|c| c.set(input));
+        if GAME_INPUT.with(Cell::get) != Key::None {
             crate::dispatch::run_responder();
         }
     }
     // As in live play, where the final (empty) poll leaves gameInput at None.
-    set_game_input(Key::None);
+    GAME_INPUT.with(|c| c.set(Key::None));
     crate::dispatch::run_ticker();
     crate::dispatch::run_drawer();
     // timer_flash keeps rate == 0 (25 / (TICKRATE * 8) = 25/480), so
     // timer_update returns only 0 or 1 and `!= 0` is the exact bool flip.
-    toggle_video_flash(timer_update(timer_flash) != 0);
+    VIDEO_FLASH.with(|c| c.set(c.get() ^ (timer_update(timer_flash) != 0)));
 }
 
 // Read-only view of the framebuffer (palette indices) and the border colour,
@@ -422,7 +409,7 @@ pub(crate) fn game_running() -> bool {
 
 // Poll one SDL event, update gameInput, return false when the queue is empty.
 fn system_get_event() -> bool {
-    set_game_input(Key::None);
+    GAME_INPUT.with(|c| c.set(Key::None));
 
     EVENT_PUMP.with(|p| {
         let mut pump = p.borrow_mut();
@@ -446,10 +433,12 @@ fn system_get_event() -> bool {
                 let state = pump.keyboard_state();
                 let gui_held = state.is_scancode_pressed(Scancode::LGui)
                     || state.is_scancode_pressed(Scancode::RGui);
-                set_game_input(if swallow_keydown(sym, gui_held) {
-                    Key::None
-                } else {
-                    map_keycode(sym)
+                GAME_INPUT.with(|c| {
+                    c.set(if swallow_keydown(sym, gui_held) {
+                        Key::None
+                    } else {
+                        map_keycode(sym)
+                    })
                 });
                 true
             }
@@ -753,7 +742,7 @@ pub(crate) fn run() -> ExitCode {
         for _ in 0..frame {
             game_frame(&mut timer_flash, || {
                 if system_get_event() {
-                    Some(game_input())
+                    Some(GAME_INPUT.with(Cell::get))
                 } else {
                     None
                 }

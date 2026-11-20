@@ -7,7 +7,7 @@
 // die.rs and cheat.rs read miner state through GAME_STATE (rope.rs reads
 // `miner_willy_rope`); the ticker/drawer paths receive the miner as a parameter.
 
-use crate::audio::{audio_willy_sfx, set_audio_pan_x};
+use crate::audio::{AUDIO_PAN_X, audio_willy_sfx};
 use crate::common::Key;
 use crate::dispatch::{DiePhase, Pending, Screen, queue_pending};
 use crate::game::{
@@ -515,7 +515,7 @@ fn do_miner_ticker(miner: &mut Miner) {
                 length,
                 apex,
             } => {
-                set_audio_pan_x(miner.x);
+                AUDIO_PAN_X.with(|c| c.set(miner.x));
                 audio_willy_sfx(pitch, length);
 
                 miner.y = y;
@@ -574,7 +574,7 @@ fn do_miner_ticker(miner: &mut Miner) {
 
     let step = fall_step(miner.air, miner.y);
     miner.air = step.air;
-    set_audio_pan_x(miner.x);
+    AUDIO_PAN_X.with(|c| c.set(miner.x));
     audio_willy_sfx(step.pitch, 4);
     miner.y = step.y;
     miner.align = step.align;

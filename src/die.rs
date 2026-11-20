@@ -1,4 +1,4 @@
-use crate::audio::{Sfx, audio_reduce_music_speed, audio_sfx, set_audio_pan_x};
+use crate::audio::{AUDIO_PAN_X, Sfx, audio_reduce_music_speed, audio_sfx};
 use crate::common::WIDTH;
 use crate::dispatch::{
     DiePhase, GameOverPhase, GamePhase, Pending, Screen, queue_pending, set_screen,
@@ -64,7 +64,7 @@ pub(crate) fn die_init() {
         .miner
         .lock()
         .expect("GAME_STATE.miner lock poisoned");
-    set_audio_pan_x(miner.x);
+    AUDIO_PAN_X.with(|c| c.set(miner.x));
     drop(miner);
     audio_sfx(Sfx::Die);
     set_screen(Screen::Die(DiePhase::Anim));

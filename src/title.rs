@@ -2,7 +2,7 @@ use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, Key, WIDTH};
 use crate::dispatch::{GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
 use crate::game::{GAME_STATE, GameMode, game_draw_status, game_game_reset};
-use crate::game_main::{do_quit, game_input, system_border, system_is_joy_fire, video_flash};
+use crate::game_main::{GAME_INPUT, VIDEO_FLASH, do_quit, system_border, system_is_joy_fire};
 use crate::levels::{level_item_count, level_restore_items};
 use crate::miner::miner_init;
 use crate::robots::robots_draw_cheat;
@@ -68,7 +68,7 @@ pub(crate) fn game_start() {
 
 pub(crate) fn do_title_ticker() {
     if audio_music_playing() {
-        if video_flash() {
+        if VIDEO_FLASH.with(Cell::get) {
             TEXT_JSW.with(|t| t.borrow_mut()[1] = b'\x0b');
             TEXT_JSW.with(|t| t.borrow_mut()[3] = b'\x02');
         } else {
@@ -120,9 +120,9 @@ pub(crate) fn do_title_drawer() {
 
 pub(crate) fn do_title_responder() {
     // Upstream 69070b9: joystick fire starts the game like Enter.
-    if game_input() == Key::Enter || system_is_joy_fire() {
+    if GAME_INPUT.with(Cell::get) == Key::Enter || system_is_joy_fire() {
         queue_pending(Pending::StartGame);
-    } else if game_input() == Key::Escape {
+    } else if GAME_INPUT.with(Cell::get) == Key::Escape {
         do_quit();
     }
 }

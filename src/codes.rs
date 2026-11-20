@@ -3,10 +3,10 @@
 use crate::common::Key::{Enter, Escape, K1, K2, K3, K4};
 use crate::common::{HEIGHT, WIDTH};
 use crate::dispatch::{Pending, Screen, TitlePhase, queue_pending};
-use crate::game_main::{do_quit, game_input, system_border, system_rnd, video_flash};
+use crate::game_main::{GAME_INPUT, VIDEO_FLASH, do_quit, system_border, system_rnd};
 
 use crate::video::{video_draw_robot_i32, video_pixel_fill, video_write, video_write_large};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 thread_local! {
     static CODES_STATE: RefCell<CodesState> = const { RefCell::new(CodesState::new()) };
@@ -99,7 +99,7 @@ impl CodesState {
     }
 
     fn do_codes_ticker(&mut self) {
-        if video_flash() {
+        if VIDEO_FLASH.with(Cell::get) {
             self.cell[0] = 0x02;
             self.cell[2] = 0x01;
         } else {
@@ -118,7 +118,7 @@ impl CodesState {
 
     // b"" byte-string literals carry the interior nul bytes these control strings need
     fn do_codes_responder(&mut self) {
-        match game_input() {
+        match GAME_INPUT.with(Cell::get) {
             K1 => self.key = 1, // blue
             K2 => self.key = 2, // red
             K3 => self.key = 3, // magenta

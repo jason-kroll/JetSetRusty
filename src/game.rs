@@ -1,5 +1,4 @@
 use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
-use crate::game_main::game_input;
 use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
@@ -13,7 +12,7 @@ use crate::cheat::{CheatHandler, cheat_code_entry, cheat_handler, cheat_level_se
 use crate::dispatch::{
     GameOverPhase, GamePhase, Pending, Screen, TitlePhase, queue_pending, set_screen,
 };
-use crate::game_main::{TICKRATE, system_border};
+use crate::game_main::{GAME_INPUT, TICKRATE, system_border};
 use crate::levels::level_init;
 use crate::miner::{
     miner_draw_sprite, miner_drawer, miner_inc_seq, miner_save, miner_set_seq, miner_ticker,
@@ -50,13 +49,6 @@ const LIFE_INK: [u8; 7] = [0x2, 0x4, 0x6, 0x1, 0x3, 0x5, 0x7];
 // slot.
 thread_local! {
     static CLOCK_REDRAW: Cell<bool> = const { Cell::new(false) };
-}
-
-fn clock_redraw() -> bool {
-    CLOCK_REDRAW.with(Cell::get)
-}
-fn set_clock_redraw(v: bool) {
-    CLOCK_REDRAW.with(|c| c.set(v));
 }
 
 // Probably a lot of functions go here!
@@ -292,7 +284,7 @@ pub(crate) fn do_game_responder() {
 
     game.inactivity_timer.store(0, Ordering::Relaxed);
 
-    match game_input() {
+    match GAME_INPUT.with(Cell::get) {
         Key::Pause => game_pause(game.game_paused.load(Ordering::Relaxed) == 0),
         Key::Mute => {
             let new_music = !game.music.load(Ordering::Relaxed);
@@ -334,7 +326,7 @@ pub(crate) fn do_game_drawer() {
     rope::rope_draw(&mut miner);
     drop(miner);
 
-    if clock_redraw() {
+    if CLOCK_REDRAW.with(Cell::get) {
         do_draw_clock();
     }
 }
@@ -365,7 +357,7 @@ pub(crate) fn do_draw_clock() {
         i32::try_from(STATUS).expect("STATUS row fits i32"),
         &text[..],
     );
-    set_clock_redraw(false);
+    CLOCK_REDRAW.with(|c| c.set(false));
 }
 
 pub(crate) fn do_pause_ticker() {
@@ -399,7 +391,7 @@ pub(crate) fn game_game_reset() {
         .expect("GAME_STATE.score_clock lock poisoned") = [0, 7, 0];
 
     // DoClockUpdate = do_draw_clock
-    set_clock_redraw(true);
+    CLOCK_REDRAW.with(|c| c.set(true));
 
     // gameClockTicks = 0
     game.clock_ticks.store(0, Ordering::Relaxed);
@@ -600,7 +592,7 @@ pub(crate) fn game_got_item(pan_x: i32) {
     }
 
     // audio_pan_x = minerWilly.x (passed in; the caller holds the miner lock)
-    crate::audio::set_audio_pan_x(pan_x);
+    crate::audio::AUDIO_PAN_X.with(|c| c.set(pan_x));
 
     audio_sfx(Sfx::Item);
 }
@@ -639,7 +631,7 @@ pub(crate) fn clock_ticker() {
         }
     }
 
-    set_clock_redraw(true);
+    CLOCK_REDRAW.with(|c| c.set(true));
 }
 
 pub(crate) fn game_draw_lives() {

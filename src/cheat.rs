@@ -1,7 +1,8 @@
 use crate::common::Key;
 use crate::dispatch::{Pending, queue_pending};
 use crate::game::{FIRSTLANDING, GAME_STATE, game_cheat_enabled, game_pause};
-use crate::game_main::{game_input, system_is_key};
+use crate::game_main::{GAME_INPUT, system_is_key};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const CHEAT_CODE: &[u8] = b"writetyper";
@@ -119,7 +120,10 @@ pub(crate) fn cheat_code_entry() {
     let on_entry_floor =
         GAME_STATE.level.load(Ordering::Relaxed) == FIRSTLANDING && y == FIRSTLANDING_FLOOR_Y;
     let pos = if on_entry_floor {
-        code_progress(CHEAT_POS.load(Ordering::Relaxed), game_input())
+        code_progress(
+            CHEAT_POS.load(Ordering::Relaxed),
+            GAME_INPUT.with(Cell::get),
+        )
     } else {
         0
     };

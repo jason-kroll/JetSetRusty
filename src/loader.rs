@@ -1,7 +1,7 @@
 use crate::audio::{MusicScore, audio_music, audio_music_playing};
 use crate::common::{HEIGHT, WIDTH};
 use crate::dispatch::{LoaderPhase, Pending, Screen, TitlePhase, queue_pending, set_screen};
-use crate::game_main::{system_border, video_flash};
+use crate::game_main::{VIDEO_FLASH, system_border};
 use crate::video::{video_pixel_paper_fill, video_text_width, video_write, video_write_large};
 
 use std::cell::{Cell, RefCell};
@@ -20,7 +20,7 @@ pub(crate) fn do_loader_responder() {
 pub(crate) fn do_loader_ticker() {
     LOADER_TEXT.with(|t| {
         let mut text = t.borrow_mut();
-        if video_flash() {
+        if VIDEO_FLASH.with(Cell::get) {
             text[1] = 7;
             text[3] = 2;
         } else {

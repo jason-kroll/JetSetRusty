@@ -1,8 +1,8 @@
 use crate::common::WIDTH;
 use crate::game::{Direction, GAME_STATE};
-use crate::game_main::{system_border, video_flash};
+use crate::game_main::{VIDEO_FLASH, system_border};
 use crate::video::{video_draw_tile, video_pixel_fill, video_text_width, video_write};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
 
 const LEVEL_W: usize = 32;
@@ -5015,8 +5015,8 @@ fn do_item(tile: &mut Tile) {
 }
 
 fn do_flash(tile: &mut Tile) {
-    tile.paper[2] = tile.paper[usize::from(video_flash())];
-    tile.ink[2] = tile.ink[usize::from(video_flash())];
+    tile.paper[2] = tile.paper[usize::from(VIDEO_FLASH.with(Cell::get))];
+    tile.ink[2] = tile.ink[usize::from(VIDEO_FLASH.with(Cell::get))];
 }
 
 pub(crate) fn level_erase_item(tile: i32) {

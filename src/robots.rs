@@ -10,7 +10,7 @@
 // robots.c and nothing else referenced it, so after this port it is
 // Rust-private: no `#[repr(C)]`, no `#[no_mangle]` globals.
 
-use crate::audio::{Sfx, audio_sfx, set_audio_pan_x};
+use crate::audio::{AUDIO_PAN_X, Sfx, audio_sfx};
 use crate::common::WIDTH;
 use crate::game::{GAME_STATE, GameMode, LIVES, MASTERBEDROOM, Miner};
 use crate::video::{video_draw_arrow, video_draw_robot, video_draw_sprite};
@@ -1244,7 +1244,7 @@ fn do_move_static(robot: &mut Robot) {
 fn do_move_arrow_left(robot: &mut Robot) {
     robot.max -= 1;
     if robot.max == 44 {
-        set_audio_pan_x(256);
+        AUDIO_PAN_X.with(|c| c.set(256));
         audio_sfx(Sfx::Arrow);
     }
 
@@ -1258,7 +1258,7 @@ fn do_move_arrow_left(robot: &mut Robot) {
 fn do_move_arrow_right(robot: &mut Robot) {
     robot.max += 1;
     if robot.max == 244 {
-        set_audio_pan_x(0);
+        AUDIO_PAN_X.with(|c| c.set(0));
         audio_sfx(Sfx::Arrow);
     }
 

@@ -257,7 +257,7 @@ static SFX_PITCH: [&[i32]; 6] = [
 static AUDIO_MUSIC_PLAYING: AtomicBool = AtomicBool::new(false); // MUS_STOP
 
 thread_local! {
-    static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
+    pub(crate) static AUDIO_PAN_X: Cell<i32> = const { Cell::new(0) };
 }
 
 pub(crate) fn audio_music_playing() -> bool {
@@ -270,14 +270,6 @@ pub(crate) fn audio_music_clock() -> i32 {
         .lock()
         .expect("AUDIO_STATE lock poisoned")
         .music_clock
-}
-
-pub(crate) fn audio_pan_x() -> i32 {
-    AUDIO_PAN_X.with(Cell::get)
-}
-
-pub(crate) fn set_audio_pan_x(pan: i32) {
-    AUDIO_PAN_X.with(|c| c.set(pan));
 }
 
 struct AudioState {
@@ -467,7 +459,7 @@ pub(crate) fn audio_willy_sfx(note: i32, length: i32) {
     s.sfx[0].clock = s.sfx_clock;
     channel_pan(
         &mut s.channels[ch],
-        usize::try_from(audio_pan_x()).expect("pan >= 0"),
+        usize::try_from(AUDIO_PAN_X.with(Cell::get)).expect("pan >= 0"),
     );
     s.sfx[0].length = length;
     s.sfx[0].handler = Some(SfxHandler::Willy);
@@ -492,7 +484,7 @@ fn begin_sfx(
 
 pub(crate) fn audio_sfx(sfx: Sfx) {
     let mut s = AUDIO_STATE.lock().expect("AUDIO_STATE lock poisoned");
-    let pan = audio_pan_x();
+    let pan = AUDIO_PAN_X.with(Cell::get);
 
     let target_slot = if sfx == Sfx::Gameover || sfx == Sfx::Die {
         // Schedule channels 0 and 1 to stop; don't call immediately.
