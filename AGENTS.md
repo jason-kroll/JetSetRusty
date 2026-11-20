@@ -32,7 +32,7 @@ Screen     — the current screen + phase (Loader/Codes/Title/Game/Die/GameOver)
 Pending    — a one-shot transition queued for the start of the next frame
 ```
 
-This is one `Copy` `Dispatch { screen, pending }` in a `thread_local! Cell` in `dispatch.rs`, behind safe accessors (`set_screen`, `queue_pending`, `with_dispatch`, plus `set_game_input`/`game_input` and `video_flash`/`toggle_video_flash` in `game_main.rs`); it is main-thread only, so no synchronization is needed. A transition works by assigning the state: `queue_pending(Pending::Enter(Screen::Title(..)))` fires at the next frame's step 1, while `set_screen(..)` is visible to later handler reads in the same frame. (This replaced the C-era `EVENT` fn-pointer slots — `Option<fn()>` globals mutated at runtime — in the `FN-POINTER-DISPATCH` plan.)
+This is one `Copy` `Dispatch { screen, pending }` in a `thread_local! Cell` in `dispatch.rs`, behind safe accessors (`set_screen`, `queue_pending`, `with_dispatch`), plus the `GAME_INPUT`/`VIDEO_FLASH` `pub(crate)` thread-local statics in `game_main.rs` (read/written directly with `.with(...)`); it is main-thread only, so no synchronization is needed. A transition works by assigning the state: `queue_pending(Pending::Enter(Screen::Title(..)))` fires at the next frame's step 1, while `set_screen(..)` is visible to later handler reads in the same frame. (This replaced the C-era `EVENT` fn-pointer slots — `Option<fn()>` globals mutated at runtime — in the `FN-POINTER-DISPATCH` plan.)
 
 ### Ported to Rust (`src/*.rs`)
 

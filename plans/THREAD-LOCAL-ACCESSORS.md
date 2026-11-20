@@ -38,7 +38,23 @@ trailer. Watch: title.rs:133 `colour_cycle() as usize` is a recorded
 lint-invisible stay - the cast itself does not change, only the getter
 call around it.
 
-## Status: REVIEWED - accept-with-defects folded in (reviewer turn 32: D1 title.rs:103->:133 both spots, D2 rope_tick/rope_draw, D3 determinate phase 4)
+## Status: COMPLETE
+
+Four commits, all gates green after each (fmt, clippy `-D warnings`,
+cargo test 56 unit + 24 replay, build); goldens byte-identical
+throughout (never `UPDATE_GOLDEN=1`):
+
+- `fe128c2` this plan (reviewer accept-with-defects, folded in)
+- `d96b803` Phase 1 — title.rs / gameover.rs / die.rs pairs + byte
+  setters inlined (TEXT_POS/TEXT_FRAME/COLOUR_CYCLE/TEXT_JSW,
+  BOOT_TICKS/TEXT_GAME/TEXT_OVER, DIE_LEVEL)
+- `0fe832d` Phase 2 — game.rs CLOCK_REDRAW, audio.rs AUDIO_PAN_X,
+  game_main.rs GAME_INPUT/VIDEO_FLASH (now pub(crate) statics),
+  toggle_video_flash inlined; ~30 call sites across nine modules
+- `9cb63dc` Phase 3 — miner.rs MINER_FRAME/MINER_SEQ_INDEX, rope.rs
+  ROPE_ACTIVE
+- Phase 4 (this commit) — AGENTS.md dispatch paragraph updated; plan
+  marked COMPLETE
 
 ## Phase 1 - title.rs, gameover.rs, die.rs (same-module pairs + byte setters)
 
