@@ -98,7 +98,7 @@ const MINER_ZERO: Miner = Miner {
     align: 0,
     frame: 0,
     dir: Facing::Right,
-    move_: 0,
+    moving: false,
     air: 0,
     jump: 0,
 };
@@ -164,7 +164,7 @@ pub(crate) fn miner_restore(miner: &mut Miner) {
         miner.align = s.align;
         miner.frame = s.frame;
         miner.dir = s.dir;
-        miner.move_ = s.move_;
+        miner.moving = s.moving;
         miner.air = s.air;
         miner.jump = s.jump;
     });
@@ -179,7 +179,7 @@ pub(crate) fn miner_save(miner: &Miner) {
         s.align = miner.align;
         s.frame = miner.frame;
         s.dir = miner.dir;
-        s.move_ = miner.move_;
+        s.moving = miner.moving;
         s.air = miner.air;
         s.jump = miner.jump;
     });
@@ -361,7 +361,7 @@ fn move_left_right(miner: &mut Miner) {
     let mut y = 0;
     let mut offset = 0;
 
-    if miner.move_ == 0 {
+    if !miner.moving {
         return;
     }
 
@@ -453,20 +453,20 @@ fn update_dir(convey_dir: i32, miner: &mut Miner) {
     }
 
     if dir == 0 {
-        miner.move_ = 0;
+        miner.moving = false;
     } else if dir == 1 {
         if miner.dir == Facing::Right {
             miner.dir = Facing::Left;
-            miner.move_ = 0;
+            miner.moving = false;
         } else {
-            miner.move_ = 1;
+            miner.moving = true;
         }
     } else if dir == 2 {
         if miner.dir == Facing::Left {
             miner.dir = Facing::Right;
-            miner.move_ = 0;
+            miner.moving = false;
         } else {
-            miner.move_ = 1;
+            miner.moving = true;
         }
     }
 
@@ -477,7 +477,7 @@ fn update_dir(convey_dir: i32, miner: &mut Miner) {
             GAME_STATE.miner_willy_rope.store(-16, Ordering::Relaxed);
             miner.y &= 120;
             miner.align = 4;
-            miner.move_ = 1;
+            miner.moving = true;
         }
     }
 }
@@ -508,7 +508,7 @@ fn do_miner_ticker(miner: &mut Miner) {
                 miner.tile = tile;
                 miner.align = 4;
                 miner.air = 2;
-                miner.move_ = 0;
+                miner.moving = false;
                 return;
             }
             JumpOutcome::Rise {
@@ -570,7 +570,7 @@ fn do_miner_ticker(miner: &mut Miner) {
         return;
     }
 
-    miner.move_ = 0;
+    miner.moving = false;
     if miner.air == 0 {
         miner.air = 2;
         return;
@@ -653,7 +653,7 @@ pub(crate) fn miner_init() {
     miner.y = 13 * 8;
     miner.tile = 13 * 32 + 20;
     miner.align = 4;
-    miner.move_ = 0;
+    miner.moving = false;
     miner.air = 0;
     miner_save(&miner);
 }

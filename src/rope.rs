@@ -247,7 +247,7 @@ fn do_rope_drawer(miner: &mut Miner) {
 
     // Handle rope movement when holding
     if ROPE.hold.load(Ordering::Relaxed) {
-        let willy_moving = miner.move_ != 0;
+        let willy_moving = miner.moving;
         if willy_moving {
             let dir = ROPE.dir.load(Ordering::Relaxed);
             // Old packing: dir ^ willy_dir with willy_dir = D_LEFT as 0/1.

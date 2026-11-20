@@ -128,7 +128,7 @@ pub(crate) struct Miner {
     pub(crate) align: i32,
     pub(crate) frame: i32,
     pub(crate) dir: Facing,
-    pub(crate) move_: i32, // renamed from 'move' which is a Rust keyword
+    pub(crate) moving: bool,
     pub(crate) air: i32,
     pub(crate) jump: i32,
 }
