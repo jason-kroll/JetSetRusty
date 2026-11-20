@@ -110,7 +110,11 @@ fn code_progress(pos: usize, key: Key) -> usize {
 pub(crate) fn cheat_code_entry() {
     static CHEAT_POS: AtomicUsize = AtomicUsize::new(0);
 
-    let y = GAME_STATE.miner.lock().unwrap().y;
+    let y = GAME_STATE
+        .miner
+        .lock()
+        .expect("GAME_STATE.miner lock poisoned")
+        .y;
     // C gates on the room and Willy's height first, then the code word
     let on_entry_floor =
         GAME_STATE.level.load(Ordering::Relaxed) == FIRSTLANDING && y == FIRSTLANDING_FLOOR_Y;

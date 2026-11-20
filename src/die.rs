@@ -51,7 +51,12 @@ pub(crate) fn die_ticker() {
         0x0,
         0x0,
     );
-    miner_restore(&mut GAME_STATE.miner.lock().unwrap());
+    miner_restore(
+        &mut GAME_STATE
+            .miner
+            .lock()
+            .expect("GAME_STATE.miner lock poisoned"),
+    );
     audio_reduce_music_speed();
     queue_pending(Pending::Enter(Screen::Game(GamePhase::Init)));
 }
@@ -61,7 +66,10 @@ pub(crate) fn die_init() {
     set_die_level(15);
     system_border(0x0);
     video_pixel_paper_fill(0, 128 * WIDTH, 0x0);
-    let miner = GAME_STATE.miner.lock().unwrap();
+    let miner = GAME_STATE
+        .miner
+        .lock()
+        .expect("GAME_STATE.miner lock poisoned");
     set_audio_pan_x(miner.x);
     drop(miner);
     audio_sfx(Sfx::Die);

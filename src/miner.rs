@@ -646,7 +646,10 @@ pub(crate) fn miner_drawer(miner: &Miner) {
 }
 
 pub(crate) fn miner_init() {
-    let mut miner = GAME_STATE.miner.lock().unwrap();
+    let mut miner = GAME_STATE
+        .miner
+        .lock()
+        .expect("GAME_STATE.miner lock poisoned");
     miner.x = 20 * 8;
     miner.y = 13 * 8;
     miner.tile = 13 * 32 + 20;

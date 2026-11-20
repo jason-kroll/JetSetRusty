@@ -133,7 +133,10 @@ pub(crate) fn run_pending() {
         }
         Pending::StartGame => crate::title::game_start(),
         Pending::ReinitRoom => {
-            let mut miner = crate::game::GAME_STATE.miner.lock().unwrap();
+            let mut miner = crate::game::GAME_STATE
+                .miner
+                .lock()
+                .expect("GAME_STATE.miner lock poisoned");
             crate::game::game_init_room(&mut miner);
         }
     }
@@ -160,7 +163,10 @@ pub(crate) fn run_ticker() {
         Screen::Title(TitlePhase::Init) => crate::title::do_title_init(),
         Screen::Title(TitlePhase::Scroll) => crate::title::do_title_ticker(),
         Screen::Game(GamePhase::Init) => {
-            let mut miner = crate::game::GAME_STATE.miner.lock().unwrap();
+            let mut miner = crate::game::GAME_STATE
+                .miner
+                .lock()
+                .expect("GAME_STATE.miner lock poisoned");
             crate::game::game_init_room(&mut miner);
         }
         Screen::Game(GamePhase::Play) => crate::game::do_game_ticker(),

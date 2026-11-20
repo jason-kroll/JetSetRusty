@@ -231,7 +231,10 @@ pub(crate) fn main(args: &[String]) -> ExitCode {
                         // Mimic entering the room from the left (game_change_level
                         // Right): Willy at the left edge, room re-inits next tick.
                         {
-                            let mut miner = GAME_STATE.miner.lock().unwrap();
+                            let mut miner = GAME_STATE
+                                .miner
+                                .lock()
+                                .expect("GAME_STATE.miner lock poisoned");
                             miner.x = 0;
                             miner.tile &= !31;
                         }
@@ -243,7 +246,10 @@ pub(crate) fn main(args: &[String]) -> ExitCode {
                     SetOp::Mode(m) => GAME_STATE.set_mode(*m),
                     SetOp::Lives(v) => GAME_STATE.lives.store(*v, Relaxed),
                     SetOp::Miner(x, y) => {
-                        let mut miner = GAME_STATE.miner.lock().unwrap();
+                        let mut miner = GAME_STATE
+                            .miner
+                            .lock()
+                            .expect("GAME_STATE.miner lock poisoned");
                         miner.x = *x;
                         miner.y = *y;
                         miner.tile = (y / 8) * 32 + (x / 8);
