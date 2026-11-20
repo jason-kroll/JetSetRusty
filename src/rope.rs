@@ -199,7 +199,7 @@ fn do_rope_drawer(miner: &mut Miner) {
             .store(ROPE.side.load(Ordering::Relaxed) ^ 1, Ordering::Relaxed);
     }
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap();
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned");
     for (seg, data) in (1..ROPE_SEGS).zip(ROPE_DATA.iter().skip(data_idx)) {
         y += data.y;
         x -= data.x

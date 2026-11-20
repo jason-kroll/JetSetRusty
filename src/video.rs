@@ -336,7 +336,7 @@ pub(crate) fn video_text_width(text: &[u8]) -> i32 {
 
 // game.c and title.c
 pub(crate) fn video_cycle_colours() -> u8 {
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for (pos, pixel) in pixels.iter_mut().enumerate() {
         let ink = (pixel.ink + 3) & 0xf;
@@ -348,7 +348,7 @@ pub(crate) fn video_cycle_colours() -> u8 {
 
 // gameover.c, game.c
 pub(crate) fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
@@ -360,7 +360,7 @@ pub(crate) fn video_pixel_paper_fill(pos: i32, size: i32, ink: u8) {
 
 // game.c is still using this
 pub(crate) fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
         if pixel.flags.contains(PixelFlags::LEVEL) {
@@ -370,7 +370,7 @@ pub(crate) fn video_pixel_ink_fill(pos: i32, size: i32, ink: u8) {
 }
 
 pub(crate) fn video_pixel_fill(pos: i32, size: i32) {
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
     for p in pos..pos + size {
         let pixel = &mut pixels[buf_index(p)];
         pixel.flags = PixelFlags::EMPTY;
@@ -379,7 +379,7 @@ pub(crate) fn video_pixel_fill(pos: i32, size: i32) {
 }
 
 pub(crate) fn video_draw_rope_seg(pos: i32, ink: u8) {
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
     video_draw_rope_seg_inner(&mut pixels, pos, ink);
 }
 
@@ -394,7 +394,7 @@ pub(crate) fn video_draw_arrow(pos: i32, dir: i32) {
     let width = WIDTH;
     let mut pos = pos + dir;
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     pixels[buf_index(pos)].flags |= PixelFlags::ROBOT | PixelFlags::LEVEL;
     video_set_pixel(&mut pixels[buf_index(pos)], pos, 7);
@@ -418,7 +418,7 @@ pub(crate) fn video_draw_tile(tile: i32, what: [u8; 8], paper: u8, ink: u8) {
     let mut pos = tile_2_pixel(tile) + 7;
     let colour = [paper, ink];
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for byte in what {
         for bit in 0..8 {
@@ -441,7 +441,7 @@ pub(crate) fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
     let y0 = pos / WIDTH;
     pos += 15;
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for (row, word) in line.iter().copied().enumerate() {
         let row_i = i32::try_from(row).expect("sprite row < 16");
@@ -467,7 +467,7 @@ pub(crate) fn video_draw_miner(pos: i32, line: &[u16; 16], level: i32) -> bool {
 pub(crate) fn video_draw_robot(pos: i32, line: &[u16; 16], ink: u8) {
     let mut pos = pos + 15;
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for &word in line {
         for bit in 0..16 {
@@ -499,7 +499,7 @@ pub(crate) fn video_draw_sprite(pos: i32, line: &[u16; 16], paper: u8, ink: u8) 
     let colour = [paper, ink];
     let mut pos = pos + 15;
 
-    let mut pixels = VIDEO_PIXEL.lock().unwrap(); // WARN: Lock!
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned"); // WARN: Lock!
 
     for &word in line {
         for bit in 0..16 {
@@ -535,7 +535,7 @@ pub(crate) fn video_write_large(x: i32, y: i32, text: &[u8]) {
     let text = &text[..find_string_end(text)];
 
     // WARN: Locks!
-    let mut pixels = VIDEO_PIXEL.lock().unwrap();
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned");
     let mut ink = TEXT_INK.with(|t| t.get());
 
     let mut i = 0;
@@ -587,7 +587,7 @@ pub(crate) fn video_write(pos: i32, text: &[u8]) {
     let text = &text[..find_string_end(text)];
 
     // WARN: Locks
-    let mut pixels = VIDEO_PIXEL.lock().unwrap();
+    let mut pixels = VIDEO_PIXEL.lock().expect("VIDEO_PIXEL lock poisoned");
     let mut ink = TEXT_INK.with(|t| t.get());
 
     let mut pos = pos;
