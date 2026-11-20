@@ -31,28 +31,6 @@ thread_local! {
     static COLOUR_CYCLE: Cell<u8> = const { Cell::new(0) };
 }
 
-fn text_pos() -> i32 {
-    TEXT_POS.with(Cell::get)
-}
-fn set_text_pos(v: i32) {
-    TEXT_POS.with(|c| c.set(v));
-}
-fn text_frame() -> i32 {
-    TEXT_FRAME.with(Cell::get)
-}
-fn set_text_frame(v: i32) {
-    TEXT_FRAME.with(|c| c.set(v));
-}
-fn colour_cycle() -> u8 {
-    COLOUR_CYCLE.with(Cell::get)
-}
-fn set_colour_cycle(v: u8) {
-    COLOUR_CYCLE.with(|c| c.set(v));
-}
-fn set_text_jsw_byte(i: usize, v: u8) {
-    TEXT_JSW.with(|t| t.borrow_mut()[i] = v);
-}
-
 static TEXT_TICKER: &[u8] = b"      Press ENTER to Start                                JET-SET WILLY by Matthew Smith   1984 SOFTWARE PROJECTS Ltd                                Guide Willy to collect all the items around the house before Midnight so Maria will let you get to your bed                                Press ENTER to Start      \0";
 
 static TEXT_END: usize = TEXT_TICKER.len() - 33;
@@ -91,24 +69,27 @@ pub(crate) fn game_start() {
 pub(crate) fn do_title_ticker() {
     if audio_music_playing() {
         if video_flash() {
-            set_text_jsw_byte(1, b'\x0b');
-            set_text_jsw_byte(3, b'\x02');
+            TEXT_JSW.with(|t| t.borrow_mut()[1] = b'\x0b');
+            TEXT_JSW.with(|t| t.borrow_mut()[3] = b'\x02');
         } else {
-            set_text_jsw_byte(1, b'\x02');
-            set_text_jsw_byte(3, b'\x0b');
+            TEXT_JSW.with(|t| t.borrow_mut()[1] = b'\x02');
+            TEXT_JSW.with(|t| t.borrow_mut()[3] = b'\x0b');
         }
         return;
     }
 
-    set_colour_cycle(COLOUR_CYCLE_ADJ[colour_cycle() as usize]);
+    let cycle = COLOUR_CYCLE.with(Cell::get);
+    COLOUR_CYCLE.with(|c| c.set(COLOUR_CYCLE_ADJ[cycle as usize]));
 
-    if text_pos() < i32::try_from(TEXT_END).expect("TEXT_END fits i32") {
-        if text_frame() < 6 {
-            set_text_frame(text_frame() + 2);
+    let pos = TEXT_POS.with(Cell::get);
+    if pos < i32::try_from(TEXT_END).expect("TEXT_END fits i32") {
+        let frame = TEXT_FRAME.with(Cell::get);
+        if frame < 6 {
+            TEXT_FRAME.with(|c| c.set(frame + 2));
             return;
         }
-        set_text_pos(text_pos() + 1);
-        set_text_frame(0);
+        TEXT_POS.with(|c| c.set(pos + 1));
+        TEXT_FRAME.with(|c| c.set(0));
         return;
     }
 
@@ -125,15 +106,15 @@ pub(crate) fn do_title_drawer() {
         return;
     }
 
-    if colour_cycle() == 1 {
+    if COLOUR_CYCLE.with(Cell::get) == 1 {
         system_border(video_cycle_colours());
     }
 
     video_write_large(0, 0, c"\x01\x01\x02\x07".to_bytes_with_nul());
     video_write_large(
-        -(text_frame() & 6),
+        -(TEXT_FRAME.with(Cell::get) & 6),
         19 * 8,
-        &TEXT_TICKER[usize::try_from(text_pos()).expect("text pos >= 0")..],
+        &TEXT_TICKER[usize::try_from(TEXT_POS.with(Cell::get)).expect("text pos >= 0")..],
     );
 }
 
@@ -208,9 +189,9 @@ pub(crate) fn do_title_init() {
     video_write_large(0, 0, b"\x01\x00\x02\x04\0");
     video_write_large(0, 19 * 8, TEXT_TICKER);
 
-    set_text_pos(0);
-    set_text_frame(-1);
-    set_colour_cycle(1);
+    TEXT_POS.with(|c| c.set(0));
+    TEXT_FRAME.with(|c| c.set(-1));
+    COLOUR_CYCLE.with(|c| c.set(1));
 
     audio_music(MusicScore::Title, true);
 

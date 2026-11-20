@@ -30,21 +30,8 @@ thread_local! {
     ]) };
 }
 
-fn boot_ticks() -> i32 {
-    BOOT_TICKS.with(Cell::get)
-}
-fn set_boot_ticks(v: i32) {
-    BOOT_TICKS.with(|c| c.set(v));
-}
-fn set_text_game_byte(i: usize, v: u8) {
-    TEXT_GAME.with(|t| t.borrow_mut()[i] = v);
-}
-fn set_text_over_byte(i: usize, v: u8) {
-    TEXT_OVER.with(|t| t.borrow_mut()[i] = v);
-}
-
 pub(crate) fn gameover_drawer() {
-    let ticks = boot_ticks();
+    let ticks = BOOT_TICKS.with(Cell::get);
     if ticks <= 96 {
         video_draw_sprite((ticks & 126) * WIDTH + 15 * 8, &BOOT_SPRITE, 0x0, 0x7);
         video_pixel_paper_fill(
@@ -63,27 +50,27 @@ pub(crate) fn gameover_drawer() {
 }
 
 pub(crate) fn gameover_ticker() {
-    let mut c = boot_ticks() >> 2;
+    let mut c = BOOT_TICKS.with(Cell::get) >> 2;
 
-    set_text_game_byte(3, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_GAME.with(|t| t.borrow_mut()[3] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(7, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_GAME.with(|t| t.borrow_mut()[7] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(11, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_GAME.with(|t| t.borrow_mut()[11] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_game_byte(15, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_GAME.with(|t| t.borrow_mut()[15] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(3, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_OVER.with(|t| t.borrow_mut()[3] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(7, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_OVER.with(|t| t.borrow_mut()[7] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(11, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_OVER.with(|t| t.borrow_mut()[11] = u8::try_from(c & 0x7).expect("3-bit mask"));
     c += 1;
-    set_text_over_byte(15, u8::try_from(c & 0x7).expect("3-bit mask"));
+    TEXT_OVER.with(|t| t.borrow_mut()[15] = u8::try_from(c & 0x7).expect("3-bit mask"));
 
-    set_boot_ticks(boot_ticks() + 1);
+    BOOT_TICKS.with(|c| c.set(c.get() + 1));
 
-    if boot_ticks() < 256 {
+    if BOOT_TICKS.with(Cell::get) < 256 {
         return;
     }
 
@@ -96,7 +83,7 @@ pub(crate) fn gameover_init() {
     // Upstream 783d7c1: draw Willy via Miner_DrawSprite with index 2.
     miner_draw_sprite(96 * WIDTH + 15 * 8, 0x0, 0x7, 2);
     video_draw_sprite(112 * WIDTH + 15 * 8, &PLINTH_SPRITE, 0x0, 0x2);
-    set_boot_ticks(0);
+    BOOT_TICKS.with(|c| c.set(0));
 
     audio_play(false);
     audio_sfx(Sfx::Gameover);

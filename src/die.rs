@@ -16,26 +16,20 @@ thread_local! {
     static DIE_LEVEL: Cell<i32> = const { Cell::new(0) };
 }
 
-fn die_level() -> i32 {
-    DIE_LEVEL.with(Cell::get)
-}
-fn set_die_level(v: i32) {
-    DIE_LEVEL.with(|c| c.set(v));
-}
-
 pub(crate) fn die_drawer() {
     video_pixel_ink_fill(
         0,
         128 * WIDTH,
-        u8::try_from(die_level() >> 1).expect("die level 0..=15"),
+        u8::try_from(DIE_LEVEL.with(Cell::get) >> 1).expect("die level 0..=15"),
     );
 }
 
 pub(crate) fn die_ticker() {
     // Upstream 7c1aed3: check before decrementing so dieLevel never falls
     // below zero (the old post-decrement left it at -1 on the final frame).
-    if die_level() > 0 {
-        set_die_level(die_level() - 1);
+    let level = DIE_LEVEL.with(Cell::get);
+    if level > 0 {
+        DIE_LEVEL.with(|c| c.set(level - 1));
         return;
     }
 
@@ -63,7 +57,7 @@ pub(crate) fn die_ticker() {
 
 pub(crate) fn die_init() {
     GAME_STATE.lives.fetch_sub(1, Ordering::Relaxed);
-    set_die_level(15);
+    DIE_LEVEL.with(|c| c.set(15));
     system_border(0x0);
     video_pixel_paper_fill(0, 128 * WIDTH, 0x0);
     let miner = GAME_STATE
