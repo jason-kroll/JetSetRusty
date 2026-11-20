@@ -1,4 +1,6 @@
-use crate::audio::{MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx};
+use crate::audio::{
+    AUDIO_PAN_X, MusicScore, Sfx, audio_music, audio_music_clock, audio_play, audio_sfx,
+};
 use crate::levels::{level_dir, level_drawer, level_set_border, level_ticker};
 use crate::misc::Timer;
 use crate::rope;
@@ -592,7 +594,7 @@ pub(crate) fn game_got_item(pan_x: i32) {
     }
 
     // audio_pan_x = minerWilly.x (passed in; the caller holds the miner lock)
-    crate::audio::AUDIO_PAN_X.with(|c| c.set(pan_x));
+    AUDIO_PAN_X.with(|c| c.set(pan_x));
 
     audio_sfx(Sfx::Item);
 }
