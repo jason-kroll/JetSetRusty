@@ -23,9 +23,12 @@ use std::cell::{Cell, RefCell};
 use std::sync::atomic::Ordering;
 
 // Conveyor direction (game.h C_NONE/C_LEFT/C_RIGHT).
-const C_NONE: i32 = 0;
-const C_LEFT: i32 = 1;
-const C_RIGHT: i32 = 2;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Conveyor {
+    None,
+    Left,
+    Right,
+}
 
 #[derive(Clone, Copy)]
 struct Jump {
@@ -295,7 +298,7 @@ enum GroundOutcome {
     Below,
     HarmPass,
     Die,
-    Land { convey_dir: i32 },
+    Land { convey_dir: Conveyor },
     Fall,
 }
 
@@ -319,11 +322,11 @@ fn ground_check(tile_base: i32, air: i32, lookup: &dyn Fn(i32) -> TileType) -> G
             return GroundOutcome::Die;
         }
         let convey_dir = if t0 == TileType::ConveyL || t1 == TileType::ConveyL {
-            C_LEFT
+            Conveyor::Left
         } else if t0 == TileType::ConveyR || t1 == TileType::ConveyR {
-            C_RIGHT
+            Conveyor::Right
         } else {
-            C_NONE
+            Conveyor::None
         };
         return GroundOutcome::Land { convey_dir };
     }
@@ -434,11 +437,11 @@ fn move_left_right(miner: &mut Miner) {
     miner.tile += offset;
 }
 
-fn update_dir(convey_dir: i32, miner: &mut Miner) {
+fn update_dir(convey_dir: Conveyor, miner: &mut Miner) {
     let mut dir = 0;
 
     // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
-    if (system_is_key(Key::Left) || system_is_joy_left() || convey_dir == C_LEFT)
+    if (system_is_key(Key::Left) || system_is_joy_left() || convey_dir == Conveyor::Left)
         && GAME_STATE.mode() < GameMode::Running
     {
         dir += 1;
@@ -446,7 +449,7 @@ fn update_dir(convey_dir: i32, miner: &mut Miner) {
 
     if system_is_key(Key::Right)
         || system_is_joy_right()
-        || convey_dir == C_RIGHT
+        || convey_dir == Conveyor::Right
         || GAME_STATE.mode() == GameMode::Running
     {
         dir += 2;
@@ -483,7 +486,7 @@ fn update_dir(convey_dir: i32, miner: &mut Miner) {
 }
 
 fn do_miner_ticker(miner: &mut Miner) {
-    let convey_dir = C_NONE;
+    let convey_dir = Conveyor::None;
 
     if GAME_STATE.miner_willy_rope.load(Ordering::Relaxed) > 0 {
         update_dir(convey_dir, miner);
@@ -864,7 +867,9 @@ mod tests {
         let lookup = lookup_of(&tiles);
         assert_eq!(
             ground_check(100, 11, &lookup),
-            GroundOutcome::Land { convey_dir: C_NONE }
+            GroundOutcome::Land {
+                convey_dir: Conveyor::None
+            }
         );
         // hard fall (air >= 12) onto something solid-ish kills
         assert_eq!(ground_check(100, 12, &lookup), GroundOutcome::Die);
@@ -875,7 +880,7 @@ mod tests {
         assert_eq!(
             ground_check(100, 5, &lookup),
             GroundOutcome::Land {
-                convey_dir: C_RIGHT
+                convey_dir: Conveyor::Right
             }
         );
 
@@ -884,7 +889,9 @@ mod tests {
         let lookup = lookup_of(&tiles);
         assert_eq!(
             ground_check(100, 5, &lookup),
-            GroundOutcome::Land { convey_dir: C_LEFT }
+            GroundOutcome::Land {
+                convey_dir: Conveyor::Left
+            }
         );
     }
 
