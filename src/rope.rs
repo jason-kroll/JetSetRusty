@@ -162,10 +162,6 @@ thread_local! {
     static ROPE_ACTIVE: Cell<bool> = const { Cell::new(false) };
 }
 
-fn set_rope_active(active: bool) {
-    ROPE_ACTIVE.with(|c| c.set(active));
-}
-
 /// Tick the rope if the current room has one (called from the game ticker).
 pub(crate) fn rope_tick() {
     if ROPE_ACTIVE.with(Cell::get) {
@@ -297,7 +293,7 @@ pub(crate) fn rope_init() {
         SWIMMINGPOOL => (16, 7),
         THEBEACH => (14, 5),
         _ => {
-            set_rope_active(false);
+            ROPE_ACTIVE.with(|c| c.set(false));
             return;
         }
     };
@@ -309,5 +305,5 @@ pub(crate) fn rope_init() {
     ROPE.side.store(0, Ordering::Relaxed);
     ROPE.hold.store(false, Ordering::Relaxed);
 
-    set_rope_active(true);
+    ROPE_ACTIVE.with(|c| c.set(true));
 }

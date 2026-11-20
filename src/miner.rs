@@ -118,19 +118,6 @@ thread_local! {
     }) };
 }
 
-fn miner_frame() -> usize {
-    MINER_FRAME.with(Cell::get)
-}
-fn set_miner_frame(v: usize) {
-    MINER_FRAME.with(|c| c.set(v));
-}
-fn miner_seq_index() -> u8 {
-    MINER_SEQ_INDEX.with(Cell::get)
-}
-fn set_miner_seq_index(v: u8) {
-    MINER_SEQ_INDEX.with(|c| c.set(v));
-}
-
 // YALIGN macro from video.h.
 const fn yalign(y: i32) -> i32 {
     4 | ((y & 4) >> 1) | (y & 2) | ((y & 1) << 1)
@@ -138,13 +125,13 @@ const fn yalign(y: i32) -> i32 {
 
 pub(crate) fn miner_set_seq(index: i32, speed: i32) {
     MINER_TIMER.with(|t| timer_set(&mut t.borrow_mut(), 1, speed));
-    set_miner_seq_index(u8::try_from(index).expect("seq index 0..=7"));
+    MINER_SEQ_INDEX.with(|c| c.set(u8::try_from(index).expect("seq index 0..=7")));
 }
 
 pub(crate) fn miner_inc_seq() {
     let next = u8::try_from(MINER_TIMER.with(|t| timer_update(&mut t.borrow_mut())))
         .expect("timer delta fits u8");
-    set_miner_seq_index(miner_seq_index().wrapping_add(next) & 7);
+    MINER_SEQ_INDEX.with(|c| c.set(c.get().wrapping_add(next) & 7));
 }
 
 // Upstream Miner_DrawSprite: minerSequence[index & 7].
@@ -187,13 +174,15 @@ pub(crate) fn miner_save(miner: &Miner) {
         s.jump = miner.jump;
     });
 
-    set_miner_frame(
-        if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM {
-            8
-        } else {
-            0
-        },
-    );
+    MINER_FRAME.with(|c| {
+        c.set(
+            if GAME_STATE.level.load(Ordering::Relaxed) == NIGHTMAREROOM {
+                8
+            } else {
+                0
+            },
+        )
+    });
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -604,7 +593,7 @@ pub(crate) fn miner_drawer(miner: &Miner) {
         }
     }
 
-    let row = miner_frame()
+    let row = MINER_FRAME.with(Cell::get)
         + miner
             .dir
             .sprite_row(usize::try_from(miner.frame).expect("frame 0..=3"));
