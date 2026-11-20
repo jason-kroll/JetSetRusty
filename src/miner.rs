@@ -437,41 +437,34 @@ fn move_left_right(miner: &mut Miner) {
     miner.tile += offset;
 }
 
-fn update_dir(convey_dir: Conveyor, miner: &mut Miner) {
-    let mut dir = 0;
-
-    // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
-    if (system_is_key(Key::Left) || system_is_joy_left() || convey_dir == Conveyor::Left)
-        && GAME_STATE.mode() < GameMode::Running
-    {
-        dir += 1;
+// Pure decision core of update_dir: given the left/right input flags,
+// Willy's facing, and whether he was moving, returns the new
+// (facing, moving). C's UpdateDir accumulates the flags into an int and
+// its if-chain has no arm for both-pressed, so (true, true) leaves both
+// fields unchanged.
+fn decide_movement(left: bool, right: bool, dir: Facing, moving: bool) -> (Facing, bool) {
+    match (left, right) {
+        (false, false) => (dir, false),
+        (true, false) if dir == Facing::Right => (Facing::Left, false),
+        (true, false) => (dir, true),
+        (false, true) if dir == Facing::Left => (Facing::Right, false),
+        (false, true) => (dir, true),
+        (true, true) => (dir, moving),
     }
+}
 
-    if system_is_key(Key::Right)
+fn update_dir(convey_dir: Conveyor, miner: &mut Miner) {
+    // Upstream 69070b9: joystick left/right/fire feed the same inputs as the keys.
+    let left = (system_is_key(Key::Left) || system_is_joy_left() || convey_dir == Conveyor::Left)
+        && GAME_STATE.mode() < GameMode::Running;
+    let right = system_is_key(Key::Right)
         || system_is_joy_right()
         || convey_dir == Conveyor::Right
-        || GAME_STATE.mode() == GameMode::Running
-    {
-        dir += 2;
-    }
+        || GAME_STATE.mode() == GameMode::Running;
 
-    if dir == 0 {
-        miner.moving = false;
-    } else if dir == 1 {
-        if miner.dir == Facing::Right {
-            miner.dir = Facing::Left;
-            miner.moving = false;
-        } else {
-            miner.moving = true;
-        }
-    } else if dir == 2 {
-        if miner.dir == Facing::Left {
-            miner.dir = Facing::Right;
-            miner.moving = false;
-        } else {
-            miner.moving = true;
-        }
-    }
+    let (dir, moving) = decide_movement(left, right, miner.dir, miner.moving);
+    miner.dir = dir;
+    miner.moving = moving;
 
     if (system_is_key(Key::Jump) || system_is_joy_fire()) && GAME_STATE.mode() < GameMode::Running {
         miner.air = 1;
@@ -664,6 +657,22 @@ pub(crate) fn miner_init() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decide_movement_matches_the_c_flag_chain() {
+        use Facing::{Left, Right};
+        // no input: stop, facing unchanged
+        assert_eq!(decide_movement(false, false, Right, true), (Right, false));
+        // left only: turn and stop when facing right, else keep moving
+        assert_eq!(decide_movement(true, false, Right, true), (Left, false));
+        assert_eq!(decide_movement(true, false, Left, false), (Left, true));
+        // right only: mirror image
+        assert_eq!(decide_movement(false, true, Left, true), (Right, false));
+        assert_eq!(decide_movement(false, true, Right, false), (Right, true));
+        // both pressed: C's if-chain has no arm for the combined flag
+        assert_eq!(decide_movement(true, true, Left, true), (Left, true));
+        assert_eq!(decide_movement(true, true, Right, false), (Right, false));
+    }
 
     // Stub for the real level_get_tile_type: all Space, with the same
     // out-of-domain -> Space behaviour (negative tiles included).
